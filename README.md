@@ -79,6 +79,11 @@ Check [root supervisor](https://github.com/vertexclique/bastion/blob/master/exam
 
 [Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover all the use cases in the frame of the crate.
 
+Include bastion to your project with, it requires nightly features to do it's job:
+```toml
+bastion = "*"
+```
+
 In most simple way you can use Bastion like here:
 ```rust
 use bastion::bastion::Bastion;
