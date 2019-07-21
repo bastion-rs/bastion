@@ -1,6 +1,6 @@
 [package]
 name = "bastion"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
