@@ -46,7 +46,7 @@ impl Bastion {
         platform
             .log_builder
             .format(|buf, record| {
-                writeln!(buf, "[HIVE] - [{}] - {}", record.level(), record.args())
+                writeln!(buf, "[BASTION] - [{}] - {}", record.level(), record.args())
             })
             .filter(None, platform.config.log_level)
             .is_test(platform.config.in_test)
