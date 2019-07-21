@@ -4,7 +4,6 @@ mod tests {
     use bastion::bastion::PLATFORM;
     use bastion::config::BastionConfig;
     use bastion::context::BastionContext;
-    use bastion::spawn::RuntimeSpawn;
     use bastion::supervisor::SupervisionStrategy;
     use log::LevelFilter;
     use std::borrow::{Borrow, BorrowMut};

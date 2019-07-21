@@ -4,7 +4,6 @@ use crate::context::BastionContext;
 use crate::messages::PoisonPill;
 use crate::runtime_manager::RuntimeManager;
 use crate::runtime_system::RuntimeSystem;
-use crate::spawn::RuntimeSpawn;
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use crate::tramp::Tramp;
 use crossbeam_channel::unbounded;
@@ -221,10 +220,8 @@ impl Bastion {
     pub fn start() {
         Bastion::runtime_shutdown_callback()
     }
-}
 
-impl RuntimeSpawn for Bastion {
-    fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
+    pub fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
     where
         F: BastionClosure,
         M: Message,

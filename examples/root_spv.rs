@@ -1,7 +1,6 @@
 use bastion::bastion::Bastion;
 use bastion::child::Message;
 use bastion::context::BastionContext;
-use bastion::spawn::RuntimeSpawn;
 
 fn main() {
     Bastion::platform();
