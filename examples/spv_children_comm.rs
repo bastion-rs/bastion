@@ -1,8 +1,8 @@
 use bastion::bastion::Bastion;
+use bastion::child::Message;
 use bastion::context::BastionContext;
 use bastion::supervisor::SupervisionStrategy;
 use std::{fs, thread};
-use bastion::child::Message;
 
 fn main() {
     Bastion::platform();
@@ -18,14 +18,26 @@ fn main() {
                 let mut i = 0;
                 loop {
                     i = i + 1;
-                    let received_msg: String = message.as_any().downcast_ref::<String>().unwrap().to_string();
+                    let received_msg: String = message
+                        .as_any()
+                        .downcast_ref::<String>()
+                        .unwrap()
+                        .to_string();
                     let new_msg = format!("{}{} ", received_msg, i);
-
-                    println!("Cooperatively assembled message :: {}", new_msg);
 
                     let tx = p.bcast_tx.as_ref().unwrap().clone();
 
                     tx.send(Box::new(new_msg));
+
+                    let rx = p.bcast_rx.clone().unwrap();
+                    if let Ok(message) = rx.try_recv() {
+                        let msg: String = message
+                            .as_any()
+                            .downcast_ref::<String>()
+                            .unwrap()
+                            .to_string();
+                        println!("Cooperatively assembled message :: {}", msg);
+                    }
 
                     // Hook to rebind to the system.
                     p.clone().hook();
