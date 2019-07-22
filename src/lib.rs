@@ -15,6 +15,7 @@ pub mod context;
 
 pub mod messages;
 mod runtime_manager;
+pub mod observer;
 pub mod spawn;
 pub mod supervisor;
 pub mod tramp;

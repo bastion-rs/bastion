@@ -87,7 +87,6 @@ bastion = "*"
 In most simple way you can use Bastion like here:
 ```rust
 use bastion::bastion::Bastion;
-use bastion::spawn::RuntimeSpawn;
 use bastion::child::Message;
 
 fn main() {
