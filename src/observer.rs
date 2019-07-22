@@ -1,5 +1,8 @@
 #![cfg(feature = "bastion-observer")]
-use azul::{prelude::*, widgets::{label::Label, button::Button}};
+
+use azul::prelude::*;
+use azul_widgets::label::Label;
+use azul_widgets::button::Button;
 
 struct DataModel {
     counter: usize,

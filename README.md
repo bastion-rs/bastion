@@ -84,6 +84,11 @@ Include bastion to your project with, it requires nightly features to do it's jo
 bastion = "*"
 ```
 
+For observer:
+```
+libffi
+```
+
 In most simple way you can use Bastion like here:
 ```rust
 use bastion::bastion::Bastion;

@@ -58,7 +58,7 @@ relm-derive = { version = "^0.16.0", optional = true }
 
 [features]
 default = ["bastion-observer"]
-bastion-observer = ["gtk, relm, relm-derive"]
+bastion-observer = ["gtk", "relm", "relm-derive"]
 
 
 [profile.bench]
