@@ -2,6 +2,7 @@ use bastion::bastion::Bastion;
 use bastion::child::Message;
 use bastion::context::BastionContext;
 use bastion::receive::Receive;
+use bastion::receive;
 
 fn main() {
     Bastion::platform();
@@ -10,12 +11,14 @@ fn main() {
 
     Bastion::spawn(
         |context: BastionContext, msg: Box<dyn Message>| {
-            // Message can be used here.
-            match Receive::<String>::from(msg) {
-                Receive(Some(o)) => println!("Received {}", o),
-                _ => println!("other message type...")
+            // Message can be selected with receiver here.
+            receive! { msg,
+                String => |e| { println!("string :: {}", e)},
+                i32 => |e| {println!("i32 :: {}", e)},
+                _ => println!("No message as expected")
             }
 
+            // Do some other job in process body
             println!("root supervisor - spawn_at_root - 1");
 
             // Rebind to the system
