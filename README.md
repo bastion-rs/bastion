@@ -86,9 +86,7 @@ bastion = "*"
 
 In most simple way you can use Bastion like here:
 ```rust
-use bastion::bastion::Bastion;
-use bastion::spawn::RuntimeSpawn;
-use bastion::child::Message;
+use bastion::prelude::*;
 
 fn main() {
     Bastion::platform();
@@ -97,7 +95,12 @@ fn main() {
 
     Bastion::spawn(
         |_context, msg: Box<dyn Message>| {
-            let received_msg = msg.as_any().downcast_ref::<String>().unwrap();
+            // Message can be selected with receiver here.
+            receive! { msg,
+                String => |e| { println!("string :: {}", e)},
+                i32 => |e| {println!("i32 :: {}", e)},
+                _ => println!("No message as expected. Default")
+            }
 
             println!("Received message: {:?}", received_msg);
             println!("root supervisor - spawn_at_root - 1");
@@ -145,5 +148,5 @@ Thanks to my dear mom (Günnur Bulut) who is an artist with many things to do bu
 spending her efforts without any hesitation on small things that I requested
 (Like this logo). My shining star.
 
-Also thanks to my friend [Berkan Yavrı](http://github.com/yavrib) who came with the idea of making this.
-Debated over the approaches that I took, spent time on thinking of this project with me.
+Also, thanks to my friend [Berkan Yavri](http://github.com/yavrib) who helped to the idea of making this.
+Debated over the approaches that I took, spent time on thinking about this project with me.

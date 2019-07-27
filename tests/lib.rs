@@ -65,7 +65,7 @@ mod tests {
         Bastion::spawn(
             |p, msg| {
                 println!("root supervisor - panic_roll_starting - 1");
-                fs::read_to_string("kakafoni").unwrap();
+                fs::read_to_string("cacophony").unwrap();
             },
             message,
         );
@@ -84,7 +84,7 @@ mod tests {
             .children(
                 |_p, _msg| {
                     println!("new supervisor - panic_roll_starting - 1");
-                    fs::read_to_string("kakafoni").unwrap();
+                    fs::read_to_string("cacophony").unwrap();
                 },
                 message,
                 1_i32,

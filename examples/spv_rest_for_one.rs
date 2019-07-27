@@ -1,6 +1,4 @@
-use bastion::bastion::Bastion;
-use bastion::context::BastionContext;
-use bastion::supervisor::SupervisionStrategy;
+use bastion::prelude::*;
 use core::time;
 use std::{fs, thread};
 
@@ -18,7 +16,7 @@ fn main() {
         .children(
             |p: BastionContext, _msg| {
                 println!("File below doesn't exist so it will panic.");
-                fs::read_to_string("kakafoni").unwrap();
+                fs::read_to_string("cacophony").unwrap();
 
                 // Hook to rebind to the system.
                 p.hook();

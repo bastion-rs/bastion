@@ -1,8 +1,4 @@
-use bastion::bastion::Bastion;
-use bastion::child::Message;
-use bastion::context::BastionContext;
-use bastion::receive::Receive;
-use bastion::receive;
+use bastion::prelude::*;
 
 fn main() {
     Bastion::platform();
@@ -15,7 +11,7 @@ fn main() {
             receive! { msg,
                 String => |e| { println!("string :: {}", e)},
                 i32 => |e| {println!("i32 :: {}", e)},
-                _ => println!("No message as expected")
+                _ => println!("No message as expected. Default")
             }
 
             // Do some other job in process body

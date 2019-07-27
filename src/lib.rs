@@ -10,18 +10,38 @@
 extern crate log;
 extern crate env_logger;
 
-pub mod receive;
-pub mod child;
-pub mod context;
-
-pub mod messages;
+// The Nether
 mod runtime_manager;
-pub mod spawn;
-pub mod supervisor;
-pub mod tramp;
+mod spawn;
+mod tramp;
+mod runtime_system;
 
+// The Overworld
 pub mod bastion;
 pub mod config;
-pub mod runtime_system;
+
+pub mod child;
+pub mod context;
+pub mod receive;
+pub mod supervisor;
+pub mod messages;
 
 pub mod macros;
+
+pub mod prelude {
+    // Runtime itself
+    pub use crate::bastion::Bastion;
+    pub use crate::config::*;
+
+    // Primitives
+    pub use crate::child::*;
+    pub use crate::context::*;
+    pub use crate::receive::*;
+    pub use crate::supervisor::*;
+    pub use crate::messages::*;
+
+    pub use crate::macros::*;
+
+    // Exported macros
+    pub use crate::receive;
+}
