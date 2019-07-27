@@ -1,14 +1,9 @@
-use bastion::bastion::Bastion;
-use bastion::child::Message;
-use bastion::context::BastionContext;
-use bastion::supervisor::SupervisionStrategy;
-use std::{fs, thread};
+use bastion::prelude::*;
 
 fn main() {
     Bastion::platform();
 
     let message = "HOPS : ".to_string();
-    let message2 = "Some Other Message".to_string();
 
     Bastion::supervisor("background-worker", "new-system")
         .strategy(SupervisionStrategy::OneForAll)

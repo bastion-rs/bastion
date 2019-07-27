@@ -1,7 +1,4 @@
-use bastion::bastion::Bastion;
-use bastion::child::Message;
-use bastion::context::BastionContext;
-use bastion::receive::Receive;
+use bastion::prelude::*;
 
 fn main() {
     Bastion::platform();
