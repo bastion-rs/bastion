@@ -91,19 +91,23 @@ use bastion::prelude::*;
 fn main() {
     Bastion::platform();
 
+    // Define, calculate or prepare messages to be sent to the processes. 
     let message = String::from("Some message to be passed");
 
     Bastion::spawn(
-        |_context, msg: Box<dyn Message>| {
-            // Message can be selected with receiver here.
+        |context, msg: Box<dyn Message>| {
+            // Message can be selected with receiver here. Take action!
             receive! { msg,
-                String => |e| { println!("string :: {}", e)},
-                i32 => |e| {println!("i32 :: {}", e)},
+                String => |e| { println!("Received string :: {}", e)},
+                i32 => |e| {println!("Received i32 :: {}", e)},
                 _ => println!("No message as expected. Default")
             }
 
-            println!("Received message: {:?}", received_msg);
+            // Do some processing in body
             println!("root supervisor - spawn_at_root - 1");
+
+            // Rebind to the system
+            context.hook();
         },
         message,
     );
