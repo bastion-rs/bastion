@@ -4,7 +4,7 @@ workflow "Gitter Release Notification" {
 }
 
 action "Call Gitter" {
-  uses = "swinton/httpie.action@69125d73caa2c6821f6a41a86112777a37adc171"
+  uses = "swinton/httpie.action@master"
   secrets = ["TOKEN"]
-  args = ["--auth-type=token", "--auth='bearer:$TOKEN'", "POST", "https://api.gitter.im/v1/rooms/bastionframework/community/chatMessages", "text=New version of Bastion released! Check out! https://crates.io/crates/bastion"]
+  args = ["--auth-type=jwt", "--auth=$TOKEN", "POST", "https://api.gitter.im/v1/rooms/5d34b303d73408ce4fc69801/chatMessages", "text=New\\ version\\ of\\ Bastion\\ released!\\ Check\\ out!\\ https://crates.io/crates/bastion"]
 }
