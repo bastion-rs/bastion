@@ -111,7 +111,7 @@ impl Bastion {
 
         let restart_needed = match trampoline_spv.strategy {
             SupervisionStrategy::OneForOne => {
-                let killed = trampoline_spv.killed;
+                let killed = trampoline_spv.killed.clone();
                 debug!(
                     "One for One – Children restart triggered for :: {:?}",
                     killed
@@ -163,9 +163,12 @@ impl Bastion {
         };
 
         debug!("Restart Needed for – {:?}", restart_needed);
+//        let spv = trampoline_spv.clone();
 
         Tramp::Traverse(restart_needed).execute(|desc| {
             let message_clone = objekt::clone_box(&*message_box);
+            let spv = trampoline_spv.clone();
+
             match &desc {
                 n if n.is_empty() => Tramp::Complete(n.to_vec()),
                 n => {
@@ -180,6 +183,7 @@ impl Bastion {
                         let f = future::lazy(move || {
                             bt(
                                 BastionContext {
+                                    spv: Some(spv.clone()),
                                     bcast_rx: Some(rx.clone()),
                                     bcast_tx: Some(tx.clone()),
                                 },
@@ -255,9 +259,16 @@ impl Bastion {
         let tx = ret_val.tx.as_ref().unwrap().clone();
         let rx = ret_val.rx.clone().unwrap();
 
+        let ark = PLATFORM.clone();
+        let runtime = ark.lock().unwrap();
+        let mut registry = runtime.registry.lock().unwrap();
+        let mut rootn = registry.root_mut();
+        let root: Supervisor = rootn.value().clone();
+
         let f = future::lazy(move || {
             bt(
                 BastionContext {
+                    spv: Some(root),
                     bcast_rx: Some(rx.clone()),
                     bcast_tx: Some(tx.clone()),
                 },

@@ -107,10 +107,12 @@ impl Supervisor {
                 if_killed.id = format!("{}::{}", if_killed.id, child_id);
 
                 let mut this_spv = self.clone();
+                let context_spv = self.clone();
 
                 let f = future::lazy(move || {
                     nt(
                         BastionContext {
+                            spv: Some(context_spv),
                             bcast_rx: Some(rx.clone()),
                             bcast_tx: Some(tx.clone()),
                         },
