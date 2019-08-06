@@ -2,7 +2,8 @@ use crate::runtime_manager::FaultRecovery;
 use crate::supervisor::Supervisor;
 use ego_tree::Tree;
 use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use tokio::runtime::{Builder, Runtime};
 
 pub struct RuntimeSystem {
@@ -15,7 +16,7 @@ impl RuntimeSystem {
         let runtime: Runtime = Builder::new()
             .panic_handler(|err| RuntimeSystem::panic_dispatcher(err))
             .before_stop(|| {
-                debug!("Executing thread stopping");
+                debug!("System is stopping...");
             })
             .build()
             .unwrap(); // Builder panic isn't a problem since we haven't started.
