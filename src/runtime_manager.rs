@@ -1,6 +1,7 @@
 use std::any::Any;
 
 pub(crate) trait RuntimeManager {
+    fn unstable_shutdown();
     fn runtime_shutdown_callback();
 }
 

@@ -15,6 +15,7 @@ impl<T> Message for T
 where
     T: Shell + Debug,
 {
+    #[inline(always)]
     fn as_any(&self) -> &dyn Any {
         self
     }

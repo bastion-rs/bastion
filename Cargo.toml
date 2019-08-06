@@ -53,9 +53,6 @@ parking_lot = "0.9"
 #futures-preview = "=0.3.0-alpha.16"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 
-[dev-dependencies]
-reqwest = "0.9.19"
-
 [profile.bench]
 panic = "unwind"
 opt-level = 3
