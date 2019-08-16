@@ -72,7 +72,7 @@
 
 Bastion is a Fault-tolerant Runtime for Rust applications.
 It detect panics during runs of your code and serves a runtime to
-prevent abrubt exits. Also, it enables you to continue serving in case of
+prevent abrupt exits. Also, it enables you to continue serving in case of
 a failure. You can select your own recovery scenario, scale your workers and
 define whole application on top of it. 
 
