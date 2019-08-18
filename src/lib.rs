@@ -1,10 +1,5 @@
 // Because if we can't trust, we can't make.
 #![forbid(unsafe_code)]
-#![feature(const_fn)]
-#![feature(unboxed_closures)]
-#![feature(fn_traits)]
-#![feature(clamp)]
-#![feature(panic_info_message)]
 
 #[macro_use]
 extern crate log;

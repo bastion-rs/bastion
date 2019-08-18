@@ -12,13 +12,13 @@ use env_logger::Builder;
 use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
-use signal_hook::{iterator::Signals, SIGINT};
 use std::panic::AssertUnwindSafe;
 use std::sync::{Arc, Mutex};
 use tokio::prelude::future::FutureResult;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
+use std::sync::atomic::{Ordering, AtomicBool};
 
 lazy_static! {
     // Platform which contains runtime system.
@@ -302,16 +302,14 @@ const CLOSE_OVER: Result<Async<()>, Never> = Ok(Async::Ready(()));
 impl RuntimeManager for Bastion {
     fn runtime_shutdown_callback() {
         let mut entered = tokio_executor::enter().expect("main thread_local runtime lock");
-        let signals = Signals::new(&[SIGINT]).unwrap();
-
+        let running = Arc::new(AtomicBool::new(true));
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            r.store(false, Ordering::SeqCst);
+        });
         entered
             .block_on(poll_fn(|| {
-                for sig in signals.forever() {
-                    match sig {
-                        signal_hook::SIGINT => break,
-                        _ => unreachable!(),
-                    }
-                }
+                while running.load(Ordering::SeqCst) {}
                 CLOSE_OVER
             }))
             .expect("cannot shutdown");
