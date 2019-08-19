@@ -104,7 +104,6 @@ impl Bastion {
     pub(crate) fn fault_recovery(given: Supervisor, message_box: Box<dyn Message>) {
         // Clone supervisor for trampoline bouncing
         let trampoline_spv = given.clone();
-        println!("SPV RESTART: {:?}", trampoline_spv.clone().ctx.descendants);
 
         // Push supervisor for next trampoline
         let fark = FAULTED.clone();
