@@ -50,8 +50,7 @@ impl Default for SupervisionStrategy {
 #[derive(Default, Clone, Debug)]
 pub struct Supervisor {
     pub urn: SupervisorURN,
-    pub(crate) descendants: Vec<BastionChildren>,
-    pub(crate) killed: Vec<BastionChildren>,
+    pub(crate) ctx: BastionContext,
     pub(crate) strategy: SupervisionStrategy,
 }
 
@@ -80,20 +79,23 @@ impl Supervisor {
 
         let children = BastionChildren {
             id: Uuid::new_v4().to_string(),
-            tx: Some(p),
-            rx: Some(c),
+            tx: Some(p.clone()),
+            rx: Some(c.clone()),
             redundancy: scale,
             msg: objekt::clone_box(&*msg_box),
             thunk: objekt::clone_box(&*bt),
         };
 
-        self.descendants.push(children);
+        self.ctx.descendants.push(children);
+        self.ctx.bcast_rx = Some(c.clone());
+        self.ctx.bcast_tx = Some(p.clone());
+        self.ctx.parent = Some(Box::new(self.clone()));
 
         self
     }
 
-    pub fn launch(self) {
-        for descendant in &self.descendants {
+    pub fn launch(mut self) {
+        for descendant in &self.ctx.descendants {
             let descendant = descendant.clone();
 
             for child_id in 0..descendant.redundancy {
@@ -112,7 +114,9 @@ impl Supervisor {
                 let f = future::lazy(move || {
                     nt(
                         BastionContext {
-                            spv: Some(context_spv),
+                            parent: Some(Box::new(context_spv.clone())),
+                            descendants: context_spv.ctx.descendants,
+                            killed: context_spv.ctx.killed,
                             bcast_rx: Some(rx.clone()),
                             bcast_tx: Some(tx.clone()),
                         },
@@ -124,7 +128,7 @@ impl Supervisor {
                 let k = AssertUnwindSafe(f)
                     .catch_unwind()
                     .then(|result| -> FutureResult<(), ()> {
-                        this_spv.killed.push(if_killed);
+                        this_spv.ctx.killed.push(if_killed);
 
                         // Already re-entrant code
                         if let Err(err) = result {
@@ -140,5 +144,7 @@ impl Supervisor {
                 shared_runtime.spawn(k);
             }
         }
+
+        self.ctx.parent = Some(Box::new(self));
     }
 }

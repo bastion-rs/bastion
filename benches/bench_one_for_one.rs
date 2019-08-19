@@ -14,10 +14,9 @@ mod tests {
     use std::borrow::{Borrow, BorrowMut};
     use std::sync::Once;
     use std::{fs, thread, time};
+    use test::Bencher;
     use tokio::prelude::*;
     use tokio::runtime::{Builder, Runtime};
-    use test::Bencher;
-
 
     static INIT: Once = Once::new();
 
@@ -55,5 +54,4 @@ mod tests {
 
         b.iter(|| closure());
     }
-
 }

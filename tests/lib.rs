@@ -182,29 +182,29 @@ mod tests {
         awaiting(500);
     }
 
-//    #[test]
-//    fn spawn_over_context() {
-//        init();
-//
-//        let panicked_message = "Panicked Children Message".to_string();
-//        let stable_message = "Stable Children Message".to_string();
-//
-//        Bastion::supervisor("background-worker", "new-system")
-//            .strategy(SupervisionStrategy::OneForAll)
-//            .children(
-//                |p: BastionContext, msg| {
-//                    println!("new supervisor - panic_process - 1");
-//
-//                    let children_scale = 1;
-//                    p.spawn(|bc, msg| {
-//                        println!("Spawned from context");
-//                    }, msg, children_scale);
-//                },
-//                panicked_message,
-//                1_i32,
-//            )
-//            .launch();
-//
-//        awaiting(500);
-//    }
+    //    #[test]
+    //    fn spawn_over_context() {
+    //        init();
+    //
+    //        let panicked_message = "Panicked Children Message".to_string();
+    //        let stable_message = "Stable Children Message".to_string();
+    //
+    //        Bastion::supervisor("background-worker", "new-system")
+    //            .strategy(SupervisionStrategy::OneForAll)
+    //            .children(
+    //                |p: BastionContext, msg| {
+    //                    println!("new supervisor - panic_process - 1");
+    //
+    //                    let children_scale = 1;
+    //                    p.spawn(|bc, msg| {
+    //                        println!("Spawned from context");
+    //                    }, msg, children_scale);
+    //                },
+    //                panicked_message,
+    //                1_i32,
+    //            )
+    //            .launch();
+    //
+    //        awaiting(500);
+    //    }
 }
