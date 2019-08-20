@@ -20,6 +20,7 @@ use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 use std::mem;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
     // Platform which contains runtime system.
