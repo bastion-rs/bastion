@@ -12,15 +12,16 @@ use env_logger::Builder;
 use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
-use std::panic::AssertUnwindSafe;
-use std::sync::Arc;
+use objekt::Clone;
 use parking_lot::Mutex;
+use std::mem;
+use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::prelude::future::FutureResult;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
-use std::mem;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
     // Platform which contains runtime system.
@@ -113,7 +114,7 @@ impl Bastion {
 
         let restart_needed = match trampoline_spv.strategy {
             SupervisionStrategy::OneForOne => {
-                let killed = trampoline_spv.killed.clone();
+                let killed = trampoline_spv.ctx.killed.clone();
                 debug!(
                     "One for One – Children restart triggered for :: {:?}",
                     killed
@@ -121,7 +122,7 @@ impl Bastion {
                 killed
             }
             SupervisionStrategy::OneForAll => {
-                trampoline_spv.descendants.iter().for_each(|children| {
+                trampoline_spv.ctx.descendants.iter().for_each(|children| {
                     let tx = children.tx.as_ref().unwrap().clone();
                     debug!(
                         "One for All – Restart triggered for all :: {:?}",
@@ -131,7 +132,7 @@ impl Bastion {
                 });
 
                 // Don't make avalanche effect, send messages and wait for all to come back.
-                let killed_processes = trampoline_spv.killed.clone();
+                let killed_processes = trampoline_spv.ctx.killed.clone();
                 debug!(
                     "One for All – Restart triggered for killed :: {:?}",
                     killed_processes
@@ -140,8 +141,8 @@ impl Bastion {
             }
             SupervisionStrategy::RestForOne => {
                 // Find the rest in the group of killed one.
-                trampoline_spv.killed.iter().for_each(|killed| {
-                    let mut rest_to_kill = trampoline_spv.descendants.clone();
+                trampoline_spv.ctx.killed.iter().for_each(|killed| {
+                    let mut rest_to_kill = trampoline_spv.ctx.descendants.clone();
                     rest_to_kill.retain(|i| !killed.id.contains(&i.id));
 
                     rest_to_kill.iter().for_each(|children| {
@@ -154,7 +155,7 @@ impl Bastion {
                     });
                 });
 
-                let killed_processes = trampoline_spv.killed.clone();
+                let killed_processes = trampoline_spv.ctx.killed.clone();
                 debug!(
                     "Rest for One – Restart triggered for killed :: {:?}",
                     killed_processes
@@ -184,7 +185,9 @@ impl Bastion {
                         let f = future::lazy(move || {
                             bt(
                                 BastionContext {
-                                    spv: Some(spv.clone()),
+                                    parent: Some(Box::new(spv.clone())),
+                                    descendants: spv.ctx.descendants,
+                                    killed: spv.ctx.killed,
                                     bcast_rx: Some(rx.clone()),
                                     bcast_tx: Some(tx.clone()),
                                 },
@@ -223,8 +226,6 @@ impl Bastion {
     }
 
     pub fn start() {
-        println!("ARKARKKARK");
-        println!("ARC {:?}", Arc::strong_count(&PLATFORM));
         Bastion::runtime_shutdown_callback()
     }
 
@@ -261,7 +262,7 @@ impl Bastion {
             let mut rootn = registry.root_mut();
             let root: &mut Supervisor = rootn.value();
 
-            root.descendants.push(child);
+            root.ctx.descendants.push(child);
 
             root_spv = root.clone();
         }
@@ -272,7 +273,9 @@ impl Bastion {
         let f = future::lazy(move || {
             bt(
                 BastionContext {
-                    spv: Some(root_spv),
+                    parent: Some(Box::new(root_spv.clone())),
+                    descendants: root_spv.ctx.descendants,
+                    killed: root_spv.ctx.killed,
                     bcast_rx: Some(rx.clone()),
                     bcast_tx: Some(tx.clone()),
                 },
@@ -290,7 +293,7 @@ impl Bastion {
                 let mut rootn = registry.root_mut();
                 let mut root = rootn.value().clone();
 
-                root.killed.push(if_killed);
+                root.ctx.killed.push(if_killed);
 
                 // Enable re-entrant code
                 drop(registry);
@@ -333,7 +336,8 @@ impl RuntimeManager for Bastion {
         let r = running.clone();
         let _ = ctrlc::set_handler(move || {
             r.store(false, Ordering::SeqCst);
-        }).unwrap();
+        })
+        .unwrap();
         entered
             .block_on(poll_fn(|| {
                 while running.load(Ordering::SeqCst) {}

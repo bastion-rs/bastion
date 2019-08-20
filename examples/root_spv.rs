@@ -10,7 +10,7 @@ fn main() {
             // Message can be used here.
             match Receive::<String>::from(msg) {
                 Receive(Some(o)) => println!("Received {}", o),
-                _ => println!("other message type...")
+                _ => println!("other message type..."),
             }
 
             println!("root supervisor - spawn_at_root - 1");
