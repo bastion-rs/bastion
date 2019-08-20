@@ -1,6 +1,7 @@
 language: rust
 rust:
   - nightly
+  - stable
 matrix:
   fast_finish: true
 script:
