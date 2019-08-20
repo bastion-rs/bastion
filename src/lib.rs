@@ -1,9 +1,3 @@
-#![feature(const_fn)]
-#![feature(unboxed_closures)]
-#![feature(fn_traits)]
-#![feature(clamp)]
-#![feature(panic_info_message)]
-
 #[macro_use]
 extern crate log;
 extern crate env_logger;
