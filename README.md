@@ -95,9 +95,9 @@ Check [root supervisor](https://github.com/vertexclique/bastion/blob/master/exam
 
 [Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover all the use cases in the frame of the crate.
 
-Include bastion to your project with, it requires nightly features to do it's job:
+Include bastion to your project with:
 ```toml
-bastion = "*"
+bastion = "0.1"
 ```
 
 In most simple way you can use Bastion like here:
