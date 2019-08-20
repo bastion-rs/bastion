@@ -35,10 +35,18 @@
 </td>
 </tr>
 <tr>
-  <td>Build Status</td>
+  <td>Build Status (Linux / MacOS)</td>
   <td>
     <a href="https://travis-ci.org/vertexclique/bastion">
     <img src="https://travis-ci.org/vertexclique/bastion.svg?branch=master" alt="travis build status" />
+    </a>
+  </td>
+</tr>
+<tr>
+  <td>Build Status (Windows)</td>
+  <td>
+    <a href="https://ci.appveyor.com/project/vertexclique/bastion/branch/master">
+    <img src="https://ci.appveyor.com/api/projects/status/ksfqpeuq9gxspnb6/branch/master?svg=true" alt="appveyor build status" />
     </a>
   </td>
 </tr>
