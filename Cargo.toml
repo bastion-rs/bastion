@@ -9,7 +9,7 @@ homepage = "https://github.com/vertexclique/bastion"
 repository = "https://github.com/vertexclique/bastion"
 documentation = "https://docs.rs/bastion"
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0/MIT"
 edition = "2018"
 exclude = [
 	".github/*",
