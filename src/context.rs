@@ -24,6 +24,8 @@ pub struct BastionContext {
 }
 
 impl BastionContext {
+    /// Prevents thundering-herd effect while system message broadcasts are
+    /// over the expected amount.
     fn dispatch_clock() -> Limiter {
         ratelimit::Builder::new()
             .capacity(1)
@@ -32,6 +34,26 @@ impl BastionContext {
             .build()
     }
 
+    ///
+    /// One-time use hook for spawned processes.
+    /// You need to have this function for processes which
+    /// you want to end gracefully by the system after
+    /// successful completion.
+    ///
+    /// # Examples
+    /// ```
+    /// use bastion::prelude::*;
+    ///
+    /// fn main() {
+    ///     Bastion::platform();
+    ///     Bastion::spawn(|context, _msg: Box<dyn Message>| {
+    ///         println!("root supervisor - spawn_at_root - 1");
+    ///
+    ///         // Rebind to the system
+    ///         context.hook();
+    ///     }, "A Message".into());
+    /// }
+    /// ```
     pub fn hook(self) {
         let mut dc = BastionContext::dispatch_clock();
         dc.wait();

@@ -24,20 +24,43 @@ use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 lazy_static! {
-    // Platform which contains runtime system.
+    /// Platform which contains runtime system.
     pub static ref PLATFORM: Arc<Mutex<RuntimeSystem>> = Arc::new(Mutex::new(RuntimeSystem::start()));
 
-    // Fault induced supervisors queue
+    /// Fault induced supervisors queue
     pub static ref FAULTED: Arc<Mutex<Vec<Supervisor>>> =
         Arc::new(Mutex::new(Vec::<Supervisor>::new()));
 }
 
+/// Runtime which holds the runtime configuration and implements methods for
+/// configuring root-level supervisors, fault recovery, and set up/tear down methods.
 pub struct Bastion {
+    /// Initial runtime configuration
     pub config: BastionConfig,
     log_builder: Builder,
 }
 
 impl Bastion {
+    /// Instantiates the platform from the given configuration.
+    ///
+    /// # Arguments
+    /// * `config` - Platform configuration given for the instantiation
+    ///
+    /// # Example
+    /// ```
+    /// use bastion::prelude::*;
+    /// use log::LevelFilter;
+    ///
+    /// // Instantiate the platform
+    /// fn main() {
+    ///    let config = BastionConfig {
+    ///         log_level: LevelFilter::Debug,
+    ///         in_test: false,
+    ///    };
+    ///    Bastion::platform_from_config(config);
+    /// }
+    /// ```
+    ///
     pub fn platform_from_config(config: BastionConfig) -> Self {
         let log_builder = Builder::from_default_env();
 
@@ -58,6 +81,18 @@ impl Bastion {
         platform
     }
 
+    /// Instantiates the platform with default configuration.
+    ///
+    /// # Example
+    /// ```
+    /// use bastion::prelude::*;
+    ///
+    /// // Instantiate the platform
+    /// fn main() {
+    ///    Bastion::platform();
+    /// }
+    /// ```
+    ///
     pub fn platform() -> Self {
         let default_config = BastionConfig {
             log_level: LevelFilter::Info,
@@ -67,6 +102,7 @@ impl Bastion {
         Bastion::platform_from_config(default_config)
     }
 
+    ///
     pub fn supervisor(name: &'static str, system: &'static str) -> Supervisor {
         let sp = Supervisor::default().props(name.into(), system.into());
         Bastion::traverse(sp)
