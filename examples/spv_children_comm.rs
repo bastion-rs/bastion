@@ -22,7 +22,7 @@ fn main() {
 
                     let tx = p.bcast_tx.as_ref().unwrap().clone();
 
-                    tx.send(Box::new(new_msg));
+                    let _ = tx.send(Box::new(new_msg));
 
                     let rx = p.bcast_rx.clone().unwrap();
                     if let Ok(message) = rx.try_recv() {

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/vertexclique/bastion/blob/master/img/bastion.png"><br>
+  <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
 -----------------
@@ -29,7 +29,7 @@
 <tr>
   <td>License</td>
   <td>
-    <a href="https://github.com/vertexclique/bastion/blob/master/LICENSE">
+    <a href="https://github.com/bastion-rs/bastion/blob/master/LICENSE">
     <img alt="Crates.io" src="https://img.shields.io/crates/l/bastion.svg?style=popout-square">
     </a>
 </td>
@@ -37,15 +37,15 @@
 <tr>
   <td>Build Status (Linux / MacOS)</td>
   <td>
-    <a href="https://travis-ci.org/vertexclique/bastion">
-    <img src="https://travis-ci.org/vertexclique/bastion.svg?branch=master" alt="travis build status" />
+    <a href="https://travis-ci.org/bastion-rs/bastion">
+    <img src="https://travis-ci.org/bastion-rs/bastion.svg?branch=master" alt="travis build status" />
     </a>
   </td>
 </tr>
 <tr>
   <td>Build Status (Windows)</td>
   <td>
-    <a href="https://ci.appveyor.com/project/vertexclique/bastion/branch/master">
+    <a href="https://ci.appveyor.com/project/bastion-rs/bastion/branch/master">
     <img src="https://ci.appveyor.com/api/projects/status/ksfqpeuq9gxspnb6/branch/master?svg=true" alt="appveyor build status" />
     </a>
   </td>
@@ -91,9 +91,27 @@ define whole application on top of it.
 Bastion comes with a default one-for-one strategy root supervisor.
 You can use this to launch automatically supervised tasks.
 
-Check [root supervisor](https://github.com/vertexclique/bastion/blob/master/examples/root_spv.rs) example in examples.
+## Why Bastion?
+If one of the questions below answered with yes, then Bastion is just for you:
+* Do I need fault-tolerancy in my project?
+* Do I hate to implement weird Actor traits?
+* I shouldn't need a webserver to run an actor system, right?
+* Do I want to make my existing code unbreakable?
+* Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
 
-[Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover all the use cases in the frame of the crate.
+## Features
+* Message-based communication makes this project a lean mesh of actor system.
+    * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
+* Runtime fault-tolerance makes it a good candidate for small scale distributed system code.
+    * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
+* Supervision makes it easy to manage lifecycles.
+    * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
+All up to you. And it should be up to you.
+
+### Get Started
+Check basic [root supervisor](https://github.com/bastion-rs/bastion/blob/master/examples/root_spv.rs) example in examples.
+
+[Examples](https://github.com/bastion-rs/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
 
 Include bastion to your project with:
 ```toml
@@ -111,7 +129,7 @@ fn main() {
     let message = String::from("Some message to be passed");
 
     Bastion::spawn(
-        |context, msg: Box<dyn Message>| {
+        |context: BastionContext, msg: Box<dyn Message>| {
             // Message can be selected with receiver here. Take action!
             receive! { msg,
                 String => |e| { println!("Received string :: {}", e)},
@@ -132,18 +150,26 @@ fn main() {
 }
 ```
 
-## Structure of the Runtime
+## Architecture of the Runtime
 
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
 
-You can see overall architecture of the framework here:
-![](img/bastion-arch.png) 
+You can see architecture of the framework [HERE](https://github.com/bastion-rs/bastion/blob/master/img/bastion-arch.png). 
 
+## Projects using Bastion
+If you are using Bastion open a PR so we can include it in our showcase.
+* [SkyNet](https://github.com/vertexclique/skynet) (a Discord bot which is resending deleted messages)
+    * Skynet is running since 0.1.3 release of Bastion on the cloud and haven't killed yet.
 
 ## License
 
-License is [MIT](https://github.com/vertexclique/bastion/blob/master/LICENSE)
+Licensed under either of
+
+ * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
 
 ## Documentation
 
@@ -156,7 +182,7 @@ Please head to our [Gitter](https://gitter.im/bastionframework/community) or use
 We use [Gitter](https://gitter.im/bastionframework/community) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
 More interaction and more ideas are better!
 
-## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/vertexclique/bastion/badges/users.svg)](https://www.codetriage.com/vertexclique/bastion)
+## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 

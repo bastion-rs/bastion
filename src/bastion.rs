@@ -1,3 +1,11 @@
+//!
+//!
+//! Main module for the runtime.
+//!
+//! Runtime management code and root supervision happens here.
+//! Root supervisor's spawn method is here to have a frictionless start for newcomers.
+//!
+
 use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::config::BastionConfig;
 use crate::context::BastionContext;
@@ -12,7 +20,7 @@ use env_logger::Builder;
 use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
-use objekt::Clone;
+
 use parking_lot::Mutex;
 use std::mem;
 use std::panic::AssertUnwindSafe;
@@ -24,20 +32,44 @@ use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 lazy_static! {
-    // Platform which contains runtime system.
+    /// Platform which contains runtime system.
     pub static ref PLATFORM: Arc<Mutex<RuntimeSystem>> = Arc::new(Mutex::new(RuntimeSystem::start()));
 
-    // Fault induced supervisors queue
+    /// Fault induced supervisors queue
     pub static ref FAULTED: Arc<Mutex<Vec<Supervisor>>> =
         Arc::new(Mutex::new(Vec::<Supervisor>::new()));
 }
 
+/// Runtime which holds the runtime configuration and implements methods for
+/// configuring root-level supervisors, fault recovery, and set up/tear down methods.
 pub struct Bastion {
+    /// Initial runtime configuration
     pub config: BastionConfig,
     log_builder: Builder,
 }
 
 impl Bastion {
+    /// Instantiates the platform from the given configuration.
+    ///
+    /// # Arguments
+    /// * `config` - Platform configuration given for the instantiation
+    ///
+    /// # Example
+    /// ```
+    ///# use bastion::prelude::*;
+    ///# use log::LevelFilter;
+    ///#
+    ///# // Instantiate the platform
+    ///# fn main() {
+    ///let config = BastionConfig {
+    ///    log_level: LevelFilter::Debug,
+    ///    in_test: false,
+    ///};
+    ///
+    ///Bastion::platform_from_config(config);
+    ///# }
+    /// ```
+    ///
     pub fn platform_from_config(config: BastionConfig) -> Self {
         let log_builder = Builder::from_default_env();
 
@@ -58,6 +90,18 @@ impl Bastion {
         platform
     }
 
+    /// Instantiates the platform with default configuration.
+    ///
+    /// # Example
+    /// ```
+    /// use bastion::prelude::*;
+    ///
+    /// // Instantiate the platform
+    /// fn main() {
+    ///    Bastion::platform();
+    /// }
+    /// ```
+    ///
     pub fn platform() -> Self {
         let default_config = BastionConfig {
             log_level: LevelFilter::Info,
@@ -67,6 +111,35 @@ impl Bastion {
         Bastion::platform_from_config(default_config)
     }
 
+    ///
+    /// Supervisor builder for the runtime.
+    ///
+    /// # Arguments
+    /// * `name` - Supervisor name
+    /// * `system` - Supervisor system's name for grouping
+    /// multiple supervisor's to the same system.
+    ///
+    /// After building the supervisor it will be placed under the supervision tree.
+    ///
+    /// When runtime is started, supervision tree will be traversed back again
+    /// to start supervisors and their children.
+    ///
+    /// Supervisors work exactly like self-contained actor systems.
+    /// One addition over ordinary actor system is that,
+    /// these supervisors also can communicate with each other with async messages.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    ///# use bastion::prelude::*;
+    ///# use std::{fs, thread};
+    ///#
+    ///# fn main() {
+    ///#  Bastion::platform();
+    ///Bastion::supervisor("background-worker", "fetcher-system")
+    ///    .strategy(SupervisionStrategy::OneForAll);
+    ///# }
+    /// ```
     pub fn supervisor(name: &'static str, system: &'static str) -> Supervisor {
         let sp = Supervisor::default().props(name.into(), system.into());
         Bastion::traverse(sp)
@@ -225,14 +298,68 @@ impl Bastion {
         });
     }
 
+    ///
+    /// Launcher method to start the runtime system. Runs the system until OS signals a shutdown.
+    ///
+    /// Platform catches all possible panics caused inside process loops and restart them.
+    ///
+    /// Note that segmentation faults are not recoverable
+    /// and they can happen in any programming language.
     pub fn start() {
         Bastion::runtime_shutdown_callback()
     }
 
+    ///
+    /// Forces runtime system to shutdown by forcing the system shutdown.
+    ///
+    /// Instead of using this it is better to use signals to kill/stop the process.
+    ///
+    /// **NOTE**: This piece is very unstable and not recommended on production.
     pub fn force_shutdown() {
         Bastion::unstable_shutdown()
     }
 
+    ///
+    /// Root supervisor's process spawner.
+    ///
+    /// If you don't need a supervision strategy other than [SupervisionStrategy::OneForOne], or
+    /// if your system doesn't need complex supervision. This is for you.
+    ///
+    /// This method helps you to get going with the basics.
+    ///
+    /// # Arguments
+    /// * `thunk` - User code which will be executed inside the process.
+    /// * `msg` - Initial message which will be passed to the thunk.
+    ///
+    /// # Example
+    /// ```rust
+    ///# use bastion::prelude::*;
+    ///#
+    ///# fn main() {
+    ///#    Bastion::platform();
+    ///#
+    ///#    let message = String::from("Some message to be passed");
+    ///#
+    /// Bastion::spawn(
+    ///     |context: BastionContext, msg: Box<dyn Message>| {
+    ///         // Message can be used here.
+    ///         receive! { msg,
+    ///             String => |o| { println!("Received {}", o) },
+    ///             _ => println!("other message type...")
+    ///         }
+    ///
+    ///         println!("root supervisor - spawn_at_root - 1");
+    ///
+    ///         // Rebind to the system
+    ///         context.hook();
+    ///     },
+    ///     message,
+    /// );
+    ///
+    /// // Comment out to start the system, so runtime can initialize.
+    /// // Bastion::start()
+    ///# }
+    /// ```
     pub fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
     where
         F: BastionClosure,
@@ -254,7 +381,7 @@ impl Bastion {
         let if_killed = child.clone();
         let ret_val = child.clone();
 
-        let mut root_spv;
+        let root_spv;
         {
             let ark = PLATFORM.clone();
             let runtime = ark.lock();

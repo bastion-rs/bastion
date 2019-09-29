@@ -5,8 +5,8 @@ description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
 categories = []
-homepage = "https://github.com/vertexclique/bastion"
-repository = "https://github.com/vertexclique/bastion"
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
 documentation = "https://docs.rs/bastion"
 readme = "README.md"
 license = "Apache-2.0/MIT"
@@ -28,7 +28,7 @@ exclude = [
 ]
 
 [badges]
-travis-ci = { repository = "vertexclique/bastion", branch = "master" }
+travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

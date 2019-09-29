@@ -1,16 +1,16 @@
 #[cfg(test)]
 mod tests {
     use bastion::bastion::Bastion;
-    use bastion::bastion::PLATFORM;
+    
     use bastion::config::BastionConfig;
     use bastion::context::BastionContext;
     use bastion::supervisor::SupervisionStrategy;
     use log::LevelFilter;
-    use std::borrow::{Borrow, BorrowMut};
+    
     use std::sync::Once;
     use std::{fs, thread, time};
-    use tokio::prelude::*;
-    use tokio::runtime::{Builder, Runtime};
+    
+    
 
     static INIT: Once = Once::new();
 
@@ -20,7 +20,7 @@ mod tests {
                 log_level: LevelFilter::Debug,
                 in_test: true,
             };
-            let bastion = Bastion::platform_from_config(config);
+            let _bastion = Bastion::platform_from_config(config);
         });
     }
 
@@ -37,14 +37,14 @@ mod tests {
         let message2 = "Kokojombo Two".to_string();
 
         Bastion::spawn(
-            |p, msg| {
+            |_p, _msg| {
                 println!("root supervisor - spawn_at_root - 1");
             },
             message,
         );
 
         Bastion::spawn(
-            |p, msg| {
+            |_p, _msg| {
                 println!("root supervisor - spawn_at_root - 2");
             },
             message2,
@@ -60,10 +60,10 @@ mod tests {
         init();
 
         let message = "Kokojombo".to_string();
-        let message2 = "Kokojombo Two".to_string();
+        let _message2 = "Kokojombo Two".to_string();
 
         Bastion::spawn(
-            |p, msg| {
+            |_p, _msg| {
                 println!("root supervisor - panic_roll_starting - 1");
                 fs::read_to_string("cacophony").unwrap();
             },
@@ -118,7 +118,7 @@ mod tests {
         Bastion::supervisor("background-worker", "new-system")
             .strategy(SupervisionStrategy::RestForOne)
             .children(
-                |p, msg| {
+                |_p, _msg| {
                     println!("new supervisor - panic_process - 1");
                     fs::read_to_string("THERE_IS_NO_FILE_NAMED_THIS_AMIRITE").unwrap();
                 },
@@ -126,7 +126,7 @@ mod tests {
                 1_i32,
             )
             .children(
-                |p: BastionContext, msg| {
+                |p: BastionContext, _msg| {
                     println!("new supervisor - stable_process - 1");
                     // No early exit
                     let mut i = 0;
@@ -155,7 +155,7 @@ mod tests {
         Bastion::supervisor("background-worker", "new-system")
             .strategy(SupervisionStrategy::OneForAll)
             .children(
-                |p, msg| {
+                |_p, _msg| {
                     println!("new supervisor - panic_process - 1");
                     fs::read_to_string("THERE_IS_NO_FILE_NAMED_THIS_AMIRITE").unwrap();
                 },
@@ -163,7 +163,7 @@ mod tests {
                 1_i32,
             )
             .children(
-                |p: BastionContext, msg| {
+                |p: BastionContext, _msg| {
                     println!("new supervisor - stable_process - 1");
                     // No early exit
                     let mut i = 0;
@@ -181,30 +181,4 @@ mod tests {
 
         awaiting(500);
     }
-
-    //    #[test]
-    //    fn spawn_over_context() {
-    //        init();
-    //
-    //        let panicked_message = "Panicked Children Message".to_string();
-    //        let stable_message = "Stable Children Message".to_string();
-    //
-    //        Bastion::supervisor("background-worker", "new-system")
-    //            .strategy(SupervisionStrategy::OneForAll)
-    //            .children(
-    //                |p: BastionContext, msg| {
-    //                    println!("new supervisor - panic_process - 1");
-    //
-    //                    let children_scale = 1;
-    //                    p.spawn(|bc, msg| {
-    //                        println!("Spawned from context");
-    //                    }, msg, children_scale);
-    //                },
-    //                panicked_message,
-    //                1_i32,
-    //            )
-    //            .launch();
-    //
-    //        awaiting(500);
-    //    }
 }
