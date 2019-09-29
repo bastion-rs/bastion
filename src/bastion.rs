@@ -111,6 +111,34 @@ impl Bastion {
     }
 
     ///
+    /// Supervisor builder for the runtime.
+    ///
+    /// # Arguments
+    /// * `name` - Supervisor name
+    /// * `system` - Supervisor system's name for grouping
+    /// multiple supervisor's to the same system.
+    ///
+    /// After building the supervisor it will be placed under the supervision tree.
+    ///
+    /// When runtime is started, supervision tree will be traversed back again
+    /// to start supervisors and their children.
+    ///
+    /// Supervisors work exactly like self-contained actor systems.
+    /// One addition over ordinary actor system is that,
+    /// these supervisors also can communicate with each other with async messages.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    ///# use bastion::prelude::*;
+    ///# use std::{fs, thread};
+    ///#
+    ///# fn main() {
+    ///#  Bastion::platform();
+    ///Bastion::supervisor("background-worker", "fetcher-system")
+    ///    .strategy(SupervisionStrategy::OneForAll);
+    ///# }
+    /// ```
     pub fn supervisor(name: &'static str, system: &'static str) -> Supervisor {
         let sp = Supervisor::default().props(name.into(), system.into());
         Bastion::traverse(sp)
