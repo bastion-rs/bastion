@@ -145,6 +145,10 @@ impl Supervisor {
             }
         }
 
-        self.ctx.parent = Some(Box::new(self));
+
+        // FIXME: There might be discrepancy between passed self and referenced self.
+        // Fix this with either passing reference without Box (lifetimes sigh!)
+        // Or use channels to send back to the supervision tree.
+        self.ctx.parent = Some(Box::new(self.clone()));
     }
 }

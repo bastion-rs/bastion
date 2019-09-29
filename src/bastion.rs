@@ -1,3 +1,11 @@
+//!
+//!
+//! Main module for the runtime.
+//!
+//! Runtime management code and root supervision happens here.
+//! Root supervisor's spawn method is here to have a frictionless start for newcomers.
+//!
+
 use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::config::BastionConfig;
 use crate::context::BastionContext;
@@ -261,13 +269,27 @@ impl Bastion {
         });
     }
 
+    ///
+    /// Launcher method to start the runtime system. Runs the system until OS signals a shutdown.
+    ///
+    /// Platform catches all possible panics caused inside process loops and restart them.
+    ///
+    /// Note that segmentation faults are not recoverable
+    /// and they can happen in any programming language.
     pub fn start() {
         Bastion::runtime_shutdown_callback()
     }
 
+    ///
+    /// Forces runtime system to shutdown by forcing the system shutdown.
+    ///
+    /// Instead of using this it is better to use signals to kill/stop the process.
+    ///
+    /// **NOTE**: This piece is very unstable and not recommended on production.
     pub fn force_shutdown() {
         Bastion::unstable_shutdown()
     }
+
 
     pub fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
     where

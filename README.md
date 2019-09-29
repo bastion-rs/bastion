@@ -91,9 +91,10 @@ define whole application on top of it.
 Bastion comes with a default one-for-one strategy root supervisor.
 You can use this to launch automatically supervised tasks.
 
-Check [root supervisor](https://github.com/vertexclique/bastion/blob/master/examples/root_spv.rs) example in examples.
+### Get Started
+Check basic [root supervisor](https://github.com/vertexclique/bastion/blob/master/examples/root_spv.rs) example in examples.
 
-[Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover all the use cases in the frame of the crate.
+[Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
 
 Include bastion to your project with:
 ```toml
