@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/vertexclique/bastion/blob/master/img/bastion.png"><br>
+  <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
 -----------------
@@ -29,7 +29,7 @@
 <tr>
   <td>License</td>
   <td>
-    <a href="https://github.com/vertexclique/bastion/blob/master/LICENSE">
+    <a href="https://github.com/bastion-rs/bastion/blob/master/LICENSE">
     <img alt="Crates.io" src="https://img.shields.io/crates/l/bastion.svg?style=popout-square">
     </a>
 </td>
@@ -37,15 +37,15 @@
 <tr>
   <td>Build Status (Linux / MacOS)</td>
   <td>
-    <a href="https://travis-ci.org/vertexclique/bastion">
-    <img src="https://travis-ci.org/vertexclique/bastion.svg?branch=master" alt="travis build status" />
+    <a href="https://travis-ci.org/bastion-rs/bastion">
+    <img src="https://travis-ci.org/bastion-rs/bastion.svg?branch=master" alt="travis build status" />
     </a>
   </td>
 </tr>
 <tr>
   <td>Build Status (Windows)</td>
   <td>
-    <a href="https://ci.appveyor.com/project/vertexclique/bastion/branch/master">
+    <a href="https://ci.appveyor.com/project/bastion-rs/bastion/branch/master">
     <img src="https://ci.appveyor.com/api/projects/status/ksfqpeuq9gxspnb6/branch/master?svg=true" alt="appveyor build status" />
     </a>
   </td>
@@ -109,9 +109,9 @@ If one of the questions below answered with yes, then Bastion is just for you:
 All up to you. And it should be up to you.
 
 ### Get Started
-Check basic [root supervisor](https://github.com/vertexclique/bastion/blob/master/examples/root_spv.rs) example in examples.
+Check basic [root supervisor](https://github.com/bastion-rs/bastion/blob/master/examples/root_spv.rs) example in examples.
 
-[Examples](https://github.com/vertexclique/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
+[Examples](https://github.com/bastion-rs/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
 
 Include bastion to your project with:
 ```toml
@@ -150,14 +150,17 @@ fn main() {
 }
 ```
 
-## Structure of the Runtime
+## Architecture of the Runtime
 
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
 
-You can see overall architecture of the framework here:
-![](img/bastion-arch.png) 
+You can see architecture of the framework [HERE](https://github.com/bastion-rs/bastion/blob/master/img/bastion-arch.png). 
 
+## Projects using Bastion
+If you are using Bastion open a PR so we can include it in our showcase.
+* [SkyNet](https://github.com/vertexclique/skynet) (a Discord bot which is resending deleted messages)
+    * Skynet is running since 0.1.3 release of Bastion on the cloud and haven't killed yet.
 
 ## License
 
@@ -179,7 +182,7 @@ Please head to our [Gitter](https://gitter.im/bastionframework/community) or use
 We use [Gitter](https://gitter.im/bastionframework/community) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
 More interaction and more ideas are better!
 
-## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/vertexclique/bastion/badges/users.svg)](https://www.codetriage.com/vertexclique/bastion)
+## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 

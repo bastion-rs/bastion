@@ -1,5 +1,5 @@
 //! # Bastion: Fault-tolerant Runtime for Rust applications
-//! [![Bastion](https://raw.githubusercontent.com/vertexclique/bastion/master/img/bastion.png)](https://github.com/vertexclique/bastion)
+//! [![Bastion](https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion.png)](https://github.com/bastion-rs/bastion)
 //!
 //!
 //!
@@ -26,7 +26,7 @@
 //! All up to you. And it should be up to you.
 //!
 
-#![doc(html_logo_url = "https://raw.githubusercontent.com/vertexclique/bastion/master/img/bastion-logo.png")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png")]
 
 #[macro_use]
 extern crate log;
