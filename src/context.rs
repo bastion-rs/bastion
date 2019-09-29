@@ -8,7 +8,6 @@
 
 use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::messages::PoisonPill;
-use crate::spawn::RuntimeSpawn;
 use crate::supervisor::Supervisor;
 use crossbeam_channel::{Receiver, Sender};
 use ratelimit::Limiter;
