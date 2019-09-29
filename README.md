@@ -91,6 +91,23 @@ define whole application on top of it.
 Bastion comes with a default one-for-one strategy root supervisor.
 You can use this to launch automatically supervised tasks.
 
+## Why Bastion?
+If one of the questions below answered with yes, then Bastion is just for you:
+* Do I need fault-tolerancy in my project?
+* Do I hate to implement weird Actor traits?
+* I shouldn't need a webserver to run an actor system, right?
+* Do I want to make my existing code unbreakable?
+* Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
+
+## Features
+* Message-based communication makes this project a lean mesh of actor system.
+    * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
+* Runtime fault-tolerance makes it a good candidate for small scale distributed system code.
+    * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
+* Supervision makes it easy to manage lifecycles.
+    * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
+All up to you. And it should be up to you.
+
 ### Get Started
 Check basic [root supervisor](https://github.com/vertexclique/bastion/blob/master/examples/root_spv.rs) example in examples.
 
@@ -144,7 +161,12 @@ You can see overall architecture of the framework here:
 
 ## License
 
-License is [MIT](https://github.com/vertexclique/bastion/blob/master/LICENSE)
+Licensed under either of
+
+ * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
 
 ## Documentation
 

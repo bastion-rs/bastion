@@ -18,11 +18,11 @@
 //!
 //! ## Features
 //! * Message-based communication makes this project a lean mesh of actor system.
-//!     * without web servers, weird shenanigans, forced trait implementations, and totally static dispatch.
+//!     * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
 //! * Runtime fault-tolerance makes it a good candidate for small scale distributed system code.
 //!     * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
 //! * Supervision makes it easy to manage lifecycles.
-//!     * Kill your application in certain condition or restart you subprocesses whenever a condition triggers.
+//!     * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
 //! All up to you. And it should be up to you.
 //!
 
