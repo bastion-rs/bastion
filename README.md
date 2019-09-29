@@ -115,7 +115,7 @@ Check basic [root supervisor](https://github.com/bastion-rs/bastion/blob/master/
 
 Include bastion to your project with:
 ```toml
-bastion = "0.1"
+bastion = "0.2"
 ```
 
 In most simple way you can use Bastion like here:
