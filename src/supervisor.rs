@@ -7,6 +7,9 @@ use tokio::prelude::future::FutureResult;
 use tokio::prelude::*;
 use uuid::Uuid;
 
+///
+/// Identifier struct for Supervisor
+/// System uses this to assemble resource name for children and supervisors.
 #[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
 pub struct SupervisorURN {
     pub sys: String,  // Supervisor System Name
@@ -34,10 +37,33 @@ impl Ord for SupervisorURN {
     }
 }
 
+///
+/// Possible supervision strategies to pass to the supervisor.
+///
+/// **OneForOne**: If a child gets killed only that child will be restarted under the supervisor.
+///
+/// **OneForAll**: If a child gets killed all children at the same level under the supervision will be restarted.
+///
+/// **RestForOne**: If a child gets killed restart the rest of the children at the same level under the supervisor.
 #[derive(Clone, Debug)]
 pub enum SupervisionStrategy {
+    /// If a child gets killed only that child will be restarted under the supervisor.
+    ///
+    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
+    ///
+    /// ![](https://learnyousomeerlang.com/static/img/restart-one-for-one.png)
     OneForOne,
+    /// If a child gets killed all children at the same level under the supervision will be restarted.
+    ///
+    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
+    ///
+    /// ![](https://learnyousomeerlang.com/static/img/restart-one-for-all.png)
     OneForAll,
+    /// If a child gets killed restart the rest of the children at the same level under the supervisor.
+    ///
+    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
+    ///
+    /// ![](https://learnyousomeerlang.com/static/img/restart-rest-for-one.png)
     RestForOne,
 }
 

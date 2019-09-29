@@ -1,3 +1,11 @@
+//!
+//! Context is generic structure to share resource between supervisor, children and the system.
+//!
+//! This enable us to work easily with system messages, api exposure and communication between processes.
+//!
+//! BastionContext is the main primitive to share this data anything related to internal
+//! communication is here.
+
 use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::messages::PoisonPill;
 use crate::spawn::RuntimeSpawn;
@@ -16,6 +24,7 @@ use uuid::Uuid;
 
 ///
 /// Context definition for any lightweight process.
+///
 /// You can use context to:
 /// * spawn children
 /// * communicate with other spawned processes
@@ -94,6 +103,9 @@ impl BastionContext {
     /// You need to have this function for processes which
     /// you want to reutilize the process later and handover the control
     /// back again to the system after successful completion.
+    ///
+    /// This function is a must to use for receiving signals from supervision and
+    /// applying supervision strategies.
     ///
     /// # Examples
     /// ```

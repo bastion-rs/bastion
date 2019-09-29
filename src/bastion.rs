@@ -290,7 +290,43 @@ impl Bastion {
         Bastion::unstable_shutdown()
     }
 
-
+    ///
+    /// Root supervisor's process spawner.
+    ///
+    /// If you don't need a supervision strategy other than [SupervisionStrategy::OneForOne], or
+    /// if your system doesn't need complex supervision. This is for you.
+    ///
+    /// This method helps you to get going with the basics.
+    ///
+    /// # Example
+    /// ```rust
+    ///    use bastion::prelude::*;
+    ///
+    ///    fn main() {
+    ///        Bastion::platform();
+    ///
+    ///        let message = String::from("Some message to be passed");
+    ///
+    ///        Bastion::spawn(
+    ///            |context: BastionContext, msg: Box<dyn Message>| {
+    ///                // Message can be used here.
+    ///                receive! { msg,
+    ///                    String => |o| { println!("Received {}", o) },
+    ///                    _ => println!("other message type...")
+    ///                }
+    ///
+    ///                println!("root supervisor - spawn_at_root - 1");
+    ///
+    ///                // Rebind to the system
+    ///                context.hook();
+    ///            },
+    ///            message,
+    ///        );
+    ///
+    ///        // Comment out to start the system, so runtime can initialize.
+    ///        // Bastion::start()
+    ///    }
+    /// ```
     pub fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
     where
         F: BastionClosure,
