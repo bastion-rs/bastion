@@ -14,12 +14,31 @@ use tokio::prelude::future::FutureResult;
 use tokio::prelude::*;
 use uuid::Uuid;
 
+///
+/// Context definition for any lightweight process.
+/// You can use context to:
+/// * spawn children
+/// * communicate with other spawned processes
+/// * communicate with parent
+///
+/// It is used internally for:
+/// * communication with the system
+/// * tracking the supervision
 #[derive(Clone, Default)]
 pub struct BastionContext {
+    /// Reference to the parent, it is [None] for root supervisor.
     pub parent: Option<Box<Supervisor>>,
+
+    /// Container holding children.
     pub descendants: Vec<BastionChildren>,
-    pub killed: Vec<BastionChildren>,
+
+    /// Container holding killed children.
+    pub(crate) killed: Vec<BastionChildren>,
+
+    /// Send endpoint for system broadcast.
     pub bcast_tx: Option<Sender<Box<dyn Message>>>,
+
+    /// Receive endpoint for system broadcast.
     pub bcast_rx: Option<Receiver<Box<dyn Message>>>,
 }
 
@@ -46,12 +65,15 @@ impl BastionContext {
     ///
     /// fn main() {
     ///     Bastion::platform();
-    ///     Bastion::spawn(|context, _msg: Box<dyn Message>| {
+    ///     Bastion::spawn(|context: BastionContext, _msg: Box<dyn Message>| {
     ///         println!("root supervisor - spawn_at_root - 1");
     ///
     ///         // Rebind to the system
     ///         context.hook();
-    ///     }, "A Message".into());
+    ///     }, String::from("A Message"));
+    ///
+    ///     // Comment out to start the system, so runtime can initialize.
+    ///     // Bastion::start()
     /// }
     /// ```
     pub fn hook(self) {
@@ -67,6 +89,29 @@ impl BastionContext {
         }
     }
 
+    ///
+    /// Forever running hook for spawned processes.
+    /// You need to have this function for processes which
+    /// you want to reutilize the process later and handover the control
+    /// back again to the system after successful completion.
+    ///
+    /// # Examples
+    /// ```
+    /// use bastion::prelude::*;
+    ///
+    /// fn main() {
+    ///     Bastion::platform();
+    ///     Bastion::spawn(|context: BastionContext, _msg: Box<dyn Message>| {
+    ///         println!("root supervisor - spawn_at_root - 1");
+    ///
+    ///         // Rebind to the system
+    ///         context.blocking_hook();
+    ///     }, String::from("A Message"));
+    ///
+    ///     // Comment out to start the system, so runtime can initialize.
+    ///     // Bastion::start()
+    /// }
+    /// ```
     pub fn blocking_hook(self) {
         let mut dc = BastionContext::dispatch_clock();
         dc.wait();
@@ -82,6 +127,50 @@ impl BastionContext {
         }
     }
 
+    ///
+    /// Context level spawn function for child generation from the parent context.
+    /// This context carries global broadcast for the system.
+    /// Every context directly tied to the parent process.
+    /// If you listen broadcast tx/rx pair in the parent process,
+    /// you can communicate with the children with specific message type.
+    ///
+    /// Bastion doesn't enforce you to use specific Message type or force you to implement traits.
+    /// Dynamic dispatch is made over heap fat ptrs and that means all message objects can be
+    /// passed around with heap constructs.
+    ///
+    /// # Examples
+    /// ```
+    /// use bastion::prelude::*;
+    ///
+    /// fn main() {
+    ///     Bastion::platform();
+    ///     Bastion::spawn(|context: BastionContext, _msg: Box<dyn Message>| {
+    ///         println!("root supervisor - spawn_at_root - 1");
+    ///
+    ///         // Let's spawn a child from here
+    ///         context.clone().spawn(
+    ///               |sub_p: BastionContext, sub_msg: Box<dyn Message>| {
+    ///                      receive! { sub_msg,
+    ///                         i32 => |msg| { println!("An integer message: {}", msg)},
+    ///                         _ => println!("Message not known")
+    ///                      }
+    ///
+    ///                      /// Use blocking hook to commence restart of children
+    ///                      /// that has finished their jobs.
+    ///                      sub_p.blocking_hook();
+    ///               },
+    ///               9999_i32, // Initial message which is passed down to child.
+    ///               1, // How many children with this body will be spawned
+    ///         );
+    ///
+    ///         // Rebind to the system
+    ///         context.blocking_hook();
+    ///     }, String::from("A Message"));
+    ///
+    ///     // Comment out to start the system, so runtime can initialize.
+    ///     // Bastion::start()
+    /// }
+    /// ```
     pub fn spawn<F, M>(mut self, thunk: F, msg: M, scale: i32) -> Self
     where
         F: BastionClosure,
