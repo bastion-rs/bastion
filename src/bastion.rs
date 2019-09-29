@@ -20,7 +20,7 @@ use env_logger::Builder;
 use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
-use objekt::Clone;
+
 use parking_lot::Mutex;
 use std::mem;
 use std::panic::AssertUnwindSafe;
@@ -376,7 +376,7 @@ impl Bastion {
         let if_killed = child.clone();
         let ret_val = child.clone();
 
-        let mut root_spv;
+        let root_spv;
         {
             let ark = PLATFORM.clone();
             let runtime = ark.lock();

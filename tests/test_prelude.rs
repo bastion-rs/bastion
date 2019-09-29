@@ -3,11 +3,11 @@ mod tests {
     use bastion::prelude::*;
 
     use log::LevelFilter;
-    use std::borrow::{Borrow, BorrowMut};
+    
     use std::sync::Once;
-    use std::{fs, thread, time};
-    use tokio::prelude::*;
-    use tokio::runtime::{Builder, Runtime};
+    use std::{thread, time};
+    
+    
 
     static INIT: Once = Once::new();
 
@@ -17,7 +17,7 @@ mod tests {
                 log_level: LevelFilter::Debug,
                 in_test: true,
             };
-            let bastion = Bastion::platform_from_config(config);
+            let _bastion = Bastion::platform_from_config(config);
         });
     }
 
@@ -34,14 +34,14 @@ mod tests {
         let message2 = "Kokojombo Two".to_string();
 
         Bastion::spawn(
-            |p, msg| {
+            |_p, _msg| {
                 println!("root supervisor - spawn_at_root - 1");
             },
             message,
         );
 
         Bastion::spawn(
-            |p, msg| {
+            |_p, _msg| {
                 println!("root supervisor - spawn_at_root - 2");
             },
             message2,

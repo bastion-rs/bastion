@@ -10,7 +10,7 @@ use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::messages::PoisonPill;
 use crate::spawn::RuntimeSpawn;
 use crate::supervisor::Supervisor;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use ratelimit::Limiter;
 use std::any::Any;
 use std::fmt;
@@ -183,7 +183,7 @@ impl BastionContext {
     ///     // Bastion::start()
     /// }
     /// ```
-    pub fn spawn<F, M>(mut self, thunk: F, msg: M, scale: i32) -> Self
+    pub fn spawn<F, M>(self, thunk: F, msg: M, scale: i32) -> Self
     where
         F: BastionClosure,
         M: Message,

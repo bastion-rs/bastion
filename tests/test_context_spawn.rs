@@ -2,7 +2,7 @@
 mod tests {
     use bastion::prelude::*;
     use log::LevelFilter;
-    use std::{fs, thread, time};
+    use std::{thread, time};
 
     fn awaiting(time: u64) {
         let ten_millis = time::Duration::from_millis(time);

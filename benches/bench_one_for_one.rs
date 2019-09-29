@@ -6,17 +6,17 @@ extern crate test;
 mod tests {
     use super::*;
     use bastion::bastion::Bastion;
-    use bastion::bastion::PLATFORM;
+    
     use bastion::config::BastionConfig;
-    use bastion::context::BastionContext;
-    use bastion::supervisor::SupervisionStrategy;
+    
+    
     use log::LevelFilter;
-    use std::borrow::{Borrow, BorrowMut};
+    
     use std::sync::Once;
-    use std::{fs, thread, time};
+    use std::{thread, time};
     use test::Bencher;
-    use tokio::prelude::*;
-    use tokio::runtime::{Builder, Runtime};
+    
+    
 
     static INIT: Once = Once::new();
 
@@ -26,7 +26,7 @@ mod tests {
                 log_level: LevelFilter::Debug,
                 in_test: true,
             };
-            let bastion = Bastion::platform_from_config(config);
+            let _bastion = Bastion::platform_from_config(config);
         });
     }
 
@@ -43,7 +43,7 @@ mod tests {
             let message = "Supervision Message".to_string();
 
             Bastion::spawn(
-                |p, msg| {
+                |_p, _msg| {
                     panic!("root supervisor - spawn_at_root - 1");
                 },
                 message,
