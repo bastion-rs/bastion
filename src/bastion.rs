@@ -56,17 +56,18 @@ impl Bastion {
     ///
     /// # Example
     /// ```
-    /// use bastion::prelude::*;
-    /// use log::LevelFilter;
+    ///# use bastion::prelude::*;
+    ///# use log::LevelFilter;
+    ///#
+    ///# // Instantiate the platform
+    ///# fn main() {
+    ///let config = BastionConfig {
+    ///    log_level: LevelFilter::Debug,
+    ///    in_test: false,
+    ///};
     ///
-    /// // Instantiate the platform
-    /// fn main() {
-    ///    let config = BastionConfig {
-    ///         log_level: LevelFilter::Debug,
-    ///         in_test: false,
-    ///    };
-    ///    Bastion::platform_from_config(config);
-    /// }
+    ///Bastion::platform_from_config(config);
+    ///# }
     /// ```
     ///
     pub fn platform_from_config(config: BastionConfig) -> Self {
@@ -326,34 +327,38 @@ impl Bastion {
     ///
     /// This method helps you to get going with the basics.
     ///
+    /// # Arguments
+    /// * `thunk` - User code which will be executed inside the process.
+    /// * `msg` - Initial message which will be passed to the thunk.
+    ///
     /// # Example
     /// ```rust
-    ///    use bastion::prelude::*;
+    ///# use bastion::prelude::*;
+    ///#
+    ///# fn main() {
+    ///#    Bastion::platform();
+    ///#
+    ///#    let message = String::from("Some message to be passed");
+    ///#
+    /// Bastion::spawn(
+    ///     |context: BastionContext, msg: Box<dyn Message>| {
+    ///         // Message can be used here.
+    ///         receive! { msg,
+    ///             String => |o| { println!("Received {}", o) },
+    ///             _ => println!("other message type...")
+    ///         }
     ///
-    ///    fn main() {
-    ///        Bastion::platform();
+    ///         println!("root supervisor - spawn_at_root - 1");
     ///
-    ///        let message = String::from("Some message to be passed");
+    ///         // Rebind to the system
+    ///         context.hook();
+    ///     },
+    ///     message,
+    /// );
     ///
-    ///        Bastion::spawn(
-    ///            |context: BastionContext, msg: Box<dyn Message>| {
-    ///                // Message can be used here.
-    ///                receive! { msg,
-    ///                    String => |o| { println!("Received {}", o) },
-    ///                    _ => println!("other message type...")
-    ///                }
-    ///
-    ///                println!("root supervisor - spawn_at_root - 1");
-    ///
-    ///                // Rebind to the system
-    ///                context.hook();
-    ///            },
-    ///            message,
-    ///        );
-    ///
-    ///        // Comment out to start the system, so runtime can initialize.
-    ///        // Bastion::start()
-    ///    }
+    /// // Comment out to start the system, so runtime can initialize.
+    /// // Bastion::start()
+    ///# }
     /// ```
     pub fn spawn<F, M>(thunk: F, msg: M) -> BastionChildren
     where

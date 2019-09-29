@@ -112,7 +112,7 @@ fn main() {
     let message = String::from("Some message to be passed");
 
     Bastion::spawn(
-        |context, msg: Box<dyn Message>| {
+        |context: BastionContext, msg: Box<dyn Message>| {
             // Message can be selected with receiver here. Take action!
             receive! { msg,
                 String => |e| { println!("Received string :: {}", e)},

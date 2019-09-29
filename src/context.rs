@@ -150,6 +150,11 @@ impl BastionContext {
     /// Dynamic dispatch is made over heap fat ptrs and that means all message objects can be
     /// passed around with heap constructs.
     ///
+    /// # Arguments
+    /// * `thunk` - User code which will be executed inside the process.
+    /// * `msg` - Initial message which will be passed to the thunk.
+    /// * `scale` - How many children will be spawn with given `thunk` and `msg` as process body.
+    ///
     /// # Examples
     /// ```
     /// use bastion::prelude::*;

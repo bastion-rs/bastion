@@ -1,3 +1,6 @@
+//!
+//! Supervisor related code. Including their management, creation, and destruction.
+
 use crate::child::{BastionChildren, BastionClosure, Message};
 use crate::context::BastionContext;
 use crossbeam_channel::unbounded;
@@ -12,9 +15,12 @@ use uuid::Uuid;
 /// System uses this to assemble resource name for children and supervisors.
 #[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
 pub struct SupervisorURN {
-    pub sys: String,  // Supervisor System Name
-    pub name: String, // Supervisor Name
-    pub res: String,  // Supervisor Identifier
+    /// Supervisor's system name
+    pub sys: String,
+    /// Supervisor's name
+    pub name: String,
+    /// Supervisor's unique identifier
+    pub res: String,
 }
 
 impl Default for SupervisorURN {
@@ -73,14 +79,39 @@ impl Default for SupervisionStrategy {
     }
 }
 
+///
+/// Supervisor definition to keep track of supervisor information. e.g:
+/// * context
+/// * children
+/// * strategy
+/// * supervisor identifier
 #[derive(Default, Clone, Debug)]
 pub struct Supervisor {
+    /// Supervisor's URN scheme
     pub urn: SupervisorURN,
+    /// Supervisor's context
     pub(crate) ctx: BastionContext,
+    /// Supervisor's strategy
     pub(crate) strategy: SupervisionStrategy,
 }
 
+///
+/// Builder pattern for supervisors.
 impl Supervisor {
+    ///
+    /// Assign properties of the supervisor
+    ///
+    /// # Arguments
+    /// * `name` - name of the supervisor
+    /// * `system` - system name for the supervisor. Can be used for grouping dependent supervisors.
+    ///
+    /// # Example
+    /// ```rust
+    ///# use bastion::prelude::*;
+    ///# let name = "supervisor-name";
+    ///# let system = "system-name";
+    /// Supervisor::default().props(name.into(), system.into());
+    /// ```
     pub fn props(mut self, name: String, system: String) -> Self {
         let mut urn = SupervisorURN::default();
         urn.name = name;
@@ -89,11 +120,69 @@ impl Supervisor {
         self
     }
 
+    ///
+    /// Assigns strategy for this supervisor
+    ///
+    /// # Arguments
+    /// * `strategy` - An [SupervisionStrategy] for supervisor to define how to operate on failures.
+    ///
+    /// # Example
+    /// ```rust
+    ///# use bastion::prelude::*;
+    ///# let name = "supervisor-name";
+    ///# let system = "system-name";
+    /// Supervisor::default().props(name.into(), system.into())
+    ///    .strategy(SupervisionStrategy::RestForOne);
+    /// ```
     pub fn strategy(mut self, strategy: SupervisionStrategy) -> Self {
         self.strategy = strategy;
         self
     }
 
+    ///
+    /// [Supervisor] level spawn function for child generation from the parent context.
+    /// This context carries global broadcast for the system.
+    /// Every context directly tied to the parent process.
+    /// If you listen broadcast tx/rx pair in the parent process,
+    /// you can communicate with the children with specific message type.
+    ///
+    /// Bastion doesn't enforce you to use specific Message type or force you to implement traits.
+    /// Dynamic dispatch is made over heap fat ptrs and that means all message objects can be
+    /// passed around with heap constructs.
+    ///
+    /// # Arguments
+    /// * `thunk` - User code which will be executed inside the process.
+    /// * `msg` - Initial message which will be passed to the thunk.
+    /// * `scale` - How many children will be spawn with given `thunk` and `msg` as process body.
+    ///
+    /// # Examples
+    /// ```
+    ///# use bastion::prelude::*;
+    ///# use std::{fs, thread};
+    ///#
+    ///# fn main() {
+    ///#     Bastion::platform();
+    ///#
+    ///#     let message = "Supervision Message".to_string();
+    ///#
+    ///#     /// Name of the supervisor, and system of the new supervisor
+    ///#     /// By default if you don't specify Supervisors use "One for One".
+    ///#     /// Let's look at "One for One".
+    ///Bastion::supervisor("file-reader", "remote-fs")
+    ///    .strategy(SupervisionStrategy::OneForOne)
+    ///    .children(
+    ///        |p: BastionContext, _msg| {
+    ///            println!("File below doesn't exist so it will panic.");
+    ///            fs::read_to_string("cacophony").unwrap();
+    ///
+    ///            /// Hook to rebind to the system.
+    ///            p.hook();
+    ///        },
+    ///        message, // Message for all redundant children
+    ///        1_i32,   // Redundancy level
+    ///    );
+    ///# }
+    /// ```
     pub fn children<F, M>(mut self, thunk: F, msg: M, scale: i32) -> Self
     where
         F: BastionClosure,
@@ -120,6 +209,42 @@ impl Supervisor {
         self
     }
 
+    ///
+    /// Launch completes the builder pattern.
+    /// It is the main finalizer that sets necessary arguments prepares
+    /// channels and registers supervisor to the runtime.
+    ///
+    /// Runtime can't be notified without calling [launch](struct.Supervisor.html#method.launch).
+    ///
+    /// # Examples
+    /// ```
+    ///# use bastion::prelude::*;
+    ///# use std::{fs, thread};
+    ///#
+    ///# fn main() {
+    ///#     Bastion::platform();
+    ///#
+    ///#     let message = "Supervision Message".to_string();
+    ///#
+    ///#     /// Name of the supervisor, and system of the new supervisor
+    ///#     /// By default if you don't specify Supervisors use "One for One".
+    ///#     /// Let's look at "One for One".
+    ///Bastion::supervisor("file-reader", "remote-fs")
+    ///    .strategy(SupervisionStrategy::OneForOne)
+    ///    .children(
+    ///        |p: BastionContext, _msg| {
+    ///            println!("File below doesn't exist so it will panic.");
+    ///            fs::read_to_string("cacophony").unwrap();
+    ///
+    ///            /// Hook to rebind to the system.
+    ///            p.hook();
+    ///        },
+    ///        message, // Message for all redundant children
+    ///        1_i32,   // Redundancy level
+    ///    )
+    ///    .launch(); // Launch finalizes supervisor build and registers to definition.
+    ///# }
+    /// ```
     pub fn launch(mut self) {
         for descendant in &self.ctx.descendants {
             let descendant = descendant.clone();
