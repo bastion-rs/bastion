@@ -59,10 +59,10 @@
   </td>
 </tr>
 <tr>
-	<td>Gitter</td>
+	<td>Discord</td>
 	<td>
-		<a href="https://gitter.im/bastionframework/community">
-		<img src="https://badges.gitter.im/Join%20Chat.svg" />
+		<a href="https://discord.gg/DqRqtRT">
+		<img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
 		</a>
 	</td>
 </tr>
