@@ -176,10 +176,10 @@ at your option.
 Official documentation is hosted on [docs.rs](https://docs.rs/bastion).
 
 ## Getting Help
-Please head to our [Gitter](https://gitter.im/bastionframework/community) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastionframework)
+Please head to our [Discord](https://discord.gg/DqRqtRT) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastionframework)
 
 ## Discussion and Development
-We use [Gitter](https://gitter.im/bastionframework/community) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
+We use [Discord](https://discord.gg/DqRqtRT) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
 More interaction and more ideas are better!
 
 ## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
