@@ -3,11 +3,9 @@ mod tests {
     use bastion::prelude::*;
 
     use log::LevelFilter;
-    
+
     use std::sync::Once;
     use std::{thread, time};
-    
-    
 
     static INIT: Once = Once::new();
 

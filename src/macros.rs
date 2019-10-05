@@ -2,7 +2,6 @@
 //! Macros to use in processes and defining the architecture of runtime.
 //!
 
-
 ///
 /// Matches incoming messages to the process.
 /// Always have a `default` case to execute if unknown message arrives to the process.

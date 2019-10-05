@@ -45,8 +45,8 @@
 <tr>
   <td>Build Status (Windows)</td>
   <td>
-    <a href="https://ci.appveyor.com/project/bastion-rs/bastion/branch/master">
-    <img src="https://ci.appveyor.com/api/projects/status/ksfqpeuq9gxspnb6/branch/master?svg=true" alt="appveyor build status" />
+    <a href="https://ci.appveyor.com/project/vertexclique/bastion-4i0dk">
+    <img src="https://ci.appveyor.com/api/projects/status/pbug23islg80de33/branch/master?svg=true" alt="appveyor build status" />
     </a>
   </td>
 </tr>

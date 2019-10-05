@@ -1,16 +1,14 @@
 #[cfg(test)]
 mod tests {
     use bastion::bastion::Bastion;
-    
+
     use bastion::config::BastionConfig;
     use bastion::context::BastionContext;
     use bastion::supervisor::SupervisionStrategy;
     use log::LevelFilter;
-    
+
     use std::sync::Once;
     use std::{fs, thread, time};
-    
-    
 
     static INIT: Once = Once::new();
 

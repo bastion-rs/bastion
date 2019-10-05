@@ -3,7 +3,7 @@ use bastion::prelude::*;
 fn main() {
     Bastion::platform();
 
-    let message = String::from("Some message to be passed");
+    let message = String::from("a message");
 
     Bastion::spawn(
         |context: BastionContext, msg: Box<dyn Message>| {
@@ -13,7 +13,7 @@ fn main() {
                 _ => println!("other message type...")
             }
 
-            println!("root supervisor - spawn_at_root - 1");
+            println!("spawned at root");
 
             // Rebind to the system
             context.hook();

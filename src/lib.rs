@@ -26,7 +26,9 @@
 //! All up to you. And it should be up to you.
 //!
 
-#![doc(html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png"
+)]
 
 #[macro_use]
 extern crate log;
