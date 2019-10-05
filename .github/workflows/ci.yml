@@ -28,7 +28,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --doc
+          args: --all
 
   check_fmt_and_docs:
     name: Checking fmt and docs
