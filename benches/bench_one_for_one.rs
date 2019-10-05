@@ -6,17 +6,14 @@ extern crate test;
 mod tests {
     use super::*;
     use bastion::bastion::Bastion;
-    
+
     use bastion::config::BastionConfig;
-    
-    
+
     use log::LevelFilter;
-    
+
     use std::sync::Once;
     use std::{thread, time};
     use test::Bencher;
-    
-    
 
     static INIT: Once = Once::new();
 

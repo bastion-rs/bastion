@@ -1,7 +1,6 @@
 use bastion::prelude::*;
 use log::LevelFilter;
 
-
 fn main() {
     let config = BastionConfig {
         log_level: LevelFilter::Debug,
