@@ -37,8 +37,8 @@
 <tr>
   <td>Build Status (Linux / MacOS)</td>
   <td>
-    <a href="https://travis-ci.org/bastion-rs/bastion">
-    <img src="https://travis-ci.org/bastion-rs/bastion.svg?branch=master" alt="travis build status" />
+    <a href="https://actions-badge.atrox.dev/bastion-rs/bastion/goto">
+    <img alt="Build Status" src="https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fbastion-rs%2Fbastion%2Fbadge&style=flat" />
     </a>
   </td>
 </tr>
