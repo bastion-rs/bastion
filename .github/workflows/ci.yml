@@ -23,7 +23,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --benches --bins --examples --tests
+          args: --all --bins --examples --tests
 
       - name: tests
         uses: actions-rs/cargo@v1
