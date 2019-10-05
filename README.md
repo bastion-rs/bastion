@@ -66,14 +66,6 @@
 		</a>
 	</td>
 </tr>
-<tr>
-	<td>Caffeine</td>
-	<td>
-	    <a href="https://liberapay.com/vertexclique/donate">
-	    <img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg">
-	    </a>
-	</td>
-</tr>
 </table>
 
 ---
