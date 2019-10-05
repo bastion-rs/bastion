@@ -19,6 +19,3 @@ bcs
 
 # Intellij stuff
 .idea/
-
-# gitter shell
-gitter.sh
