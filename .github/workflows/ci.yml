@@ -3,55 +3,36 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build_and_test_stable:
-    name: Stable - Build and test on ${{ matrix.os }}
+  build_and_test:
+    name: ${{ matrix.version }} - Build and test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        version: [stable, nightly]
 
     steps:
       - uses: actions/checkout@master
 
-      - name: Install stable
+      - name: Install ${{ matrix.version }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.version }}
           override: true
 
-      - name: check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all --bins --examples --tests
-
-      - name: tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
-
-  build_and_test_nightly:
-    name: Nightly - Build and test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-
-    steps:
-      - uses: actions/checkout@master
-
-      - name: Install nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-
-      - name: check
+      - name: check nightly
+        if: matrix.version == 'nightly'
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all --benches --bins --examples --tests
+
+      - name: check stable
+        if: matrix.version == 'stable'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all --bins --examples --tests
 
       - name: tests
         uses: actions-rs/cargo@v1
