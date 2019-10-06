@@ -64,12 +64,11 @@ impl PartialEq for BastionChildren {
 
 impl Debug for BastionChildren {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        // TODO: add thunk ref address here
-        write!(
-            f,
-            "(ID :: {:?}, Redundancy :: {:?})",
-            self.id, self.redundancy
-        )
+        f.debug_struct("BastionChildren")
+            .field("id", &self.id)
+            .field("redundancy", &self.redundancy)
+            .field("thunk_ptr", &format_args!("{:p}", &self.thunk as *const _))
+            .finish()
     }
 }
 

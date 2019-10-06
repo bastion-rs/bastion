@@ -265,10 +265,12 @@ impl BastionContext {
 
 impl Debug for BastionContext {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "\nContext\n\tParent :: {:?}, Descendants :: {:?}, Killed :: {:?}, TX :: {:?}, RX :: {:?}\n\t",
-            self.parent, self.descendants, self.killed, self.bcast_tx, self.bcast_rx
-        )
+        f.debug_struct("BastionContext")
+            .field("parent", &self.parent)
+            .field("descendants", &self.descendants)
+            .field("killed", &self.killed)
+            .field("TX", &self.bcast_tx)
+            .field("RX", &self.bcast_rx)
+            .finish()
     }
 }
