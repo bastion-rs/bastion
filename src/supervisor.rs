@@ -1,305 +1,206 @@
-//!
-//! Supervisor related code. Including their management, creation, and destruction.
-
-use crate::child::{BastionChildren, BastionClosure, Message};
-use crate::context::BastionContext;
-use crossbeam_channel::unbounded;
-use std::cmp::Ordering;
-use std::panic::AssertUnwindSafe;
-use tokio::prelude::future::FutureResult;
-use tokio::prelude::*;
+use crate::broadcast::{BastionMessage, Broadcast};
+use crate::children::{Children, Closure, Message};
+use futures::pending;
+use futures::poll;
+use futures::prelude::*;
+use fxhash::FxHashMap;
+use fxhash::FxHashSet;
+use runtime::task::JoinHandle;
+use std::collections::BTreeMap;
+use std::ops::RangeFrom;
+use std::task::Poll;
 use uuid::Uuid;
 
-///
-/// Identifier struct for Supervisor
-/// System uses this to assemble resource name for children and supervisors.
-#[derive(Clone, PartialOrd, PartialEq, Eq, Debug)]
-pub struct SupervisorURN {
-    /// Supervisor's system name
-    pub sys: String,
-    /// Supervisor's name
-    pub name: String,
-    /// Supervisor's unique identifier
-    pub res: String,
+
+pub struct Supervisor {
+    bcast: Broadcast,
+    children: Vec<Children>,
+    order: BTreeMap<usize, Uuid>, // FIXME
+    launched: FxHashMap<Uuid, (usize, JoinHandle<Children>)>, // FIXME
+    dead: FxHashSet<Uuid>,
+    strategy: SupervisionStrategy,
 }
 
-impl Default for SupervisorURN {
-    fn default() -> Self {
-        let uuid_gen = Uuid::new_v4();
-        SupervisorURN {
-            sys: "bastion".to_owned(),
-            name: "default-supervisor".to_owned(),
-            res: uuid_gen.to_string(),
-        }
-    }
-}
-
-impl Ord for SupervisorURN {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.sys
-            .cmp(&other.sys)
-            .then(self.name.cmp(&other.name))
-            .then(self.res.cmp(&other.res))
-    }
-}
-
-///
-/// Possible supervision strategies to pass to the supervisor.
-///
-/// **OneForOne**: If a child gets killed only that child will be restarted under the supervisor.
-///
-/// **OneForAll**: If a child gets killed all children at the same level under the supervision will be restarted.
-///
-/// **RestForOne**: If a child gets killed restart the rest of the children at the same level under the supervisor.
-#[derive(Clone, Debug)]
 pub enum SupervisionStrategy {
-    /// If a child gets killed only that child will be restarted under the supervisor.
-    ///
-    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
-    ///
-    /// ![](https://learnyousomeerlang.com/static/img/restart-one-for-one.png)
     OneForOne,
-    /// If a child gets killed all children at the same level under the supervision will be restarted.
-    ///
-    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
-    ///
-    /// ![](https://learnyousomeerlang.com/static/img/restart-one-for-all.png)
     OneForAll,
-    /// If a child gets killed restart the rest of the children at the same level under the supervisor.
-    ///
-    /// Example is from [learnyousomeerlang.com](https://learnyousomeerlang.com):
-    ///
-    /// ![](https://learnyousomeerlang.com/static/img/restart-rest-for-one.png)
     RestForOne,
 }
 
-impl Default for SupervisionStrategy {
-    fn default() -> Self {
-        SupervisionStrategy::OneForOne
-    }
-}
-
-///
-/// Supervisor definition to keep track of supervisor information. e.g:
-/// * context
-/// * children
-/// * strategy
-/// * supervisor identifier
-#[derive(Default, Clone, Debug)]
-pub struct Supervisor {
-    /// Supervisor's URN scheme
-    pub urn: SupervisorURN,
-    /// Supervisor's context
-    pub(crate) ctx: BastionContext,
-    /// Supervisor's strategy
-    pub(crate) strategy: SupervisionStrategy,
-}
-
-///
-/// Builder pattern for supervisors.
 impl Supervisor {
-    ///
-    /// Assign properties of the supervisor
-    ///
-    /// # Arguments
-    /// * `name` - name of the supervisor
-    /// * `system` - system name for the supervisor. Can be used for grouping dependent supervisors.
-    ///
-    /// # Example
-    /// ```rust
-    ///# use bastion::prelude::*;
-    ///# let name = "supervisor-name";
-    ///# let system = "system-name";
-    /// Supervisor::default().props(name.into(), system.into());
-    /// ```
-    pub fn props(mut self, name: String, system: String) -> Self {
-        let mut urn = SupervisorURN::default();
-        urn.name = name;
-        self.urn = urn;
-        self.urn.sys = system;
-        self
+    pub(super) fn new() -> Self {
+        let id = Uuid::new_v4();
+        let bcast = Broadcast::new(id);
+
+        let children = Vec::new();
+        let order = BTreeMap::new();
+        let launched = FxHashMap::default();
+        let dead = FxHashSet::default();
+        let strategy = SupervisionStrategy::default();
+
+        Supervisor {
+            bcast,
+            children,
+            order,
+            launched,
+            dead,
+            strategy,
+        }
     }
 
-    ///
-    /// Assigns strategy for this supervisor
-    ///
-    /// # Arguments
-    /// * `strategy` - An [SupervisionStrategy] for supervisor to define how to operate on failures.
-    ///
-    /// # Example
-    /// ```rust
-    ///# use bastion::prelude::*;
-    ///# let name = "supervisor-name";
-    ///# let system = "system-name";
-    /// Supervisor::default().props(name.into(), system.into())
-    ///    .strategy(SupervisionStrategy::RestForOne);
-    /// ```
     pub fn strategy(mut self, strategy: SupervisionStrategy) -> Self {
         self.strategy = strategy;
         self
     }
 
-    ///
-    /// [Supervisor] level spawn function for child generation from the parent context.
-    /// This context carries global broadcast for the system.
-    /// Every context directly tied to the parent process.
-    /// If you listen broadcast tx/rx pair in the parent process,
-    /// you can communicate with the children with specific message type.
-    ///
-    /// Bastion doesn't enforce you to use specific Message type or force you to implement traits.
-    /// Dynamic dispatch is made over heap fat ptrs and that means all message objects can be
-    /// passed around with heap constructs.
-    ///
-    /// # Arguments
-    /// * `thunk` - User code which will be executed inside the process.
-    /// * `msg` - Initial message which will be passed to the thunk.
-    /// * `scale` - How many children will be spawn with given `thunk` and `msg` as process body.
-    ///
-    /// # Examples
-    /// ```
-    ///# use bastion::prelude::*;
-    ///# use std::{fs, thread};
-    ///#
-    ///# fn main() {
-    ///#     Bastion::platform();
-    ///#
-    ///#     let message = "Supervision Message".to_string();
-    ///#
-    ///#     /// Name of the supervisor, and system of the new supervisor
-    ///#     /// By default if you don't specify Supervisors use "One for One".
-    ///#     /// Let's look at "One for One".
-    ///Bastion::supervisor("file-reader", "remote-fs")
-    ///    .strategy(SupervisionStrategy::OneForOne)
-    ///    .children(
-    ///        |p: BastionContext, _msg| {
-    ///            println!("File below doesn't exist so it will panic.");
-    ///            fs::read_to_string("cacophony").unwrap();
-    ///
-    ///            /// Hook to rebind to the system.
-    ///            p.hook();
-    ///        },
-    ///        message, // Message for all redundant children
-    ///        1_i32,   // Redundancy level
-    ///    );
-    ///# }
-    /// ```
-    pub fn children<F, M>(mut self, thunk: F, msg: M, scale: i32) -> Self
-    where
-        F: BastionClosure,
-        M: Message,
+    pub fn children<F, M>(mut self, thunk: F, msg: M, redundancy: usize) -> Self
+        where
+            F: Closure,
+            M: Message,
     {
-        let bt = Box::new(thunk);
-        let msg_box = Box::new(msg);
-        let (p, c) = unbounded();
+        let id = Uuid::new_v4();
+        let bcast = self.bcast.new_child(id);
 
-        let children = BastionChildren {
-            id: Uuid::new_v4().to_string(),
-            tx: Some(p.clone()),
-            rx: Some(c.clone()),
-            redundancy: scale,
-            msg: objekt::clone_box(&*msg_box),
-            thunk: objekt::clone_box(&*bt),
-        };
+        let thunk = Box::new(thunk);
+        let msg = Box::new(msg);
 
-        self.ctx.descendants.push(children);
-        self.ctx.bcast_rx = Some(c.clone());
-        self.ctx.bcast_tx = Some(p.clone());
-        self.ctx.parent = Some(Box::new(self.clone()));
+        let children = Children::new(
+            thunk,
+            msg,
+            bcast,
+            redundancy,
+        );
+
+        self.children.push(children);
 
         self
     }
 
-    ///
-    /// Launch completes the builder pattern.
-    /// It is the main finalizer that sets necessary arguments prepares
-    /// channels and registers supervisor to the runtime.
-    ///
-    /// Runtime can't be notified without calling [launch](struct.Supervisor.html#method.launch).
-    ///
-    /// # Examples
-    /// ```
-    ///# use bastion::prelude::*;
-    ///# use std::{fs, thread};
-    ///#
-    ///# fn main() {
-    ///#     Bastion::platform();
-    ///#
-    ///#     let message = "Supervision Message".to_string();
-    ///#
-    ///#     /// Name of the supervisor, and system of the new supervisor
-    ///#     /// By default if you don't specify Supervisors use "One for One".
-    ///#     /// Let's look at "One for One".
-    ///Bastion::supervisor("file-reader", "remote-fs")
-    ///    .strategy(SupervisionStrategy::OneForOne)
-    ///    .children(
-    ///        |p: BastionContext, _msg| {
-    ///            println!("File below doesn't exist so it will panic.");
-    ///            fs::read_to_string("cacophony").unwrap();
-    ///
-    ///            /// Hook to rebind to the system.
-    ///            p.hook();
-    ///        },
-    ///        message, // Message for all redundant children
-    ///        1_i32,   // Redundancy level
-    ///    )
-    ///    .launch(); // Launch finalizes supervisor build and registers to definition.
-    ///# }
-    /// ```
-    pub fn launch(mut self) {
-        for descendant in &self.ctx.descendants {
-            let descendant = descendant.clone();
+    fn launch_children(&mut self) {
+        let start = if let Some(order) = self.order.keys().next_back() {
+            *order + 1
+        } else {
+            0
+        };
 
-            for child_id in 0..descendant.redundancy {
-                let tx = descendant.tx.as_ref().unwrap().clone();
-                let rx = descendant.rx.clone().unwrap();
+        for (order, children) in self.children.drain(..).enumerate() {
+            let id = children.id().clone();
+            let order = start + order;
 
-                let nt = objekt::clone_box(&*descendant.thunk);
-                let msgr = objekt::clone_box(&*descendant.msg);
-                let msgr_panic_handler = objekt::clone_box(&*descendant.msg);
-                let mut if_killed = descendant.clone();
-                if_killed.id = format!("{}::{}", if_killed.id, child_id);
+            self.order.insert(order, id.clone());
+            self.launched.insert(id, (order, children.launch()));
+        }
+    }
 
-                let mut this_spv = self.clone();
-                let context_spv = self.clone();
-
-                let f = future::lazy(move || {
-                    nt(
-                        BastionContext {
-                            parent: Some(Box::new(context_spv.clone())),
-                            descendants: context_spv.ctx.descendants,
-                            killed: context_spv.ctx.killed,
-                            bcast_rx: Some(rx.clone()),
-                            bcast_tx: Some(tx.clone()),
-                        },
-                        msgr,
-                    );
-                    future::ok::<(), ()>(())
-                });
-
-                let k = AssertUnwindSafe(f)
-                    .catch_unwind()
-                    .then(|result| -> FutureResult<(), ()> {
-                        this_spv.ctx.killed.push(if_killed);
-
-                        // Already re-entrant code
-                        if let Err(err) = result {
-                            error!("Panic happened in supervised child - {:?}", err);
-                            crate::bastion::Bastion::fault_recovery(this_spv, msgr_panic_handler);
-                        }
-                        future::ok(())
-                    });
-
-                let ark = crate::bastion::PLATFORM.clone();
-                let mut runtime = ark.lock();
-                let shared_runtime = &mut runtime.runtime;
-                shared_runtime.spawn(k);
+    async fn kill_children(&mut self, range: RangeFrom<usize>) {
+        if range.start == 0 {
+            self.bcast.send_children(BastionMessage::poison_pill());
+            self.bcast.clear_children();
+        } else {
+            for (_, id) in self.order.range(range.clone()) {
+                self.bcast.send_child(id, BastionMessage::poison_pill());
+                self.bcast.remove_child(id);
             }
         }
 
+        let mut removed = vec![];
+        let mut children = Vec::new();
+        for (order, id) in self.order.range(range) {
+            // FIXME: Err if None?
+            if let Some((_, launched)) = self.launched.remove(id) {
+                // FIXME: join?
+                children.push(launched.await);
+            }
 
-        // FIXME: There might be discrepancy between passed self and referenced self.
-        // Fix this with either passing reference without Box (lifetimes sigh!)
-        // Or use channels to send back to the supervision tree.
-        self.ctx.parent = Some(Box::new(self.clone()));
+            removed.push(*order);
+        }
+
+        for order in removed {
+            self.order.remove(&order);
+        }
+
+        // FIXME: might remove children
+        self.children = children;
+    }
+
+    async fn recover(&mut self, id: Uuid) -> Result<(), ()> {
+        match self.strategy {
+            SupervisionStrategy::OneForOne => {
+                let (order, launched) = self.launched.remove(&id).ok_or(())?;
+                let children = launched.await;
+
+                self.launched.insert(id, (order, children.launch()));
+            }
+            SupervisionStrategy::OneForAll => {
+                self.kill_children(0..).await;
+                self.launch_children();
+            }
+            SupervisionStrategy::RestForOne => {
+                let (order, launched) = self.launched.remove(&id).ok_or(())?;
+                let children = launched.await;
+
+                self.children.push(children);
+
+                self.kill_children(order..);
+                self.launch_children();
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run(mut self) -> Self {
+        loop {
+            match poll!(&mut self.bcast.next()) {
+                Poll::Ready(Some(msg)) => {
+                    match msg {
+                        BastionMessage::PoisonPill => {
+                            let id = self.bcast.id().clone();
+
+                            self.bcast.send_children(BastionMessage::poison_pill());
+                            self.bcast.clear_children();
+
+                            self.bcast.send_parent(BastionMessage::dead(id));
+
+                            return self;
+                        }
+                        BastionMessage::Dead { id } => {
+                            self.launched.remove(&id);
+                            self.bcast.remove_child(&id);
+
+                            self.dead.insert(id);
+                        }
+                        BastionMessage::Faulted { id } => {
+                            if self.recover(id).await.is_err() {
+                                self.bcast.send_children(BastionMessage::poison_pill());
+                                self.bcast.clear_children();
+
+                                let id = self.bcast.id().clone();
+                                self.bcast.send_parent(BastionMessage::faulted(id));
+
+                                return self;
+                            }
+                        }
+                        // FIXME
+                        BastionMessage::Message(_) => unimplemented!(),
+                    }
+                }
+                // FIXME: "return self" or "send_parent(Faulted)"?
+                Poll::Ready(None) => unimplemented!(),
+                Poll::Pending => pending!(),
+            }
+        }
+    }
+
+    pub fn launch(mut self) -> JoinHandle<Self> {
+        //self.launch_children();
+
+        runtime::spawn(self.run())
+    }
+}
+
+impl Default for SupervisionStrategy {
+    fn default() -> Self {
+        SupervisionStrategy::OneForOne
     }
 }

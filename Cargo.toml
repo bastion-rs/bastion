@@ -34,24 +34,24 @@ maintenance = { status = "actively-developed" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ctrlc = "3.1.3"
-tokio = "^0.1"
-tokio-executor = "0.1.8"
-tokio-threadpool = "0.1.15"
-futures = "0.1.28"
-log = "0.4.7"
-env_logger = "0.6.1"
-crossbeam-channel = "0.3.8"
-ratelimit = "0.4.4"
-backtrace = "0.3.32"
-ego-tree = "0.6.0"
-lazy_static = "1.3.0"
-objekt = "0.1.2"
+#backtrace = "0.3.32"
+#crossbeam-channel = "0.3.8"
+#ctrlc = "3.1.3"
+#ego-tree = "0.6.0"
+#env_logger = "0.6.1"
+#futures = "0.1.28"
+futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+fxhash = "0.2"
+lazy_static = "1.4"
+#log = "0.4.7"
+objekt = "0.1"
 parking_lot = "0.9"
-
-
-#futures-preview = "=0.3.0-alpha.16"
-uuid = { version = "0.7", features = ["serde", "v4"] }
+#ratelimit = "0.4.4"
+runtime = "=0.3.0-alpha.7"
+#tokio = "^0.1"
+#tokio-executor = "0.1.8"
+#tokio-threadpool = "0.1.15"
+uuid = { version = "0.7", features = ["v4"] }
 
 [profile.bench]
 panic = "unwind"
@@ -62,7 +62,7 @@ lto = false
 debug-assertions = false
 codegen-units = 1
 
-[profile.debug]
+[profile.dev]
 panic = "unwind"
 
 [profile.release]
