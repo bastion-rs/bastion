@@ -1,4 +1,4 @@
-use crate::broadcast::{BastionMessage, Broadcast};
+use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::context::BastionContext;
 use futures::future::CatchUnwind;
 use futures::pending;
@@ -42,7 +42,7 @@ pub(super) struct Children {
     redundancy: usize,
 }
 
-struct Child {
+pub(super) struct Child {
     exec: CatchUnwind<Pin<Box<dyn Fut>>>,
     bcast: Broadcast,
 }
@@ -64,6 +64,10 @@ impl Children {
 
     pub(super) fn id(&self) -> &Uuid {
         self.bcast.id()
+    }
+
+    pub(super) fn sender(&self) -> &Sender {
+        self.bcast.sender()
     }
 
     async fn run(mut self) -> Self {
@@ -117,6 +121,14 @@ impl Children {
 }
 
 impl Child {
+    pub(super) fn id(&self) -> &Uuid {
+        self.bcast.id()
+    }
+
+    pub(super) fn sender(&self) -> &Sender {
+        self.bcast.sender()
+    }
+
     async fn run(mut self) {
         loop {
             if let Poll::Ready(res) = poll!(&mut self.exec) {

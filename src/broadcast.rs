@@ -105,7 +105,7 @@ impl Broadcast {
         // FIXME: Err if None?
         if let Some(parent) = &mut self.parent {
             // FIXME: handle errors
-            parent.unbounded_send(msg);
+            parent.unbounded_send(msg).ok();
         }
     }
 
@@ -113,32 +113,32 @@ impl Broadcast {
         // FIXME: Err if None?
         if let Some(child) = self.children.get_mut(id) {
             // FIXME: handle errors
-            child.unbounded_send(msg);
+            child.unbounded_send(msg).ok();
         }
     }
 
     pub(super) fn send_children(&mut self, msg: BastionMessage) {
         for (_, child) in &mut self.children {
             // FIXME: handle errors
-            child.unbounded_send(msg.clone());
+            child.unbounded_send(msg.clone()).ok();
         }
     }
 }
 
 impl BastionMessage {
-    pub(super) fn poison_pill() -> BastionMessage {
+    pub(super) fn poison_pill() -> Self {
         BastionMessage::PoisonPill
     }
 
-    pub(super) fn dead(id: Uuid) -> BastionMessage {
+    pub(super) fn dead(id: Uuid) -> Self {
         BastionMessage::Dead { id }
     }
 
-    pub(super) fn faulted(id: Uuid) -> BastionMessage {
+    pub(super) fn faulted(id: Uuid) -> Self {
         BastionMessage::Faulted { id }
     }
 
-    pub(super) fn msg(msg: Box<dyn Message>) -> BastionMessage {
+    pub(super) fn msg(msg: Box<dyn Message>) -> Self {
         BastionMessage::Message(msg)
     }
 

@@ -1,5 +1,5 @@
-use crate::bastion::SYSTEM_SENDER;
-use crate::broadcast::{BastionMessage, Broadcast};
+use crate::bastion::SYSTEM;
+use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::children::{Children, Closure, Message};
 use futures::{pending, poll};
 use futures::prelude::*;
@@ -8,7 +8,6 @@ use runtime::task::JoinHandle;
 use std::ops::RangeFrom;
 use std::task::Poll;
 use uuid::Uuid;
-
 
 pub struct Supervisor {
     bcast: Broadcast,
@@ -45,6 +44,14 @@ impl Supervisor {
             dead,
             strategy,
         }
+    }
+
+    pub fn id(&self) -> &Uuid {
+        &self.bcast.id()
+    }
+
+    pub(super) fn sender(&self) -> &Sender {
+        self.bcast.sender()
     }
 
     pub fn strategy(mut self, strategy: SupervisionStrategy) -> Self {
@@ -175,7 +182,7 @@ impl Supervisor {
 
     pub fn launch(self) {
         // FIXME: handle errors
-        SYSTEM_SENDER.unbounded_send(self);
+        SYSTEM.unbounded_send(self).ok();
     }
 }
 
