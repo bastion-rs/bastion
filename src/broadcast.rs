@@ -1,5 +1,5 @@
 use crate::children::Message;
-use futures::channel::mpsc::{self, TrySendError, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;
 use std::pin::Pin;

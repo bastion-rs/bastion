@@ -1,10 +1,9 @@
+use crate::bastion::SYSTEM_SENDER;
 use crate::broadcast::{BastionMessage, Broadcast};
 use crate::children::{Children, Closure, Message};
-use futures::pending;
-use futures::poll;
+use futures::{pending, poll};
 use futures::prelude::*;
-use fxhash::FxHashMap;
-use fxhash::FxHashSet;
+use fxhash::{FxHashMap, FxHashSet};
 use runtime::task::JoinHandle;
 use std::collections::BTreeMap;
 use std::ops::RangeFrom;
@@ -76,7 +75,7 @@ impl Supervisor {
         self
     }
 
-    fn launch_children(&mut self) {
+    pub(super) fn launch_children(&mut self) {
         let start = if let Some(order) = self.order.keys().next_back() {
             *order + 1
         } else {
@@ -103,7 +102,7 @@ impl Supervisor {
             }
         }
 
-        let mut removed = vec![];
+        let mut removed = Vec::new();
         let mut children = Vec::new();
         for (order, id) in self.order.range(range) {
             // FIXME: Err if None?
@@ -141,7 +140,7 @@ impl Supervisor {
 
                 self.children.push(children);
 
-                self.kill_children(order..);
+                self.kill_children(order..).await;
                 self.launch_children();
             }
         }
@@ -149,7 +148,7 @@ impl Supervisor {
         Ok(())
     }
 
-    async fn run(mut self) -> Self {
+    pub(super) async fn run(mut self) -> Self {
         loop {
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
@@ -168,6 +167,7 @@ impl Supervisor {
                             self.launched.remove(&id);
                             self.bcast.remove_child(&id);
 
+                            // FIXME: remove from order?
                             self.dead.insert(id);
                         }
                         BastionMessage::Faulted { id } => {
@@ -192,10 +192,9 @@ impl Supervisor {
         }
     }
 
-    pub fn launch(mut self) -> JoinHandle<Self> {
-        //self.launch_children();
-
-        runtime::spawn(self.run())
+    pub fn launch(self) {
+        // FIXME: handle errors
+        SYSTEM_SENDER.unbounded_send(self);
     }
 }
 

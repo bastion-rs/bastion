@@ -1,6 +1,5 @@
 use crate::broadcast::{BastionMessage, Broadcast};
 use crate::context::BastionContext;
-use futures::channel::mpsc::{Receiver, Sender};
 use futures::future::CatchUnwind;
 use futures::pending;
 use futures::poll;
@@ -11,7 +10,7 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::panic::UnwindSafe;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::Poll;
 use uuid::Uuid;
 
 pub trait Shell: objekt::Clone + Send + Sync + Any + 'static {}
@@ -87,7 +86,7 @@ impl Children {
                             return self;
                         }
                         // FIXME
-                        BastionMessage::Message(msg) => unimplemented!(),
+                        BastionMessage::Message(_) => unimplemented!(),
                     }
                 }
                 // FIXME: "return self" or "send_parent(Faulted)"?
@@ -98,7 +97,7 @@ impl Children {
     }
 
     pub(super) fn launch(mut self) ->  JoinHandle<Self> {
-        for child in 0..self.redundancy {
+        for _ in 0..self.redundancy {
             let id = Uuid::new_v4();
             let bcast = self.bcast.new_child(id);
 
@@ -145,7 +144,7 @@ impl Child {
                             unimplemented!()
                         }
                         // FIXME
-                        BastionMessage::Message(msg) => unimplemented!(),
+                        BastionMessage::Message(_) => unimplemented!(),
                     }
                 }
                 // FIXME: "return" or "send_parent(Faulted)"?
