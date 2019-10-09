@@ -53,12 +53,23 @@ impl System {
 					match msg {
 						// FIXME
 						BastionMessage::PoisonPill => unimplemented!(),
-						// FIXME
-						BastionMessage::Dead { .. } => unimplemented!(),
-						// FIXME
-						BastionMessage::Faulted { .. } => unimplemented!(),
-						// FIXME
-						BastionMessage::Message(_) => unimplemented!(),
+						BastionMessage::Dead { id } => {
+							self.supervisors.remove(&id);
+							self.bcast.remove_child(&id);
+
+							self.dead.insert(id);
+						}
+						BastionMessage::Faulted { id } => {
+							// TODO: add a "faulted" list and poll from it instead of awaiting
+
+							if let Some(supervisor) = self.supervisors.remove(&id) {
+								// FIXME: set a limit?
+								self.launch_supervisor(supervisor.await);
+							}
+						}
+						BastionMessage::Message(_) => {
+							self.bcast.send_children(msg);
+						}
 					}
 				}
 				// FIXME

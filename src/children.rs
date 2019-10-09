@@ -20,8 +20,8 @@ pub trait Message: Shell + Debug {
     fn as_any(&self) -> &dyn Any;
 }
 impl<T> Message for T
-    where
-        T: Shell + Debug,
+where
+    T: Shell + Debug,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -74,13 +74,10 @@ impl Children {
 
                     match msg {
                         BastionMessage::PoisonPill | BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
-                            self.bcast.send_children(BastionMessage::poison_pill());
-                            self.bcast.clear_children();
-
                             if msg.is_faulted() {
-                                self.bcast.send_parent(BastionMessage::faulted(id));
+	                            self.bcast.faulted();
                             } else {
-                                self.bcast.send_parent(BastionMessage::dead(id));
+                                self.bcast.dead();
                             }
 
                             return self;
@@ -89,8 +86,11 @@ impl Children {
                         BastionMessage::Message(_) => unimplemented!(),
                     }
                 }
-                // FIXME: "return self" or "send_parent(Faulted)"?
-                Poll::Ready(None) => unimplemented!(),
+                Poll::Ready(None) => {
+                    self.bcast.faulted();
+
+                    return self;
+                }
                 Poll::Pending => pending!(),
             }
         }
@@ -99,11 +99,14 @@ impl Children {
     pub(super) fn launch(mut self) ->  JoinHandle<Self> {
         for _ in 0..self.redundancy {
             let id = Uuid::new_v4();
-            let bcast = self.bcast.new_child(id);
+            let bcast = self.bcast.new_child(id.clone());
 
             let thunk = objekt::clone_box(&*self.thunk);
-            let ctx = BastionContext { };
             let msg = objekt::clone_box(&*self.msg);
+
+            let parent = self.bcast.sender().clone();
+            let ctx = BastionContext::new(id, parent);
+
             let exec = thunk(ctx, msg)
                 .catch_unwind();
 
@@ -122,8 +125,8 @@ impl Child {
                 let id = self.bcast.id().clone();
 
                 match res {
-                    Ok(Ok(())) => self.bcast.send_parent(BastionMessage::dead(id)),
-                    Ok(Err(())) | Err(_) => self.bcast.send_parent(BastionMessage::faulted(id)),
+                    Ok(Ok(())) => self.bcast.dead(),
+                    Ok(Err(())) | Err(_) => self.bcast.faulted(),
                 }
 
                 return;
@@ -135,20 +138,24 @@ impl Child {
 
                     match msg {
                         BastionMessage::PoisonPill => {
-                            self.bcast.send_parent(BastionMessage::dead(id));
+                            self.bcast.dead();
 
                             return;
                         }
                         BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
-                            // FIXME: shouldn't happen; send_parent(Faulted)?
-                            unimplemented!()
+	                        self.bcast.faulted();
+
+                            return;
                         }
                         // FIXME
                         BastionMessage::Message(_) => unimplemented!(),
                     }
                 }
-                // FIXME: "return" or "send_parent(Faulted)"?
-                Poll::Ready(None) => unimplemented!(),
+                Poll::Ready(None) => {
+                    self.bcast.faulted();
+
+                    return;
+                }
                 Poll::Pending => pending!(),
             }
         }

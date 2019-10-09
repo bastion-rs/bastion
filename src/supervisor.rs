@@ -93,12 +93,10 @@ impl Supervisor {
 
     async fn kill_children(&mut self, range: RangeFrom<usize>) {
         if range.start == 0 {
-            self.bcast.send_children(BastionMessage::poison_pill());
-            self.bcast.clear_children();
+	        self.bcast.poison_pill_children();
         } else {
             for (_, id) in self.order.range(range.clone()) {
-                self.bcast.send_child(id, BastionMessage::poison_pill());
-                self.bcast.remove_child(id);
+	            self.bcast.poison_pill_child(id);
             }
         }
 
@@ -154,12 +152,7 @@ impl Supervisor {
                 Poll::Ready(Some(msg)) => {
                     match msg {
                         BastionMessage::PoisonPill => {
-                            let id = self.bcast.id().clone();
-
-                            self.bcast.send_children(BastionMessage::poison_pill());
-                            self.bcast.clear_children();
-
-                            self.bcast.send_parent(BastionMessage::dead(id));
+                            self.bcast.dead();
 
                             return self;
                         }
@@ -172,21 +165,23 @@ impl Supervisor {
                         }
                         BastionMessage::Faulted { id } => {
                             if self.recover(id).await.is_err() {
-                                self.bcast.send_children(BastionMessage::poison_pill());
-                                self.bcast.clear_children();
-
-                                let id = self.bcast.id().clone();
-                                self.bcast.send_parent(BastionMessage::faulted(id));
+                                self.bcast.faulted();
 
                                 return self;
                             }
                         }
-                        // FIXME
-                        BastionMessage::Message(_) => unimplemented!(),
+                        BastionMessage::Message(_) => {
+                            // TODO: send to parent too?
+
+                            self.bcast.send_children(msg);
+                        }
                     }
                 }
-                // FIXME: "return self" or "send_parent(Faulted)"?
-                Poll::Ready(None) => unimplemented!(),
+                Poll::Ready(None) => {
+                    self.bcast.faulted();
+
+                    return self;
+                }
                 Poll::Pending => pending!(),
             }
         }

@@ -6,8 +6,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use uuid::Uuid;
 
-type Sender = UnboundedSender<BastionMessage>;
-type Receiver = UnboundedReceiver<BastionMessage>;
+pub(super) type Sender = UnboundedSender<BastionMessage>;
+pub(super) type Receiver = UnboundedReceiver<BastionMessage>;
 
 pub(super) struct Broadcast {
     id: Uuid,
@@ -60,6 +60,30 @@ impl Broadcast {
 
     pub(super) fn id(&self) -> &Uuid {
         &self.id
+    }
+
+    pub(super) fn sender(&self) -> &Sender {
+        &self.sender
+    }
+
+    pub(super) fn poison_pill_child(&mut self, id: &Uuid) {
+        self.send_child(id, BastionMessage::PoisonPill);
+        self.remove_child(id);
+    }
+
+    pub(super) fn poison_pill_children(&mut self) {
+        self.send_children(BastionMessage::PoisonPill);
+        self.clear_children();
+    }
+
+    pub(super) fn dead(&mut self) {
+        self.poison_pill_children();
+        self.send_parent(BastionMessage::dead(self.id.clone()));
+    }
+
+    pub(super) fn faulted(&mut self) {
+	    self.poison_pill_children();
+        self.send_parent(BastionMessage::faulted(self.id.clone()));
     }
 
     pub(super) fn new_child(&mut self, id: Uuid) -> Self {
