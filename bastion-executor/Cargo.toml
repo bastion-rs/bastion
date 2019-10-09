@@ -1,0 +1,7 @@
+[package]
+name = "bastion-executor"
+version = "0.2.1-alpha.0"
+description = "Fault-tolerant Runtime for Rust applications"
+authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
+keywords = ["fault-tolerant", "runtime", "actor", "system"]
+categories = []
