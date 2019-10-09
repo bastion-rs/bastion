@@ -5,7 +5,6 @@ use futures::{pending, poll};
 use futures::prelude::*;
 use fxhash::{FxHashMap, FxHashSet};
 use runtime::task::JoinHandle;
-use std::collections::BTreeMap;
 use std::ops::RangeFrom;
 use std::task::Poll;
 use uuid::Uuid;
@@ -14,8 +13,9 @@ use uuid::Uuid;
 pub struct Supervisor {
     bcast: Broadcast,
     children: Vec<Children>,
-    order: BTreeMap<usize, Uuid>, // FIXME
-    launched: FxHashMap<Uuid, (usize, JoinHandle<Children>)>, // FIXME
+    // FIXME: contains dead Children
+    order: Vec<Uuid>,
+    launched: FxHashMap<Uuid, (usize, JoinHandle<Children>)>,
     dead: FxHashSet<Uuid>,
     strategy: SupervisionStrategy,
 }
@@ -32,7 +32,7 @@ impl Supervisor {
         let bcast = Broadcast::new(id);
 
         let children = Vec::new();
-        let order = BTreeMap::new();
+        let order = Vec::new();
         let launched = FxHashMap::default();
         let dead = FxHashSet::default();
         let strategy = SupervisionStrategy::default();
@@ -76,18 +76,11 @@ impl Supervisor {
     }
 
     pub(super) fn launch_children(&mut self) {
-        let start = if let Some(order) = self.order.keys().next_back() {
-            *order + 1
-        } else {
-            0
-        };
-
-        for (order, children) in self.children.drain(..).enumerate() {
+        for children in self.children.drain(..) {
             let id = children.id().clone();
-            let order = start + order;
 
-            self.order.insert(order, id.clone());
-            self.launched.insert(id, (order, children.launch()));
+            self.launched.insert(id.clone(), (self.order.len(), children.launch()));
+            self.order.push(id);
         }
     }
 
@@ -95,25 +88,19 @@ impl Supervisor {
         if range.start == 0 {
 	        self.bcast.poison_pill_children();
         } else {
-            for (_, id) in self.order.range(range.clone()) {
+            // FIXME: panics
+            for id in self.order.get(range.clone()).unwrap() {
 	            self.bcast.poison_pill_child(id);
             }
         }
 
-        let mut removed = Vec::new();
         let mut children = Vec::new();
-        for (order, id) in self.order.range(range) {
+        for id in self.order.drain(range) {
             // FIXME: Err if None?
-            if let Some((_, launched)) = self.launched.remove(id) {
+            if let Some((_, launched)) = self.launched.remove(&id) {
                 // FIXME: join?
                 children.push(launched.await);
             }
-
-            removed.push(*order);
-        }
-
-        for order in removed {
-            self.order.remove(&order);
         }
 
         // FIXME: might remove children
@@ -160,7 +147,6 @@ impl Supervisor {
                             self.launched.remove(&id);
                             self.bcast.remove_child(&id);
 
-                            // FIXME: remove from order?
                             self.dead.insert(id);
                         }
                         BastionMessage::Faulted { id } => {

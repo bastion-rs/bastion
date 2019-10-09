@@ -39,7 +39,6 @@ maintenance = { status = "actively-developed" }
 #ctrlc = "3.1.3"
 #ego-tree = "0.6.0"
 #env_logger = "0.6.1"
-#futures = "0.1.28"
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"

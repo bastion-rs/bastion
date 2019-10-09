@@ -1,4 +1,4 @@
-use crate::broadcast::{BastionMessage, Broadcast, Sender};
+use crate::broadcast::Sender;
 use uuid::Uuid;
 
 pub struct BastionContext {

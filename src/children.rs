@@ -70,8 +70,6 @@ impl Children {
         loop {
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
-                    let id = self.bcast.id().clone();
-
                     match msg {
                         BastionMessage::PoisonPill | BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
                             if msg.is_faulted() {
@@ -122,8 +120,6 @@ impl Child {
     async fn run(mut self) {
         loop {
             if let Poll::Ready(res) = poll!(&mut self.exec) {
-                let id = self.bcast.id().clone();
-
                 match res {
                     Ok(Ok(())) => self.bcast.dead(),
                     Ok(Err(())) | Err(_) => self.bcast.faulted(),
@@ -134,8 +130,6 @@ impl Child {
 
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
-                    let id = self.bcast.id().clone();
-
                     match msg {
                         BastionMessage::PoisonPill => {
                             self.bcast.dead();
