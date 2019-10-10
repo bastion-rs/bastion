@@ -173,6 +173,14 @@ impl BastionMessage {
             false
         }
     }
+
+    pub(super) fn into_msg(self) -> Option<Box<dyn Message>> {
+        if let BastionMessage::Message(msg) = self {
+            Some(msg)
+        } else {
+            None
+        }
+    }
 }
 
 impl Stream for Broadcast {

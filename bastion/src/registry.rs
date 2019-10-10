@@ -1,4 +1,4 @@
-use crate::broadcast::Sender;
+use crate::broadcast::{BastionMessage, Sender};
 use crate::children::{Child, Children};
 use crate::supervisor::Supervisor;
 use chashmap::CHashMap;
@@ -13,6 +13,7 @@ struct Registrant {
 	ty: RegistrantType,
 }
 
+#[derive(Eq, PartialEq)]
 enum RegistrantType {
 	Supervisor,
 	Children,
@@ -53,6 +54,48 @@ impl Registry {
 
 		self.registered.insert(id, registrant);
 	}
+
+	pub(super) fn send_supervisor(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+		let registrant = if let Some(registrant) = self.registered.get(id) {
+			registrant
+		} else {
+			return Err(msg);
+		};
+
+		if !registrant.is_supervisor() {
+			return Err(msg);
+		}
+
+		registrant.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+	}
+
+	pub(super) fn send_children(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+		let registrant = if let Some(registrant) = self.registered.get(id) {
+			registrant
+		} else {
+			return Err(msg);
+		};
+
+		if !registrant.is_children() {
+			return Err(msg);
+		}
+
+		registrant.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+	}
+
+	pub(super) fn send_child(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+		let registrant = if let Some(registrant) = self.registered.get(id) {
+			registrant
+		} else {
+			return Err(msg);
+		};
+
+		if !registrant.is_child() {
+			return Err(msg);
+		}
+
+		registrant.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+	}
 }
 
 impl Registrant {
@@ -72,5 +115,17 @@ impl Registrant {
 		let ty = RegistrantType::Child;
 
 		Registrant { sender, ty }
+	}
+
+	fn is_supervisor(&self) -> bool {
+		self.ty == RegistrantType::Supervisor
+	}
+
+	fn is_children(&self) -> bool {
+		self.ty == RegistrantType::Children
+	}
+
+	fn is_child(&self) -> bool {
+		self.ty == RegistrantType::Child
 	}
 }
