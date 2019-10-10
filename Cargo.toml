@@ -3,4 +3,5 @@
 members = [
   "bastion",
   "bastion-executor",
+  "lightproc"
 ]
