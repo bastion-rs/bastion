@@ -1,3 +1,4 @@
+use crate::bastion::REGISTRY;
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::context::{BastionContext, BastionId};
 use futures::future::CatchUnwind;
@@ -70,11 +71,15 @@ impl Children {
     }
 
     async fn run(mut self) -> Self {
+        REGISTRY.add_children(&self);
+
         loop {
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
                     match msg {
                         BastionMessage::PoisonPill | BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
+	                        REGISTRY.remove_children(&self);
+
                             if msg.is_faulted() {
 	                            self.bcast.faulted();
                             } else {
@@ -88,6 +93,8 @@ impl Children {
                     }
                 }
                 Poll::Ready(None) => {
+                    REGISTRY.remove_children(&self);
+
                     self.bcast.faulted();
 
                     return self;
@@ -129,8 +136,12 @@ impl Child {
     }
 
     async fn run(mut self) {
+	    REGISTRY.add_child(&self);
+
         loop {
             if let Poll::Ready(res) = poll!(&mut self.exec) {
+                REGISTRY.remove_child(&self);
+
                 match res {
                     Ok(Ok(())) => self.bcast.dead(),
                     Ok(Err(())) | Err(_) => self.bcast.faulted(),
@@ -143,11 +154,15 @@ impl Child {
                 Poll::Ready(Some(msg)) => {
                     match msg {
                         BastionMessage::PoisonPill => {
+                            REGISTRY.remove_child(&self);
+
                             self.bcast.dead();
 
                             return;
                         }
                         BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
+                            REGISTRY.remove_child(&self);
+
 	                        self.bcast.faulted();
 
                             return;
@@ -157,6 +172,8 @@ impl Child {
                     }
                 }
                 Poll::Ready(None) => {
+                    REGISTRY.remove_child(&self);
+
                     self.bcast.faulted();
 
                     return;

@@ -1,4 +1,4 @@
-use crate::bastion::SYSTEM;
+use crate::bastion::{REGISTRY, SYSTEM};
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::children::{Children, Closure, Message};
 use crate::context::BastionId;
@@ -141,11 +141,15 @@ impl Supervisor {
     }
 
     pub(super) async fn run(mut self) -> Self {
+        REGISTRY.add_supervisor(&self);
+
         loop {
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
                     match msg {
                         BastionMessage::PoisonPill => {
+                            REGISTRY.remove_supervisor(&self);
+
                             self.bcast.dead();
 
                             return self;
@@ -158,6 +162,8 @@ impl Supervisor {
                         }
                         BastionMessage::Faulted { id } => {
                             if self.recover(id).await.is_err() {
+                                REGISTRY.remove_supervisor(&self);
+
                                 self.bcast.faulted();
 
                                 return self;
@@ -171,6 +177,8 @@ impl Supervisor {
                     }
                 }
                 Poll::Ready(None) => {
+                    REGISTRY.remove_supervisor(&self);
+
                     self.bcast.faulted();
 
                     return self;

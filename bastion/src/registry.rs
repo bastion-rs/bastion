@@ -55,6 +55,24 @@ impl Registry {
 		self.registered.insert(id, registrant);
 	}
 
+	pub(super) fn remove_supervisor(&self, supervisor: &Supervisor) {
+		let id = supervisor.id();
+
+		self.registered.remove(id);
+	}
+
+	pub(super) fn remove_children(&self, children: &Children) {
+		let id = children.id();
+
+		self.registered.remove(id);
+	}
+
+	pub(super) fn remove_child(&self, child: &Child) {
+		let id = child.id();
+
+		self.registered.remove(id);
+	}
+
 	pub(super) fn send_supervisor(&self, id: &BastionId, msg: BastionMessage) -> Result<(), BastionMessage> {
 		let registrant = if let Some(registrant) = self.registered.get(id) {
 			registrant
