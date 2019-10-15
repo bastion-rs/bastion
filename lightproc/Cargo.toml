@@ -5,3 +5,4 @@ description = "Lightweight process abstraction for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
 categories = []
+edition = "2018"

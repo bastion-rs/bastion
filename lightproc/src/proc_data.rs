@@ -1,6 +1,6 @@
 use std::task::Waker;
 use std::cell::UnsafeCell;
-use proc_vtable::ProcVTable;
+use crate::proc_vtable::ProcVTable;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub(crate) struct ProcData {
