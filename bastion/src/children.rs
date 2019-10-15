@@ -62,6 +62,12 @@ impl Children {
         }
     }
 
+    pub(super) fn reset(&mut self, bcast: Broadcast) {
+        self.bcast.poison_pill_children();
+
+        self.bcast = bcast;
+    }
+
     pub(super) fn id(&self) -> &BastionId {
         self.bcast.id()
     }
@@ -106,8 +112,8 @@ impl Children {
 
     pub(super) fn launch(mut self) ->  JoinHandle<Self> {
         for _ in 0..self.redundancy {
-            let id = BastionId::new();
-            let bcast = self.bcast.new_child(id.clone());
+            let bcast = self.bcast.new_child();
+            let id = bcast.id().clone();
 
             let thunk = objekt::clone_box(&*self.thunk);
             let msg = objekt::clone_box(&*self.msg);

@@ -4,7 +4,7 @@ use crate::children::{Children, Closure, Message};
 use crate::context::BastionId;
 use futures::{pending, poll};
 use futures::prelude::*;
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 use runtime::task::JoinHandle;
 use std::ops::RangeFrom;
 use std::task::Poll;
@@ -15,7 +15,7 @@ pub struct Supervisor {
     // FIXME: contains dead Children
     order: Vec<BastionId>,
     launched: FxHashMap<BastionId, (usize, JoinHandle<Children>)>,
-    dead: FxHashSet<BastionId>,
+    dead: FxHashMap<BastionId, Children>,
     strategy: SupervisionStrategy,
 }
 
@@ -27,13 +27,12 @@ pub enum SupervisionStrategy {
 
 impl Supervisor {
     pub(super) fn new() -> Self {
-        let id = BastionId::new();
-        let bcast = Broadcast::new(id);
+        let bcast = Broadcast::new();
 
         let children = Vec::new();
         let order = Vec::new();
         let launched = FxHashMap::default();
-        let dead = FxHashSet::default();
+        let dead = FxHashMap::default();
         let strategy = SupervisionStrategy::default();
 
         Supervisor {
@@ -43,6 +42,17 @@ impl Supervisor {
             launched,
             dead,
             strategy,
+        }
+    }
+
+    pub(super) async fn reset(&mut self) {
+        self.kill_children(0..).await;
+        self.bcast = Broadcast::new();
+
+        for children in &mut self.children {
+            let bcast = self.bcast.new_child();
+
+            children.reset(bcast);
         }
     }
 
@@ -64,8 +74,7 @@ impl Supervisor {
             F: Closure,
             M: Message,
     {
-        let id = BastionId::new();
-        let bcast = self.bcast.new_child(id);
+        let bcast = self.bcast.new_child();
 
         let thunk = Box::new(thunk);
         let msg = Box::new(msg);
@@ -107,6 +116,11 @@ impl Supervisor {
             if let Some((_, launched)) = self.launched.remove(&id) {
                 // FIXME: join?
                 children.push(launched.await);
+            }
+
+            if let Some(dead) = self.dead.remove(&id) {
+                // FIXME: join?
+                children.push(dead);
             }
         }
 
@@ -155,10 +169,16 @@ impl Supervisor {
                             return self;
                         }
                         BastionMessage::Dead { id } => {
-                            self.launched.remove(&id);
-                            self.bcast.remove_child(&id);
+                            // TODO: add a "faulted" list and poll from it instead of awaiting
 
-                            self.dead.insert(id);
+                            // FIXME: Err if None?
+                            if let Some((_, launched)) = self.launched.remove(&id) {
+                                let children = launched.await;
+
+                                self.bcast.remove_child(&id);
+
+                                self.dead.insert(id, children);
+                            }
                         }
                         BastionMessage::Faulted { id } => {
                             if self.recover(id).await.is_err() {

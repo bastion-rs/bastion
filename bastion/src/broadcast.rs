@@ -30,7 +30,8 @@ pub(super) enum BastionMessage {
 }
 
 impl Broadcast {
-    pub(super) fn new(id: BastionId) -> Self {
+    pub(super) fn new() -> Self {
+	    let id = BastionId::new();
         let parent = None;
         let (sender, recver) = mpsc::unbounded();
         let children = FxHashMap::default();
@@ -44,7 +45,8 @@ impl Broadcast {
         }
     }
 
-    pub(super) fn with_parent(id: BastionId, parent: Sender) -> Self {
+    pub(super) fn with_parent(parent: Sender) -> Self {
+        let id = BastionId::new();
         let parent = Some(parent);
         let (sender, recver) = mpsc::unbounded();
         let children = FxHashMap::default();
@@ -86,8 +88,8 @@ impl Broadcast {
         self.send_parent(BastionMessage::faulted(self.id.clone()));
     }
 
-    pub(super) fn new_child(&mut self, id: BastionId) -> Self {
-        let child = Broadcast::with_parent(id, self.sender.clone());
+    pub(super) fn new_child(&mut self) -> Self {
+        let child = Broadcast::with_parent(self.sender.clone());
         self.children.insert(child.id.clone(), child.sender.clone());
 
         child

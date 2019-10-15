@@ -17,8 +17,7 @@ pub(super) struct System {
 
 impl System {
 	pub(super) fn start() -> UnboundedSender<Supervisor> {
-		let id = BastionId::new();
-		let bcast = Broadcast::new(id);
+		let bcast = Broadcast::new();
 		let (sender, recver) = mpsc::unbounded();
 
 		let supervisors = FxHashMap::default();
@@ -62,9 +61,14 @@ impl System {
 						BastionMessage::Faulted { id } => {
 							// TODO: add a "faulted" list and poll from it instead of awaiting
 
-							if let Some(supervisor) = self.supervisors.remove(&id) {
+							// FIXME: Err if None?
+							if let Some(launched) = self.supervisors.remove(&id) {
+								let mut supervisor = launched.await;
+
+								supervisor.reset().await;
+
 								// FIXME: set a limit?
-								self.launch_supervisor(supervisor.await);
+								self.launch_supervisor(supervisor);
 							}
 						}
 						BastionMessage::Message(_) => {
