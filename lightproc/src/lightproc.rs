@@ -37,9 +37,10 @@ impl<T> LightProc<T> {
         F: Future<Output = R> + Send + 'static
     {
         let fut_mem = Layout::new::<F>();
-        let (new_layout, offset_t) =
+        let (new_layout, offset_f) =
             extend(self.proc_layout.layout, fut_mem);
         self.proc_layout.layout = new_layout;
-
+        self.proc_layout.offset_table
+            .insert("future", offset_f);
     }
 }

@@ -6,3 +6,6 @@ authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
 categories = []
 edition = "2018"
+
+[dependencies]
+rustc-hash = "1.0.1"
