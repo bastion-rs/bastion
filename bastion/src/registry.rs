@@ -1,11 +1,11 @@
 use crate::broadcast::{BastionMessage, Sender};
 use crate::children::{Child, Children};
+use crate::context::{BastionId};
 use crate::supervisor::Supervisor;
 use chashmap::CHashMap;
-use uuid::Uuid;
 
 pub(super) struct Registry {
-	registered: CHashMap<Uuid, Registrant>,
+	registered: CHashMap<BastionId, Registrant>,
 }
 
 struct Registrant {
@@ -55,7 +55,7 @@ impl Registry {
 		self.registered.insert(id, registrant);
 	}
 
-	pub(super) fn send_supervisor(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+	pub(super) fn send_supervisor(&self, id: &BastionId, msg: BastionMessage) -> Result<(), BastionMessage> {
 		let registrant = if let Some(registrant) = self.registered.get(id) {
 			registrant
 		} else {
@@ -69,7 +69,7 @@ impl Registry {
 		registrant.sender.unbounded_send(msg).map_err(|err| err.into_inner())
 	}
 
-	pub(super) fn send_children(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+	pub(super) fn send_children(&self, id: &BastionId, msg: BastionMessage) -> Result<(), BastionMessage> {
 		let registrant = if let Some(registrant) = self.registered.get(id) {
 			registrant
 		} else {
@@ -83,7 +83,7 @@ impl Registry {
 		registrant.sender.unbounded_send(msg).map_err(|err| err.into_inner())
 	}
 
-	pub(super) fn send_child(&self, id: &Uuid, msg: BastionMessage) -> Result<(), BastionMessage> {
+	pub(super) fn send_child(&self, id: &BastionId, msg: BastionMessage) -> Result<(), BastionMessage> {
 		let registrant = if let Some(registrant) = self.registered.get(id) {
 			registrant
 		} else {

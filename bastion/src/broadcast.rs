@@ -1,36 +1,36 @@
 use crate::children::Message;
+use crate::context::BastionId;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use uuid::Uuid;
 
 pub(super) type Sender = UnboundedSender<BastionMessage>;
 pub(super) type Receiver = UnboundedReceiver<BastionMessage>;
 
 pub(super) struct Broadcast {
-    id: Uuid,
+    id: BastionId,
     sender: Sender,
     recver: Receiver,
     parent: Option<Sender>,
-    children: FxHashMap<Uuid, Sender>,
+    children: FxHashMap<BastionId, Sender>,
 }
 
 #[derive(Debug)]
 pub(super) enum BastionMessage {
     PoisonPill,
     Dead {
-        id: Uuid,
+        id: BastionId,
     },
     Faulted {
-        id: Uuid,
+        id: BastionId,
     },
     Message(Box<dyn Message>),
 }
 
 impl Broadcast {
-    pub(super) fn new(id: Uuid) -> Self {
+    pub(super) fn new(id: BastionId) -> Self {
         let parent = None;
         let (sender, recver) = mpsc::unbounded();
         let children = FxHashMap::default();
@@ -44,7 +44,7 @@ impl Broadcast {
         }
     }
 
-    pub(super) fn with_parent(id: Uuid, parent: Sender) -> Self {
+    pub(super) fn with_parent(id: BastionId, parent: Sender) -> Self {
         let parent = Some(parent);
         let (sender, recver) = mpsc::unbounded();
         let children = FxHashMap::default();
@@ -58,7 +58,7 @@ impl Broadcast {
         }
     }
 
-    pub(super) fn id(&self) -> &Uuid {
+    pub(super) fn id(&self) -> &BastionId {
         &self.id
     }
 
@@ -66,7 +66,7 @@ impl Broadcast {
         &self.sender
     }
 
-    pub(super) fn poison_pill_child(&mut self, id: &Uuid) {
+    pub(super) fn poison_pill_child(&mut self, id: &BastionId) {
         self.send_child(id, BastionMessage::PoisonPill);
         self.remove_child(id);
     }
@@ -86,14 +86,14 @@ impl Broadcast {
         self.send_parent(BastionMessage::faulted(self.id.clone()));
     }
 
-    pub(super) fn new_child(&mut self, id: Uuid) -> Self {
+    pub(super) fn new_child(&mut self, id: BastionId) -> Self {
         let child = Broadcast::with_parent(id, self.sender.clone());
         self.children.insert(child.id.clone(), child.sender.clone());
 
         child
     }
 
-    pub(super) fn remove_child(&mut self, id: &Uuid) -> bool {
+    pub(super) fn remove_child(&mut self, id: &BastionId) -> bool {
         self.children.remove(id).is_some()
     }
 
@@ -109,7 +109,7 @@ impl Broadcast {
         }
     }
 
-    pub(super) fn send_child(&mut self, id: &Uuid, msg: BastionMessage) {
+    pub(super) fn send_child(&mut self, id: &BastionId, msg: BastionMessage) {
         // FIXME: Err if None?
         if let Some(child) = self.children.get_mut(id) {
             // FIXME: handle errors
@@ -130,11 +130,11 @@ impl BastionMessage {
         BastionMessage::PoisonPill
     }
 
-    pub(super) fn dead(id: Uuid) -> Self {
+    pub(super) fn dead(id: BastionId) -> Self {
         BastionMessage::Dead { id }
     }
 
-    pub(super) fn faulted(id: Uuid) -> Self {
+    pub(super) fn faulted(id: BastionId) -> Self {
         BastionMessage::Faulted { id }
     }
 

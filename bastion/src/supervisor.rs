@@ -1,21 +1,21 @@
 use crate::bastion::SYSTEM;
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::children::{Children, Closure, Message};
+use crate::context::BastionId;
 use futures::{pending, poll};
 use futures::prelude::*;
 use fxhash::{FxHashMap, FxHashSet};
 use runtime::task::JoinHandle;
 use std::ops::RangeFrom;
 use std::task::Poll;
-use uuid::Uuid;
 
 pub struct Supervisor {
     bcast: Broadcast,
     children: Vec<Children>,
     // FIXME: contains dead Children
-    order: Vec<Uuid>,
-    launched: FxHashMap<Uuid, (usize, JoinHandle<Children>)>,
-    dead: FxHashSet<Uuid>,
+    order: Vec<BastionId>,
+    launched: FxHashMap<BastionId, (usize, JoinHandle<Children>)>,
+    dead: FxHashSet<BastionId>,
     strategy: SupervisionStrategy,
 }
 
@@ -27,7 +27,7 @@ pub enum SupervisionStrategy {
 
 impl Supervisor {
     pub(super) fn new() -> Self {
-        let id = Uuid::new_v4();
+        let id = BastionId::new();
         let bcast = Broadcast::new(id);
 
         let children = Vec::new();
@@ -46,7 +46,7 @@ impl Supervisor {
         }
     }
 
-    pub fn id(&self) -> &Uuid {
+    pub fn id(&self) -> &BastionId {
         &self.bcast.id()
     }
 
@@ -64,7 +64,7 @@ impl Supervisor {
             F: Closure,
             M: Message,
     {
-        let id = Uuid::new_v4();
+        let id = BastionId::new();
         let bcast = self.bcast.new_child(id);
 
         let thunk = Box::new(thunk);
@@ -114,7 +114,7 @@ impl Supervisor {
         self.children = children;
     }
 
-    async fn recover(&mut self, id: Uuid) -> Result<(), ()> {
+    async fn recover(&mut self, id: BastionId) -> Result<(), ()> {
         match self.strategy {
             SupervisionStrategy::OneForOne => {
                 let (order, launched) = self.launched.remove(&id).ok_or(())?;

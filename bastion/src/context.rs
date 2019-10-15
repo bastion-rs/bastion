@@ -3,28 +3,34 @@ use crate::broadcast::{BastionMessage, Sender};
 use crate::children::Message;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
-pub struct BastionID(Uuid);
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub struct BastionId(Uuid);
 
 pub struct BastionContext {
-	id: BastionID,
+	id: BastionId,
 	parent: Sender,
 }
 
-impl BastionContext {
-	pub(super) fn new(id: Uuid, parent: Sender) -> Self {
-		let id = BastionID(id);
+impl BastionId {
+	pub(super) fn new() -> Self {
+		let uuid = Uuid::new_v4();
 
+		BastionId(uuid)
+	}
+}
+
+impl BastionContext {
+	pub(super) fn new(id: BastionId, parent: Sender) -> Self {
 		BastionContext { id, parent }
 	}
 
-	pub fn id(&self) -> &BastionID {
+	pub fn id(&self) -> &BastionId {
 		&self.id
 	}
 
-	pub fn send_msg(&self, id: &BastionID, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
+	pub fn send_msg(&self, id: &BastionId, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
 		let msg = BastionMessage::msg(msg);
 
-		REGISTRY.send_child(&id.0, msg).map_err(|msg| msg.into_msg().unwrap())
+		REGISTRY.send_child(id, msg).map_err(|msg| msg.into_msg().unwrap())
 	}
 }

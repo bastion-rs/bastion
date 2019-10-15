@@ -1,4 +1,5 @@
 use crate::broadcast::{BastionMessage, Broadcast};
+use crate::context::BastionId;
 use crate::supervisor::Supervisor;
 use futures::{pending, poll};
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -6,18 +7,17 @@ use futures::prelude::*;
 use fxhash::{FxHashMap, FxHashSet};
 use runtime::task::JoinHandle;
 use std::task::Poll;
-use uuid::Uuid;
 
 pub(super) struct System {
 	bcast: Broadcast,
 	recver: UnboundedReceiver<Supervisor>,
-	supervisors: FxHashMap<Uuid, JoinHandle<Supervisor>>,
-	dead: FxHashSet<Uuid>,
+	supervisors: FxHashMap<BastionId, JoinHandle<Supervisor>>,
+	dead: FxHashSet<BastionId>,
 }
 
 impl System {
 	pub(super) fn start() -> UnboundedSender<Supervisor> {
-		let id = Uuid::new_v4();
+		let id = BastionId::new();
 		let bcast = Broadcast::new(id);
 		let (sender, recver) = mpsc::unbounded();
 

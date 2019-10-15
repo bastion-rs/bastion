@@ -1,5 +1,5 @@
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
-use crate::context::BastionContext;
+use crate::context::{BastionContext, BastionId};
 use futures::future::CatchUnwind;
 use futures::pending;
 use futures::poll;
@@ -11,7 +11,6 @@ use std::future::Future;
 use std::panic::UnwindSafe;
 use std::pin::Pin;
 use std::task::Poll;
-use uuid::Uuid;
 
 pub trait Shell: objekt::Clone + Send + Sync + Any + 'static {}
 impl<T> Shell for T where T: objekt::Clone + Send + Sync + Any + 'static {}
@@ -62,7 +61,7 @@ impl Children {
         }
     }
 
-    pub(super) fn id(&self) -> &Uuid {
+    pub(super) fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
@@ -100,7 +99,7 @@ impl Children {
 
     pub(super) fn launch(mut self) ->  JoinHandle<Self> {
         for _ in 0..self.redundancy {
-            let id = Uuid::new_v4();
+            let id = BastionId::new();
             let bcast = self.bcast.new_child(id.clone());
 
             let thunk = objekt::clone_box(&*self.thunk);
@@ -121,7 +120,7 @@ impl Children {
 }
 
 impl Child {
-    pub(super) fn id(&self) -> &Uuid {
+    pub(super) fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
