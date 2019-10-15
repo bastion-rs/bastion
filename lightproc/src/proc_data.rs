@@ -1,7 +1,7 @@
-use std::task::Waker;
-use std::cell::UnsafeCell;
 use crate::proc_vtable::ProcVTable;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::UnsafeCell;
+use std::sync::atomic::AtomicUsize;
+use std::task::Waker;
 
 pub(crate) struct ProcData {
     pub(crate) state: AtomicUsize,
