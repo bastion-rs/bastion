@@ -2,6 +2,7 @@ use crate::lightproc::LightProc;
 use crate::proc_data::ProcData;
 use crate::proc_layout::ProcLayout;
 use std::future::Future;
+use std::ptr::NonNull;
 
 /// Raw pointers to the fields of a task.
 pub struct RawProc<F, R, S, T> {
@@ -44,12 +45,26 @@ where
         unsafe {
             Self {
                 pdata: p as *const ProcData,
-                schedule: p.add(proc_layout.offset_table.get("schedule").cloned().unwrap())
-                    as *const S,
-                stack: p.add(proc_layout.offset_table.get("stack").cloned().unwrap()) as *mut T,
-                future: p.add(proc_layout.offset_table.get("future").cloned().unwrap()) as *mut F,
-                output: p.add(proc_layout.offset_table.get("output").cloned().unwrap()) as *mut R,
+                schedule: p.add(
+                    Self::get_offset(&proc_layout, "schedule")
+                ) as *const S,
+                stack: p.add(
+                    Self::get_offset(&proc_layout, "stack")
+                ) as *mut T,
+                future: p.add(
+                    Self::get_offset(&proc_layout, "future")
+                ) as *mut F,
+                output: p.add(
+                    Self::get_offset(&proc_layout, "output")
+                ) as *mut R,
             }
         }
+    }
+
+    #[inline]
+    pub(crate) fn get_offset(proc_layout: &ProcLayout, offset_of: &str) -> usize {
+        if let Some(offset) = proc_layout.offset_table.get(offset_of).cloned() {
+            offset
+        } else { 0x00_usize }
     }
 }
