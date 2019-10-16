@@ -21,7 +21,7 @@ use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
 
-use parking_lot::Mutex;
+use std::sync::Mutex;
 use std::mem;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -166,9 +166,9 @@ impl Bastion {
     }
 
     fn traverse(ns: Supervisor) -> Supervisor {
-        let runtime = PLATFORM.lock();
+        let runtime = PLATFORM.lock().unwrap();
         let arcreg = runtime.registry.clone();
-        let registry = arcreg.lock();
+        let registry = arcreg.lock().unwrap();
         Bastion::traverse_registry(registry.clone(), registry.root(), &ns);
 
         ns
@@ -180,7 +180,7 @@ impl Bastion {
 
         // Push supervisor for next trampoline
         let fark = FAULTED.clone();
-        let mut faulted_ones = fark.lock();
+        let mut faulted_ones = fark.lock().unwrap();
         faulted_ones.push(given.clone());
 
         debug!("Fault induced supervisors: {:?}", faulted_ones);
@@ -274,7 +274,7 @@ impl Bastion {
                                 if let Err(err) = result {
                                     error!("Panic happened in restarted - {:?}", err);
                                     let fark = FAULTED.clone();
-                                    let mut faulted_ones = fark.lock();
+                                    let mut faulted_ones = fark.lock().unwrap();
                                     let faulted = faulted_ones.pop().unwrap();
 
                                     // Make trampoline to re-enter
@@ -287,7 +287,7 @@ impl Bastion {
                         );
 
                         let ark = PLATFORM.clone();
-                        let mut runtime = ark.lock();
+                        let mut runtime = ark.lock().unwrap();
                         let shared_runtime: &mut Runtime = &mut runtime.runtime;
                         shared_runtime.spawn(k);
                     }
@@ -384,8 +384,8 @@ impl Bastion {
         let root_spv;
         {
             let ark = PLATFORM.clone();
-            let runtime = ark.lock();
-            let mut registry = runtime.registry.lock();
+            let runtime = ark.lock().unwrap();
+            let mut registry = runtime.registry.lock().unwrap();
             let mut rootn = registry.root_mut();
             let root: &mut Supervisor = rootn.value();
 
@@ -415,8 +415,8 @@ impl Bastion {
             .catch_unwind()
             .then(|result| -> FutureResult<(), ()> {
                 let ark = PLATFORM.clone();
-                let runtime = ark.lock();
-                let mut registry = runtime.registry.lock();
+                let runtime = ark.lock().unwrap();
+                let mut registry = runtime.registry.lock().unwrap();
                 let mut rootn = registry.root_mut();
                 let mut root = rootn.value().clone();
 
@@ -433,7 +433,7 @@ impl Bastion {
             });
 
         let ark = PLATFORM.clone();
-        let mut runtime = ark.lock();
+        let mut runtime = ark.lock().unwrap();
         let shared_runtime: &mut Runtime = &mut runtime.runtime;
         shared_runtime.spawn(k);
 
@@ -446,12 +446,10 @@ const CLOSE_OVER: Result<Async<()>, Never> = Ok(Async::Ready(()));
 
 impl RuntimeManager for Bastion {
     fn unstable_shutdown() {
-        let ark = PLATFORM.clone();
         unsafe {
-            if let Some(lock_ptr) = ark.clone().try_lock() {
+            if let Ok(lock_ptr) = PLATFORM.clone().try_lock() {
                 let l: RuntimeSystem = mem::transmute_copy(&*lock_ptr);
                 l.runtime.shutdown_now().wait().unwrap();
-                ark.force_unlock_fair();
                 mem::forget(lock_ptr);
             }
         }

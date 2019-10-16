@@ -1,7 +1,7 @@
 use crate::runtime_manager::FaultRecovery;
 use crate::supervisor::Supervisor;
 use ego_tree::Tree;
-use parking_lot::Mutex;
+use std::sync::Mutex;
 use std::any::Any;
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};

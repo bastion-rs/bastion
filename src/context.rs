@@ -254,7 +254,7 @@ impl BastionContext {
                 });
 
             let ark = crate::bastion::PLATFORM.clone();
-            let mut runtime = ark.lock();
+            let mut runtime = ark.lock().unwrap();
             let shared_runtime = &mut runtime.runtime;
             shared_runtime.spawn(k);
         }
