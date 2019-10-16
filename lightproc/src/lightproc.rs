@@ -87,8 +87,6 @@ impl<T> LightProc<T> {
         let (new_layout, offset_st) = extend(self.proc_layout.layout, stack_mem);
         self.proc_layout.offset_table.insert("stack", offset_st);
 
-        println!("==============");
-
         self.reallocate(new_layout);
 
         let rawp =
@@ -102,7 +100,7 @@ impl<T> LightProc<T> {
         self
     }
 
-    pub fn build<R>(mut self) -> (LightProc<T>, ProcHandle<R, T>) {
+    pub fn returning<R>(mut self) -> (LightProc<T>, ProcHandle<R, T>) {
         let raw_proc = self.raw_proc;
         let proc = LightProc {
             raw_proc,

@@ -1,5 +1,6 @@
 use lightproc::prelude::*;
 use lightproc::stack::ProcStack;
+use lightproc::proc_handle::ProcHandle;
 
 fn main() {
     let lp = LightProc::<()>::new().with_future(async move {
@@ -31,4 +32,14 @@ fn main() {
         })
         .with_stack(ProcStack::default());
     dbg!(lp4);
+
+    let (proc, handle) = LightProc::<ProcStack>::new()
+        .with_future(async move {
+            println!("future");
+        })
+        .with_schedule(|t| {
+            println!("scheduler");
+        })
+        .with_stack(ProcStack::default())
+        .returning::<i32>();
 }
