@@ -21,11 +21,11 @@ use futures::future::poll_fn;
 use lazy_static::lazy_static;
 use log::LevelFilter;
 
-use std::sync::Mutex;
 use std::mem;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 use tokio::prelude::future::FutureResult;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
