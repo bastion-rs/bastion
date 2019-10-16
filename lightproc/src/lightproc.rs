@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use crate::proc_layout::ProcLayout;
 
 use crate::layout_helpers::extend;
-use crate::raw_proc::RawProc;
+
 use std::alloc::Layout;
 
 pub struct LightProc<T> {

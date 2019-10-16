@@ -2,7 +2,7 @@ use crate::lightproc::LightProc;
 use crate::proc_data::ProcData;
 use crate::proc_layout::ProcLayout;
 use std::future::Future;
-use std::ptr::NonNull;
+
 
 /// Raw pointers to the fields of a task.
 pub struct RawProc<F, R, S, T> {
