@@ -2,8 +2,8 @@ use std::marker::PhantomData as marker;
 use std::ptr::NonNull;
 
 pub struct ProcHandle<R, T> {
-    raw_proc: NonNull<()>,
-    _private: marker<(R, T)>,
+    pub(crate) raw_proc: NonNull<()>,
+    pub(crate) _private: marker<(R, T)>,
 }
 
 unsafe impl<R, T> Send for ProcHandle<R, T> {}

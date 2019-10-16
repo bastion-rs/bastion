@@ -32,30 +32,25 @@ impl<F, R, S, T> Clone for RawProc<F, R, S, T> {
 }
 
 impl<F, R, S, T> RawProc<F, R, S, T>
-where
-    F: Future<Output = R> + Send + 'static,
-    R: Send + 'static,
-    S: Fn(LightProc<T>) + Send + Sync + 'static,
-    T: Send + 'static,
 {
     #[inline]
-    pub(crate) fn from_ptr(ptr: *const (), proc_layout: ProcLayout) -> Self {
+    pub(crate) fn from_ptr(ptr: *const (), proc_layout: &ProcLayout) -> Self {
         let p = ptr as *const u8;
 
         unsafe {
             Self {
                 pdata: p as *const ProcData,
                 schedule: p.add(
-                    Self::get_offset(&proc_layout, "schedule")
+                    Self::get_offset(proc_layout, "schedule")
                 ) as *const S,
                 stack: p.add(
-                    Self::get_offset(&proc_layout, "stack")
+                    Self::get_offset(proc_layout, "stack")
                 ) as *mut T,
                 future: p.add(
-                    Self::get_offset(&proc_layout, "future")
+                    Self::get_offset(proc_layout, "future")
                 ) as *mut F,
                 output: p.add(
-                    Self::get_offset(&proc_layout, "output")
+                    Self::get_offset(proc_layout, "output")
                 ) as *mut R,
             }
         }
@@ -64,7 +59,11 @@ where
     #[inline]
     pub(crate) fn get_offset(proc_layout: &ProcLayout, offset_of: &str) -> usize {
         if let Some(offset) = proc_layout.offset_table.get(offset_of).cloned() {
+            dbg!(offset);
             offset
-        } else { 0x00_usize }
+        } else {
+            dbg!("OFFSET NOT FOUND");
+            0x00_usize
+        }
     }
 }
