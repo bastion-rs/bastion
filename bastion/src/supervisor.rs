@@ -2,8 +2,8 @@ use crate::bastion::{REGISTRY, SYSTEM};
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
 use crate::children::{Children, Closure, Message};
 use crate::context::BastionId;
-use futures::{pending, poll};
 use futures::prelude::*;
+use futures::{pending, poll};
 use fxhash::FxHashMap;
 use runtime::task::JoinHandle;
 use std::ops::RangeFrom;
@@ -70,21 +70,16 @@ impl Supervisor {
     }
 
     pub fn children<F, M>(mut self, thunk: F, msg: M, redundancy: usize) -> Self
-        where
-            F: Closure,
-            M: Message,
+    where
+        F: Closure,
+        M: Message,
     {
         let bcast = self.bcast.new_child();
 
         let thunk = Box::new(thunk);
         let msg = Box::new(msg);
 
-        let children = Children::new(
-            thunk,
-            msg,
-            bcast,
-            redundancy,
-        );
+        let children = Children::new(thunk, msg, bcast, redundancy);
 
         self.children.push(children);
 
@@ -95,18 +90,19 @@ impl Supervisor {
         for children in self.children.drain(..) {
             let id = children.id().clone();
 
-            self.launched.insert(id.clone(), (self.order.len(), children.launch()));
+            self.launched
+                .insert(id.clone(), (self.order.len(), children.launch()));
             self.order.push(id);
         }
     }
 
     async fn kill_children(&mut self, range: RangeFrom<usize>) {
         if range.start == 0 {
-	        self.bcast.poison_pill_children();
+            self.bcast.poison_pill_children();
         } else {
             // FIXME: panics
             for id in self.order.get(range.clone()).unwrap() {
-	            self.bcast.poison_pill_child(id);
+                self.bcast.poison_pill_child(id);
             }
         }
 

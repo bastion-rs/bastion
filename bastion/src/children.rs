@@ -93,23 +93,22 @@ impl Children {
 
         loop {
             match poll!(&mut self.bcast.next()) {
-                Poll::Ready(Some(msg)) => {
-                    match msg {
-                        BastionMessage::PoisonPill | BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
-	                        REGISTRY.remove_children(&self);
+                Poll::Ready(Some(msg)) => match msg {
+                    BastionMessage::PoisonPill
+                    | BastionMessage::Dead { .. }
+                    | BastionMessage::Faulted { .. } => {
+                        REGISTRY.remove_children(&self);
 
-                            if msg.is_faulted() {
-	                            self.bcast.faulted();
-                            } else {
-                                self.bcast.dead();
-                            }
-
-                            return self;
+                        if msg.is_faulted() {
+                            self.bcast.faulted();
+                        } else {
+                            self.bcast.dead();
                         }
-                        // FIXME
-                        BastionMessage::Message(_) => unimplemented!(),
+
+                        return self;
                     }
-                }
+                    BastionMessage::Message(_) => self.bcast.send_children(msg),
+                },
                 Poll::Ready(None) => {
                     REGISTRY.remove_children(&self);
 
@@ -122,7 +121,7 @@ impl Children {
         }
     }
 
-    pub(super) fn launch(mut self) ->  JoinHandle<Self> {
+    pub(super) fn launch(mut self) -> JoinHandle<Self> {
         for _ in 0..self.redundancy {
             let bcast = self.bcast.new_child();
             let id = bcast.id().clone();
@@ -136,8 +135,7 @@ impl Children {
             let parent = self.bcast.sender().clone();
             let ctx = BastionContext::new(id, parent, state.clone());
 
-            let exec = AssertUnwindSafe(thunk(ctx, msg).0)
-                .catch_unwind();
+            let exec = AssertUnwindSafe(thunk(ctx, msg).0).catch_unwind();
 
             let child = Child { exec, bcast, state };
             runtime::spawn(child.run());
@@ -180,14 +178,14 @@ impl Child {
                     match msg {
                         BastionMessage::PoisonPill => return self.dead(),
                         // FIXME
-	                    BastionMessage::Dead { .. } => unimplemented!(),
+                        BastionMessage::Dead { .. } => unimplemented!(),
                         // FIXME
                         BastionMessage::Faulted { .. } => unimplemented!(),
                         BastionMessage::Message(msg) => {
                             state.push_msg(msg);
 
                             continue;
-                        },
+                        }
                     }
                 }
                 Poll::Ready(None) => return self.faulted(),
@@ -195,7 +193,7 @@ impl Child {
             }
 
             if let Poll::Ready(res) = poll!(&mut self.exec) {
-	            match res {
+                match res {
                     Ok(Ok(())) => return self.dead(),
                     Ok(Err(())) | Err(_) => return self.faulted(),
                 }

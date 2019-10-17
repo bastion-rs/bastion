@@ -20,18 +20,14 @@ pub(super) struct Broadcast {
 #[derive(Debug)]
 pub(super) enum BastionMessage {
     PoisonPill,
-    Dead {
-        id: BastionId,
-    },
-    Faulted {
-        id: BastionId,
-    },
+    Dead { id: BastionId },
+    Faulted { id: BastionId },
     Message(Box<dyn Message>),
 }
 
 impl Broadcast {
     pub(super) fn new() -> Self {
-	    let id = BastionId::new();
+        let id = BastionId::new();
         let parent = None;
         let (sender, recver) = mpsc::unbounded();
         let children = FxHashMap::default();
@@ -84,7 +80,7 @@ impl Broadcast {
     }
 
     pub(super) fn faulted(&mut self) {
-	    self.poison_pill_children();
+        self.poison_pill_children();
         self.send_parent(BastionMessage::faulted(self.id.clone()));
     }
 

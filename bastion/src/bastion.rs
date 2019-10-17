@@ -5,16 +5,16 @@ use futures::channel::mpsc::UnboundedSender;
 use lazy_static::lazy_static;
 
 lazy_static! {
-	pub(super) static ref SYSTEM: UnboundedSender<Supervisor> = System::start();
-	pub(super) static ref REGISTRY: Registry = Registry::new();
+    pub(super) static ref SYSTEM: UnboundedSender<Supervisor> = System::start();
+    pub(super) static ref REGISTRY: Registry = Registry::new();
 }
 
 pub struct Bastion {
-	// TODO: ...
+    // TODO: ...
 }
 
 impl Bastion {
-	pub fn supervisor() -> Supervisor {
-		Supervisor::new()
-	}
+    pub fn supervisor() -> Supervisor {
+        Supervisor::new()
+    }
 }
