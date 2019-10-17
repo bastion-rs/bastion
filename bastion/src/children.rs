@@ -10,7 +10,7 @@ use runtime::task::JoinHandle;
 use std::any::Any;
 use std::fmt::Debug;
 use std::future::Future;
-use std::panic::UnwindSafe;
+use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::task::Poll;
 
@@ -29,12 +29,22 @@ where
     }
 }
 
-pub trait Closure: Fn(BastionContext, Box<dyn Message>) -> Pin<Box<dyn Fut>> + Shell {}
-impl<T> Closure for T where T: Fn(BastionContext, Box<dyn Message>) -> Pin<Box<dyn Fut>> + Shell {}
+pub trait Closure: Fn(BastionContext, Box<dyn Message>) -> Fut + Shell {}
+impl<T> Closure for T where T: Fn(BastionContext, Box<dyn Message>) -> Fut + Shell {}
 
 // TODO: Ok(T) & Err(E)
-pub trait Fut: Future<Output = Result<(), ()>> + Send + UnwindSafe {}
-impl<T> Fut for T where T: Future<Output = Result<(), ()>> + Send + UnwindSafe {}
+type FutInner = dyn Future<Output = Result<(), ()>> + Send;
+
+pub struct Fut(Pin<Box<FutInner>>);
+
+impl<T> From<T> for Fut
+where
+    T: Future<Output = Result<(), ()>> + Send + 'static,
+{
+    fn from(fut: T) -> Fut {
+        Fut(Box::pin(fut))
+    }
+}
 
 pub(super) struct Children {
     thunk: Box<dyn Closure>,
@@ -44,7 +54,7 @@ pub(super) struct Children {
 }
 
 pub(super) struct Child {
-    exec: CatchUnwind<Pin<Box<dyn Fut>>>,
+    exec: CatchUnwind<AssertUnwindSafe<Pin<Box<FutInner>>>>,
     bcast: Broadcast,
     state: Qutex<ContextState>,
 }
@@ -126,7 +136,7 @@ impl Children {
             let parent = self.bcast.sender().clone();
             let ctx = BastionContext::new(id, parent, state.clone());
 
-            let exec = thunk(ctx, msg)
+            let exec = AssertUnwindSafe(thunk(ctx, msg).0)
                 .catch_unwind();
 
             let child = Child { exec, bcast, state };
