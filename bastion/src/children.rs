@@ -1,10 +1,11 @@
 use crate::bastion::REGISTRY;
 use crate::broadcast::{BastionMessage, Broadcast, Sender};
-use crate::context::{BastionContext, BastionId};
+use crate::context::{BastionContext, BastionId, ContextState};
 use futures::future::CatchUnwind;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
+use qutex::Qutex;
 use runtime::task::JoinHandle;
 use std::any::Any;
 use std::fmt::Debug;
@@ -45,6 +46,7 @@ pub(super) struct Children {
 pub(super) struct Child {
     exec: CatchUnwind<Pin<Box<dyn Fut>>>,
     bcast: Broadcast,
+    state: Qutex<ContextState>,
 }
 
 impl Children {
@@ -115,16 +117,19 @@ impl Children {
             let bcast = self.bcast.new_child();
             let id = bcast.id().clone();
 
+            let state = ContextState::new();
+            let state = Qutex::new(state);
+
             let thunk = objekt::clone_box(&*self.thunk);
             let msg = objekt::clone_box(&*self.msg);
 
             let parent = self.bcast.sender().clone();
-            let ctx = BastionContext::new(id, parent);
+            let ctx = BastionContext::new(id, parent, state.clone());
 
             let exec = thunk(ctx, msg)
                 .catch_unwind();
 
-            let child = Child { exec, bcast };
+            let child = Child { exec, bcast, state };
             runtime::spawn(child.run());
         }
 
@@ -141,51 +146,52 @@ impl Child {
         self.bcast.sender()
     }
 
+    fn dead(mut self) {
+        REGISTRY.remove_child(&self);
+
+        self.bcast.dead();
+    }
+
+    fn faulted(mut self) {
+        REGISTRY.remove_child(&self);
+
+        self.bcast.faulted();
+    }
+
     async fn run(mut self) {
-	    REGISTRY.add_child(&self);
+        REGISTRY.add_child(&self);
 
         loop {
-            if let Poll::Ready(res) = poll!(&mut self.exec) {
-                REGISTRY.remove_child(&self);
-
-                match res {
-                    Ok(Ok(())) => self.bcast.dead(),
-                    Ok(Err(())) | Err(_) => self.bcast.faulted(),
-                }
-
-                return;
-            }
-
             match poll!(&mut self.bcast.next()) {
                 Poll::Ready(Some(msg)) => {
+                    // FIXME: Err(Error)
+                    let mut state = self.state.clone().lock_async().await.unwrap();
+
                     match msg {
-                        BastionMessage::PoisonPill => {
-                            REGISTRY.remove_child(&self);
-
-                            self.bcast.dead();
-
-                            return;
-                        }
-                        BastionMessage::Dead { .. } | BastionMessage::Faulted { .. } => {
-                            REGISTRY.remove_child(&self);
-
-	                        self.bcast.faulted();
-
-                            return;
-                        }
+                        BastionMessage::PoisonPill => return self.dead(),
                         // FIXME
-                        BastionMessage::Message(_) => unimplemented!(),
+	                    BastionMessage::Dead { .. } => unimplemented!(),
+                        // FIXME
+                        BastionMessage::Faulted { .. } => unimplemented!(),
+                        BastionMessage::Message(msg) => {
+                            state.push_msg(msg);
+
+                            continue;
+                        },
                     }
                 }
-                Poll::Ready(None) => {
-                    REGISTRY.remove_child(&self);
-
-                    self.bcast.faulted();
-
-                    return;
-                }
-                Poll::Pending => pending!(),
+                Poll::Ready(None) => return self.faulted(),
+                Poll::Pending => (),
             }
+
+            if let Poll::Ready(res) = poll!(&mut self.exec) {
+	            match res {
+                    Ok(Ok(())) => return self.dead(),
+                    Ok(Err(())) | Err(_) => return self.faulted(),
+                }
+            }
+
+            pending!();
         }
     }
 }
