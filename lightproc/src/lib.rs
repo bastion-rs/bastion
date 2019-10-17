@@ -10,5 +10,7 @@ pub mod state;
 
 pub mod prelude {
     pub use crate::lightproc::*;
+    pub use crate::stack::*;
     pub use crate::proc_layout::*;
+    pub use crate::proc_handle::*;
 }

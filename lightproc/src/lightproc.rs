@@ -1,4 +1,4 @@
-use std::alloc;
+use std::{alloc, mem, ptr};
 use std::future::Future;
 use std::marker::PhantomData as marker;
 use std::ptr::NonNull;
@@ -11,6 +11,7 @@ use std::alloc::Layout;
 use crate::raw_proc::RawProc;
 use crate::proc_handle::ProcHandle;
 use crate::stack::ProcStack;
+use crate::proc_data::ProcData;
 
 #[derive(Debug)]
 pub struct LightProc<T> {
@@ -80,17 +81,16 @@ impl<T> LightProc<T> {
         self
     }
 
-    pub fn with_stack(mut self, st: T) -> Self
-        where T: Send + 'static,
+    pub fn with_stack(mut self, st: ProcStack) -> Self
     {
-        let stack_mem = Layout::new::<T>();
+        let stack_mem = Layout::new::<ProcStack>();
         let (new_layout, offset_st) = extend(self.proc_layout.layout, stack_mem);
         self.proc_layout.offset_table.insert("stack", offset_st);
 
         self.reallocate(new_layout);
 
         let rawp =
-            RawProc::<usize, usize, usize, T>::from_ptr(
+            RawProc::<usize, usize, usize, ProcStack>::from_ptr(
                 self.raw_proc.as_ptr(), &self.proc_layout);
 
         unsafe {
@@ -104,7 +104,7 @@ impl<T> LightProc<T> {
         let raw_proc = self.raw_proc;
         let proc = LightProc {
             raw_proc,
-            proc_layout: self.proc_layout,
+            proc_layout: self.proc_layout.clone(),
             _private: marker,
         };
         let handle = ProcHandle {
@@ -114,16 +114,75 @@ impl<T> LightProc<T> {
         (proc, handle)
     }
 
-    fn reallocate(&mut self, added: Layout) {
+    pub fn schedule(self) {
+        let ptr = self.raw_proc.as_ptr();
+        let header = ptr as *const ProcData;
+        mem::forget(self);
+
         unsafe {
-            let pointer = alloc::realloc(
-                self.raw_proc.as_ptr() as *mut u8,
+            ((*header).vtable.schedule)(ptr);
+        }
+    }
+
+    pub fn run(self) {
+        let ptr = self.raw_proc.as_ptr();
+        let header = ptr as *const ProcData;
+        mem::forget(self);
+
+        unsafe {
+            ((*header).vtable.run)(ptr);
+        }
+    }
+
+    pub fn cancel(&self) {
+        let ptr = self.raw_proc.as_ptr();
+        let header = ptr as *const ProcData;
+
+        unsafe {
+            (*header).cancel();
+        }
+    }
+
+    pub fn stack(&self) -> &T {
+        let offset = ProcData::offset_tag::<T>();
+        let ptr = self.raw_proc.as_ptr();
+
+        unsafe {
+            let raw = (ptr as *mut u8).add(offset) as *const T;
+            &*raw
+        }
+    }
+
+    fn reallocate(&mut self, enlarged: Layout) {
+        unsafe {
+            let old = self.raw_proc.as_ptr() as *mut u8;
+            let bigger = alloc::realloc(
+                old,
                 self.proc_layout.layout,
-                added.size(),
+                enlarged.size(),
             );
-            self.raw_proc = NonNull::new(pointer as *mut ()).unwrap()
+            ptr::copy(old, bigger, self.proc_layout.layout.size());
+            self.raw_proc = NonNull::new(bigger as *mut ()).unwrap()
         }
 
-        self.proc_layout.layout = added;
+        self.proc_layout.layout = enlarged;
+    }
+}
+
+impl<T> Drop for LightProc<T> {
+    fn drop(&mut self) {
+        let ptr = self.raw_proc.as_ptr();
+        let header = ptr as *const ProcData;
+
+        unsafe {
+            // Cancel the task.
+            (*header).cancel();
+
+            // Drop the future.
+            ((*header).vtable.drop_future)(ptr);
+
+            // Drop the task reference.
+            ((*header).vtable.decrement)(ptr);
+        }
     }
 }
