@@ -2,10 +2,10 @@ use crate::broadcast::{BastionMessage, Sender};
 use crate::children::{Child, Children};
 use crate::context::BastionId;
 use crate::supervisor::{Supervisor, SupervisorRef};
-use chashmap::CHashMap;
+use dashmap::DashMap;
 
 pub(super) struct Registry {
-    registered: CHashMap<BastionId, Registrant>,
+    registered: DashMap<BastionId, Registrant>,
 }
 
 struct Registrant {
@@ -22,8 +22,7 @@ enum RegistrantType {
 
 impl Registry {
     pub(super) fn new() -> Self {
-        // TODO: with_capacity?
-        let registered = CHashMap::new();
+        let registered = DashMap::default();
 
         Registry { registered }
     }
@@ -96,6 +95,8 @@ impl Registry {
                 return;
             }
 
+            drop(registrant);
+
             self.registered.remove(id);
         }
     }
@@ -109,6 +110,8 @@ impl Registry {
                 return;
             }
 
+            drop(registrant);
+
             self.registered.remove(id);
         }
     }
@@ -121,6 +124,8 @@ impl Registry {
             if !registrant.is_child() {
                 return;
             }
+
+            drop(registrant);
 
             self.registered.remove(id);
         }

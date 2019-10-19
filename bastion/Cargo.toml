@@ -33,9 +33,9 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 #backtrace = "0.3.32"
-chashmap = "2.2"
 #crossbeam-channel = "0.3.8"
 #ctrlc = "3.1.3"
+dashmap = "1.2"
 #ego-tree = "0.6.0"
 #env_logger = "0.6.1"
 #futures = "0.1.28"
