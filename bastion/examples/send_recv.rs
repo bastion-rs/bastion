@@ -1,8 +1,6 @@
 use bastion::prelude::*;
-use futures::pending;
 
-#[runtime::main]
-async fn main() {
+fn main() {
     Bastion::init();
 
     Bastion::children(
@@ -15,13 +13,14 @@ async fn main() {
                 let try_recv = ctx.try_recv().await;
                 println!("try_recv.is_some() == {}", try_recv.is_some());
 
-                ctx.send_msg(id, Box::new(hello_world));
+                ctx.send_msg(id, Box::new(hello_world)).ok();
 
-                // This is going to return Ok(Box("Hello World!"))
+                // This is going to return Ok(Box("Hello World!")).
                 let recv = ctx.recv().await;
                 println!("recv.is_ok() == {}", recv.is_ok());
 
-                Ok(())
+                // Panicking, will restart the children.
+                panic!("Oh no!");
             }
             .into()
         },

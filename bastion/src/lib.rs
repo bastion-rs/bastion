@@ -2,6 +2,7 @@ pub use self::bastion::Bastion;
 
 mod bastion;
 mod broadcast;
+mod proc;
 mod registry;
 mod system;
 

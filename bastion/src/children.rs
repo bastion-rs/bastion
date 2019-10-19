@@ -1,6 +1,7 @@
 use crate::bastion::REGISTRY;
 use crate::broadcast::{BastionMessage, Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::proc::Proc;
 use crate::supervisor::SupervisorRef;
 use futures::future::CatchUnwind;
 use futures::pending;
@@ -9,7 +10,6 @@ use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use fxhash::FxHashMap;
 use qutex::Qutex;
-use runtime::task::JoinHandle;
 use std::any::Any;
 use std::fmt::Debug;
 use std::future::Future;
@@ -54,7 +54,7 @@ where
 pub(super) struct Children {
     bcast: Broadcast,
     supervisor: SupervisorRef,
-    launched: FxHashMap<BastionId, JoinHandle<Child>>,
+    launched: FxHashMap<BastionId, Proc<()>>,
     thunk: Box<dyn Closure>,
     redundancy: usize,
     pre_start_msgs: Vec<BastionMessage>,
@@ -105,8 +105,12 @@ impl Children {
         // TODO: stop or kill?
         self.kill().await;
 
+        REGISTRY.remove_children(&self);
+
         self.bcast = bcast;
         self.supervisor = supervisor;
+
+        REGISTRY.add_children(&self);
     }
 
     pub fn as_ref(&self) -> ChildrenRef {
@@ -221,13 +225,15 @@ impl Children {
             let state = Qutex::new(state);
 
             let thunk = objekt::clone_box(&*self.thunk);
-            let ctx = BastionContext::new(id, children, supervisor, state.clone());
+            let ctx = BastionContext::new(id.clone(), children, supervisor, state.clone());
             let exec = AssertUnwindSafe(thunk(ctx).0).catch_unwind();
 
             self.bcast.register(&bcast);
 
             let child = Child::new(exec, bcast, state);
-            runtime::spawn(child.run());
+            let launched = Proc::spawn(child.run());
+
+            self.launched.insert(id, launched);
         }
 
         loop {

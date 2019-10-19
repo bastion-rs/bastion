@@ -17,6 +17,8 @@ pub struct Bastion {
 
 impl Bastion {
     pub fn init() {
+        std::panic::set_hook(Box::new(|_| ()));
+
         // NOTE: this is just to make sure that SYSTEM has been initialized by lazy_static
         SYSTEM.is_closed();
     }

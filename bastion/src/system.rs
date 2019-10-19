@@ -1,19 +1,25 @@
 use crate::broadcast::{BastionMessage, Broadcast, Deployment, Parent, Sender};
 use crate::context::{BastionId, NIL_ID};
+use crate::proc::Proc;
 use crate::supervisor::Supervisor;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
-use runtime::task::JoinHandle;
+use lazy_static::lazy_static;
 use std::task::Poll;
+use tokio::runtime::{Builder, Runtime};
+
+lazy_static! {
+    pub(super) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
+}
 
 pub(super) struct System {
     bcast: Broadcast,
-    launched: FxHashMap<BastionId, JoinHandle<Supervisor>>,
+    launched: FxHashMap<BastionId, Proc<Supervisor>>,
     // TODO: set limit
     restart: FxHashSet<BastionId>,
-    waiting: FuturesUnordered<JoinHandle<Supervisor>>,
+    waiting: FuturesUnordered<Proc<Supervisor>>,
     pre_start_msgs: Vec<BastionMessage>,
     started: bool,
 }
@@ -46,7 +52,7 @@ impl System {
         let msg = BastionMessage::deploy_supervisor(supervisor);
         system.bcast.send_self(msg);
 
-        runtime::spawn(system.run());
+        Proc::spawn(system.run());
 
         sender
     }
@@ -65,7 +71,7 @@ impl System {
         supervisor.reset(bcast).await;
         self.bcast.register(supervisor.bcast());
 
-        let launched = runtime::spawn(supervisor.run());
+        let launched = Proc::spawn(supervisor.run());
         self.launched.insert(id, launched);
     }
 
@@ -123,7 +129,7 @@ impl System {
                     self.bcast.register(supervisor.bcast());
 
                     let id = supervisor.id().clone();
-                    let launched = runtime::spawn(supervisor.run());
+                    let launched = Proc::spawn(supervisor.run());
                     self.launched.insert(id, launched);
                 }
                 // FIXME
