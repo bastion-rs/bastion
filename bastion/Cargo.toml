@@ -31,8 +31,6 @@ exclude = [
 travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 #backtrace = "0.3.32"
 chashmap = "2.2"
@@ -46,10 +44,10 @@ fxhash = "0.2"
 lazy_static = "1.4"
 #log = "0.4.7"
 objekt = "0.1"
-parking_lot = "0.9"
+qutex = { version = "0.2", features = ["async_await"] }
 #ratelimit = "0.4.4"
 runtime = "=0.3.0-alpha.7"
 #tokio = "^0.1"
 #tokio-executor = "0.1.8"
 #tokio-threadpool = "0.1.15"
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.7", features = ["v4", "const_fn"] }

@@ -1,17 +1,21 @@
 use crate::bastion::REGISTRY;
-use crate::broadcast::{BastionMessage, Sender};
-use crate::children::Message;
+use crate::broadcast::BastionMessage;
+use crate::children::{ChildrenRef, Message};
+use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use uuid::Uuid;
+
+pub(super) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct BastionId(Uuid);
 
 pub struct BastionContext {
     id: BastionId,
-    parent: Sender,
+    children: ChildrenRef,
+    supervisor: SupervisorRef,
     state: Qutex<ContextState>,
 }
 
@@ -28,16 +32,34 @@ impl BastionId {
 }
 
 impl BastionContext {
-    pub(super) fn new(id: BastionId, parent: Sender, state: Qutex<ContextState>) -> Self {
-        BastionContext { id, parent, state }
+    pub(super) fn new(
+        id: BastionId,
+        children: ChildrenRef,
+        supervisor: SupervisorRef,
+        state: Qutex<ContextState>,
+    ) -> Self {
+        BastionContext {
+            id,
+            children,
+            supervisor,
+            state,
+        }
     }
 
     pub fn id(&self) -> &BastionId {
         &self.id
     }
 
+    pub fn parent(&self) -> &ChildrenRef {
+        &self.children
+    }
+
+    pub fn supervisor(&self) -> &SupervisorRef {
+        &self.supervisor
+    }
+
     pub fn send_msg(&self, id: &BastionId, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
-        let msg = BastionMessage::msg(msg);
+        let msg = BastionMessage::message(msg);
 
         // TODO: Err(Error)
         REGISTRY

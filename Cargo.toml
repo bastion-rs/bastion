@@ -1,3 +1,8 @@
+# TODO: https://github.com/cogciprocate/qutex/pull/5
+[patch.crates-io.qutex]
+git = "https://github.com/azastrael/qutex"
+branch = "0.2.4-async_await"
+
 [workspace]
 members = [
   "bastion",

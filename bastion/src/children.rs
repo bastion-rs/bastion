@@ -1,15 +1,19 @@
 use crate::bastion::REGISTRY;
-use crate::broadcast::{BastionMessage, Broadcast, Sender};
+use crate::broadcast::{BastionMessage, Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::supervisor::SupervisorRef;
 use futures::future::CatchUnwind;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use fxhash::FxHashMap;
 use qutex::Qutex;
 use runtime::task::JoinHandle;
 use std::any::Any;
 use std::fmt::Debug;
 use std::future::Future;
+use std::iter::FromIterator;
 use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::task::Poll;
@@ -29,11 +33,12 @@ where
     }
 }
 
-pub trait Closure: Fn(BastionContext, Box<dyn Message>) -> Fut + Shell {}
-impl<T> Closure for T where T: Fn(BastionContext, Box<dyn Message>) -> Fut + Shell {}
+pub trait Closure: Fn(BastionContext) -> Fut + Shell {}
+impl<T> Closure for T where T: Fn(BastionContext) -> Fut + Shell {}
 
 // TODO: Ok(T) & Err(E)
 type FutInner = dyn Future<Output = Result<(), ()>> + Send;
+type Exec = CatchUnwind<AssertUnwindSafe<Pin<Box<FutInner>>>>;
 
 pub struct Fut(Pin<Box<FutInner>>);
 
@@ -47,37 +52,69 @@ where
 }
 
 pub(super) struct Children {
-    thunk: Box<dyn Closure>,
-    msg: Box<dyn Message>,
     bcast: Broadcast,
+    supervisor: SupervisorRef,
+    launched: FxHashMap<BastionId, JoinHandle<Child>>,
+    thunk: Box<dyn Closure>,
     redundancy: usize,
+    pre_start_msgs: Vec<BastionMessage>,
+    started: bool,
+}
+
+#[derive(Clone)]
+pub struct ChildrenRef {
+    id: BastionId,
+    sender: Sender,
 }
 
 pub(super) struct Child {
-    exec: CatchUnwind<AssertUnwindSafe<Pin<Box<FutInner>>>>,
     bcast: Broadcast,
+    exec: Exec,
     state: Qutex<ContextState>,
+    pre_start_msgs: Vec<BastionMessage>,
+    started: bool,
 }
 
 impl Children {
     pub(super) fn new(
         thunk: Box<dyn Closure>,
-        msg: Box<dyn Message>,
         bcast: Broadcast,
+        supervisor: SupervisorRef,
         redundancy: usize,
     ) -> Self {
-        Children {
-            thunk,
-            msg,
+        let launched = FxHashMap::default();
+        let pre_start_msgs = Vec::new();
+        let started = false;
+
+        let children = Children {
             bcast,
+            supervisor,
+            launched,
+            thunk,
             redundancy,
-        }
+            pre_start_msgs,
+            started,
+        };
+
+        REGISTRY.add_children(&children);
+
+        children
     }
 
-    pub(super) fn reset(&mut self, bcast: Broadcast) {
-        self.bcast.poison_pill_children();
+    pub(super) async fn reset(&mut self, bcast: Broadcast, supervisor: SupervisorRef) {
+        // TODO: stop or kill?
+        self.kill().await;
 
         self.bcast = bcast;
+        self.supervisor = supervisor;
+    }
+
+    pub fn as_ref(&self) -> ChildrenRef {
+        // TODO: clone or ref?
+        let id = self.bcast.id().clone();
+        let sender = self.bcast.sender().clone();
+
+        ChildrenRef { id, sender }
     }
 
     pub(super) fn id(&self) -> &BastionId {
@@ -88,31 +125,141 @@ impl Children {
         self.bcast.sender()
     }
 
-    async fn run(mut self) -> Self {
-        REGISTRY.add_children(&self);
+    pub(super) fn bcast(&self) -> &Broadcast {
+        &self.bcast
+    }
+
+    async fn stop(&mut self) {
+        self.bcast.stop_children();
+
+        let launched = self.launched.drain().map(|(_, launched)| launched);
+        FuturesUnordered::from_iter(launched)
+            .collect::<Vec<_>>()
+            .await;
+    }
+
+    async fn kill(&mut self) {
+        self.bcast.kill_children();
+
+        let launched = self.launched.drain().map(|(_, launched)| launched);
+        FuturesUnordered::from_iter(launched)
+            .collect::<Vec<_>>()
+            .await;
+    }
+
+    fn dead(&mut self) {
+        REGISTRY.remove_children(&self);
+
+        self.bcast.dead();
+    }
+
+    fn faulted(&mut self) {
+        REGISTRY.remove_children(&self);
+
+        self.bcast.faulted();
+    }
+
+    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
+        match msg {
+            BastionMessage::Start => unreachable!(),
+            BastionMessage::Stop => {
+                self.stop().await;
+                self.dead();
+
+                return Err(());
+            }
+            BastionMessage::PoisonPill => {
+                self.kill().await;
+                self.dead();
+
+                return Err(());
+            }
+            // FIXME
+            BastionMessage::Deploy(_) => unimplemented!(),
+            // FIXME
+            BastionMessage::Prune { .. } => unimplemented!(),
+            // FIXME
+            BastionMessage::SuperviseWith(_) => unimplemented!(),
+            BastionMessage::Message(_) => {
+                self.bcast.send_children(msg);
+            }
+            BastionMessage::Dead { id } => {
+                // FIXME: Err if false?
+                if self.launched.contains_key(&id) {
+                    // TODO: stop or kill?
+                    self.kill().await;
+                    self.dead();
+
+                    return Err(());
+                }
+            }
+            BastionMessage::Faulted { id } => {
+                // FIXME: Err if false?
+                if self.launched.contains_key(&id) {
+                    // TODO: stop or kill?
+                    self.kill().await;
+                    self.faulted();
+
+                    return Err(());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(super) async fn run(mut self) -> Self {
+        for _ in 0..self.redundancy {
+            let parent = Parent::children(self.as_ref());
+            let bcast = Broadcast::new(parent);
+            let id = bcast.id().clone();
+
+            let children = self.as_ref();
+            let supervisor = self.supervisor.clone();
+
+            let state = ContextState::new();
+            let state = Qutex::new(state);
+
+            let thunk = objekt::clone_box(&*self.thunk);
+            let ctx = BastionContext::new(id, children, supervisor, state.clone());
+            let exec = AssertUnwindSafe(thunk(ctx).0).catch_unwind();
+
+            self.bcast.register(&bcast);
+
+            let child = Child::new(exec, bcast, state);
+            runtime::spawn(child.run());
+        }
 
         loop {
             match poll!(&mut self.bcast.next()) {
-                Poll::Ready(Some(msg)) => match msg {
-                    BastionMessage::PoisonPill
-                    | BastionMessage::Dead { .. }
-                    | BastionMessage::Faulted { .. } => {
-                        REGISTRY.remove_children(&self);
+                // TODO: Err if started == true?
+                Poll::Ready(Some(BastionMessage::Start)) => {
+                    self.started = true;
 
-                        if msg.is_faulted() {
-                            self.bcast.faulted();
-                        } else {
-                            self.bcast.dead();
+                    let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
+                    self.pre_start_msgs.shrink_to_fit();
+
+                    for msg in msgs {
+                        if self.handle(msg).await.is_err() {
+                            return self;
                         }
+                    }
 
+                    let msg = BastionMessage::start();
+                    self.bcast.send_children(msg);
+                }
+                Poll::Ready(Some(msg)) if !self.started => {
+                    self.pre_start_msgs.push(msg);
+                }
+                Poll::Ready(Some(msg)) => {
+                    if self.handle(msg).await.is_err() {
                         return self;
                     }
-                    BastionMessage::Message(_) => self.bcast.send_children(msg),
-                },
+                }
                 Poll::Ready(None) => {
-                    REGISTRY.remove_children(&self);
-
-                    self.bcast.faulted();
+                    // TODO: stop or kill?
+                    self.kill().await;
+                    self.faulted();
 
                     return self;
                 }
@@ -120,32 +267,33 @@ impl Children {
             }
         }
     }
+}
 
-    pub(super) fn launch(mut self) -> JoinHandle<Self> {
-        for _ in 0..self.redundancy {
-            let bcast = self.bcast.new_child();
-            let id = bcast.id().clone();
-
-            let state = ContextState::new();
-            let state = Qutex::new(state);
-
-            let thunk = objekt::clone_box(&*self.thunk);
-            let msg = objekt::clone_box(&*self.msg);
-
-            let parent = self.bcast.sender().clone();
-            let ctx = BastionContext::new(id, parent, state.clone());
-
-            let exec = AssertUnwindSafe(thunk(ctx, msg).0).catch_unwind();
-
-            let child = Child { exec, bcast, state };
-            runtime::spawn(child.run());
-        }
-
-        runtime::spawn(self.run())
+impl ChildrenRef {
+    pub(super) fn send(&self, msg: BastionMessage) {
+        // FIXME: Err(Error)
+        self.sender.unbounded_send(msg).ok();
     }
 }
 
 impl Child {
+    fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>) -> Self {
+        let pre_start_msgs = Vec::new();
+        let started = false;
+
+        let child = Child {
+            bcast,
+            exec,
+            state,
+            pre_start_msgs,
+            started,
+        };
+
+        REGISTRY.add_child(&child);
+
+        child
+    }
+
     pub(super) fn id(&self) -> &BastionId {
         self.bcast.id()
     }
@@ -154,42 +302,87 @@ impl Child {
         self.bcast.sender()
     }
 
-    fn dead(mut self) {
+    fn dead(&mut self) {
         REGISTRY.remove_child(&self);
 
         self.bcast.dead();
     }
 
-    fn faulted(mut self) {
+    fn faulted(&mut self) {
         REGISTRY.remove_child(&self);
 
         self.bcast.faulted();
     }
 
-    async fn run(mut self) {
-        REGISTRY.add_child(&self);
+    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
+        match msg {
+            BastionMessage::Start => unreachable!(),
+            BastionMessage::Stop | BastionMessage::PoisonPill => {
+                self.dead();
 
+                return Err(());
+            }
+            // FIXME
+            BastionMessage::Deploy(_) => unimplemented!(),
+            // FIXME
+            BastionMessage::Prune { .. } => unimplemented!(),
+            // FIXME
+            BastionMessage::SuperviseWith(_) => unimplemented!(),
+            BastionMessage::Message(msg) => {
+                let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
+                state.push_msg(msg);
+            }
+            // FIXME
+            BastionMessage::Dead { .. } => unimplemented!(),
+            // FIXME
+            BastionMessage::Faulted { .. } => unimplemented!(),
+        }
+
+        Ok(())
+    }
+
+    async fn run(mut self) {
         loop {
             match poll!(&mut self.bcast.next()) {
-                Poll::Ready(Some(msg)) => {
-                    // FIXME: Err(Error)
-                    let mut state = self.state.clone().lock_async().await.unwrap();
+                // TODO: Err if started == true?
+                Poll::Ready(Some(BastionMessage::Start)) => {
+                    self.started = true;
 
-                    match msg {
-                        BastionMessage::PoisonPill => return self.dead(),
-                        // FIXME
-                        BastionMessage::Dead { .. } => unimplemented!(),
-                        // FIXME
-                        BastionMessage::Faulted { .. } => unimplemented!(),
-                        BastionMessage::Message(msg) => {
-                            state.push_msg(msg);
+                    let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
+                    self.pre_start_msgs.shrink_to_fit();
 
-                            continue;
+                    for msg in msgs {
+                        if self.handle(msg).await.is_err() {
+                            return;
                         }
                     }
+
+                    continue;
                 }
-                Poll::Ready(None) => return self.faulted(),
+                Poll::Ready(Some(msg)) if !self.started => {
+                    self.pre_start_msgs.push(msg);
+
+                    continue;
+                }
+                Poll::Ready(Some(msg)) => {
+                    if self.handle(msg).await.is_err() {
+                        return;
+                    }
+
+                    continue;
+                }
+                Poll::Ready(None) => {
+                    self.faulted();
+
+                    return;
+                }
                 Poll::Pending => (),
+            }
+
+            if !self.started {
+                pending!();
+
+                continue;
             }
 
             if let Poll::Ready(res) = poll!(&mut self.exec) {
