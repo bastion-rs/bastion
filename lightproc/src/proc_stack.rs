@@ -7,8 +7,10 @@ use std::fmt;
 pub struct ProcStack {
     pub pid: AtomicUsize,
 
-    pub after_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    // Before action callbacks
+    pub before_start: Option<Arc<dyn Fn() + Send + Sync>>,
 
+    // After action callbacks
     pub after_complete: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 

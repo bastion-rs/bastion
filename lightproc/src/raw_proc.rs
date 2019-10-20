@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use crate::state::*;
-use crate::stack::*;
+use crate::proc_stack::*;
 use crate::proc_vtable::TaskVTable;
 use crate::proc_layout::TaskLayout;
 use crate::proc_data::ProcData;
@@ -397,6 +397,11 @@ where
         // Poll the inner future, but surround it with a guard that closes the task in case polling
         // panics.
         let guard = Guard(raw);
+
+        if let Some(before_start_cb) = &(*raw.stack).before_start {
+            (*before_start_cb)();
+        }
+
         let poll = <F as Future>::poll(Pin::new_unchecked(&mut *raw.future), cx);
         mem::forget(guard);
 

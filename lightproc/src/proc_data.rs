@@ -7,7 +7,7 @@ use std::task::Waker;
 use crossbeam_utils::Backoff;
 
 use crate::state::*;
-use crate::stack::*;
+use crate::proc_stack::*;
 use crate::proc_vtable::TaskVTable;
 use crate::layout_helpers::extend;
 

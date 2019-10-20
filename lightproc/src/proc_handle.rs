@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
 use crate::state::*;
-use crate::stack::*;
+use crate::proc_stack::*;
 use crate::proc_data::ProcData;
 
 /// A handle that awaits the result of a task.

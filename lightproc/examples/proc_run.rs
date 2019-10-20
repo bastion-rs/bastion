@@ -32,8 +32,8 @@ fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
             after_complete: Some(Arc::new(|| {
                 println!("After complete");
             })),
-            after_start: Some(Arc::new(|| {
-                println!("After start");
+            before_start: Some(Arc::new(|| {
+                println!("Before start");
             }))
         }
     );

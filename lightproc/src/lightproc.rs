@@ -7,7 +7,7 @@ use std::ptr::NonNull;
 use crate::proc_data::ProcData;
 use crate::raw_proc::RawProc;
 use crate::proc_handle::ProcHandle;
-use crate::stack::*;
+use crate::proc_stack::*;
 
 
 pub struct LightProc {
