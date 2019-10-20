@@ -64,3 +64,7 @@ pub(crate) const LOCKED: usize = 1 << 6;
 /// tracked separately by the `HANDLE` flag.
 pub(crate) const REFERENCE: usize = 1 << 7;
 
+/// Finalized build of proc.
+///
+/// Determine how drop behavior will change.
+pub(crate) const BUILD_FINALIZED: usize = 1 << 8;

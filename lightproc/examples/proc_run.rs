@@ -6,12 +6,16 @@ use std::thread;
 
 use crossbeam::channel;
 use futures::executor;
-use lightproc::prelude::*;
+use std::sync::atomic::AtomicUsize;
+use lightproc::proc_handle::ProcHandle;
+use lightproc::stack::ProcStack;
+use lightproc::lightproc::LightProc;
+use std::time::Duration;
 
 /// Spawns a future on a new dedicated thread.
 ///
 /// The returned handle can be used to await the output of the future.
-fn spawn_on_thread<F, R>(future: F) -> ProcHandle<R, ()>
+fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
@@ -24,17 +28,19 @@ fn spawn_on_thread<F, R>(future: F) -> ProcHandle<R, ()>
     // Wrap the future into one that disconnects the channel on completion.
     let future = async move {
         // When the inner future completes, the sender gets dropped and disconnects the channel.
+        println!("exec");
         let _sender = sender;
-        future.await
+        println!("exec1");
+        fut.await
     };
 
     // Create a task that is scheduled by sending itself into the channel.
     let schedule = move |t| s.upgrade().unwrap().send(t).unwrap();
-    let (proc, handle) = LightProc::<()>::new()
-        .with_future(future)
-        .with_schedule(schedule)
-        .with_stack(ProcStack::default())
-        .returning();
+    let (proc, handle) = LightProc::build(
+        future,
+        schedule,
+        ProcStack::default()
+    );
 
     // Schedule the task by sending it into the channel.
     proc.schedule();
@@ -43,7 +49,9 @@ fn spawn_on_thread<F, R>(future: F) -> ProcHandle<R, ()>
     thread::spawn(move || {
         // Keep taking the task from the channel and running it until completion.
         for proc in receiver {
+            println!("ad");
             proc.run();
+            println!("ad2");
         }
     });
 
@@ -54,4 +62,6 @@ fn main() {
     executor::block_on(spawn_on_thread(async {
         println!("Hello, world!");
     }));
+
+    thread::sleep(Duration::new(5, 0));
 }

@@ -12,113 +12,36 @@ use crate::raw_proc::RawProc;
 use crate::proc_handle::ProcHandle;
 use crate::stack::ProcStack;
 use crate::proc_data::ProcData;
+use crate::align_proc::AlignProc;
+use std::sync::atomic::Ordering;
+
 
 #[derive(Debug)]
-pub struct LightProc<T> {
+pub struct LightProc {
     pub(crate) raw_proc: NonNull<()>,
-
-    pub(crate) proc_layout: ProcLayout,
-    pub(crate) _private: marker<T>,
 }
 
-unsafe impl<T> Send for LightProc<T> {}
-unsafe impl<T> Sync for LightProc<T> {}
+unsafe impl Send for LightProc {}
+unsafe impl Sync for LightProc {}
 
-impl<T> LightProc<T> {
-    pub fn new() -> LightProc<T> {
-        let proc_layout = ProcLayout::default();
-
-        unsafe {
-            LightProc {
-                raw_proc: NonNull::new(alloc::alloc(proc_layout.layout) as *mut ()).unwrap(),
-                proc_layout,
-                _private: marker,
-            }
-        }
-    }
-
-    pub fn with_future<F, R>(mut self, f: F) -> Self
+impl LightProc {
+    pub fn build<F, R, S>(future: F, schedule: S, stack: ProcStack) -> (LightProc, ProcHandle<R>)
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
+        S: Fn(LightProc) + Send + Sync + 'static
     {
-        let fut_mem = Layout::new::<F>();
-        let (new_layout, offset_f) = extend(self.proc_layout.layout, fut_mem);
-        self.proc_layout.offset_table.insert("future", offset_f);
-
-        self.reallocate(new_layout);
-
-        let rawp =
-            RawProc::<F, R, usize, usize>::from_ptr(
-                self.raw_proc.as_ptr(), &self.proc_layout);
-
-        unsafe {
-            rawp.future.write(f);
-        }
-
-        self
-    }
-
-    pub fn with_schedule<S>(mut self, s: S) -> Self
-        where
-            S: Fn(LightProc<T>) + Send + Sync + 'static,
-            T: Send + 'static,
-    {
-        let sched_mem = Layout::new::<S>();
-        let (new_layout, offset_s) = extend(self.proc_layout.layout, sched_mem);
-        self.proc_layout.offset_table.insert("schedule", offset_s);
-
-        self.reallocate(new_layout);
-
-        let rawp =
-            RawProc::<usize, usize, S, T>::from_ptr(
-                self.raw_proc.as_ptr(), &self.proc_layout);
-
-        unsafe {
-            (rawp.schedule as *mut S).write(s);
-        }
-
-        self
-    }
-
-    pub fn with_stack(mut self, st: ProcStack) -> Self
-    {
-        let stack_mem = Layout::new::<ProcStack>();
-        let (new_layout, offset_st) = extend(self.proc_layout.layout, stack_mem);
-        self.proc_layout.offset_table.insert("stack", offset_st);
-
-        self.reallocate(new_layout);
-
-        let rawp =
-            RawProc::<usize, usize, usize, ProcStack>::from_ptr(
-                self.raw_proc.as_ptr(), &self.proc_layout);
-
-        unsafe {
-            rawp.stack.write(st);
-        }
-
-        self
-    }
-
-    pub fn returning<R>(mut self) -> (LightProc<T>, ProcHandle<R, T>) {
-        let raw_proc = self.raw_proc;
-        let proc = LightProc {
-            raw_proc,
-            proc_layout: self.proc_layout.clone(),
-            _private: marker,
-        };
-        let handle = ProcHandle {
-            raw_proc,
-            _private: marker,
-        };
+        let raw_proc = RawProc::<F, R, S>::allocate(
+            future, schedule, stack
+        );
+        let proc = LightProc { raw_proc };
+        let handle = ProcHandle { raw_proc, _private: marker };
         (proc, handle)
     }
 
     pub fn schedule(self) {
         let ptr = self.raw_proc.as_ptr();
         let header = ptr as *const ProcData;
-        mem::forget(self);
-
         unsafe {
             ((*header).vtable.schedule)(ptr);
         }
@@ -143,33 +66,18 @@ impl<T> LightProc<T> {
         }
     }
 
-    pub fn stack(&self) -> &T {
-        let offset = ProcData::offset_tag::<T>();
+    pub fn stack(&self) -> &ProcStack {
+        let offset = ProcData::offset_stack();
         let ptr = self.raw_proc.as_ptr();
 
         unsafe {
-            let raw = (ptr as *mut u8).add(offset) as *const T;
+            let raw = (ptr as *mut u8).add(offset) as *const ProcStack;
             &*raw
         }
     }
-
-    fn reallocate(&mut self, enlarged: Layout) {
-        unsafe {
-            let old = self.raw_proc.as_ptr() as *mut u8;
-            let bigger = alloc::realloc(
-                old,
-                self.proc_layout.layout,
-                enlarged.size(),
-            );
-            ptr::copy(old, bigger, self.proc_layout.layout.size());
-            self.raw_proc = NonNull::new(bigger as *mut ()).unwrap()
-        }
-
-        self.proc_layout.layout = enlarged;
-    }
 }
 
-impl<T> Drop for LightProc<T> {
+impl Drop for LightProc {
     fn drop(&mut self) {
         let ptr = self.raw_proc.as_ptr();
         let header = ptr as *const ProcData;

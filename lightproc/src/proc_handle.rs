@@ -1,24 +1,36 @@
-use std::marker::PhantomData as marker;
-use std::ptr::NonNull;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::future::Future;
-use std::sync::atomic::Ordering;
-use crate::proc_data::ProcData;
-use crate::state::*;
 use std::fmt;
+use std::future::Future;
+use std::marker::{PhantomData, Unpin};
+use std::pin::Pin;
+use std::ptr::NonNull;
+use std::sync::atomic::Ordering;
+use std::task::{Context, Poll};
 
-pub struct ProcHandle<R, T> {
+use crate::state::*;
+use crate::utils::abort_on_panic;
+use crate::stack::ProcStack;
+use crate::proc_data::ProcData;
+
+/// A handle that awaits the result of a task.
+///
+/// This type is a future that resolves to an `Option<R>` where:
+///
+/// * `None` indicates the task has panicked or was cancelled
+/// * `Some(res)` indicates the task has completed with `res`
+pub struct ProcHandle<R> {
+    /// A raw task pointer.
     pub(crate) raw_proc: NonNull<()>,
-    pub(crate) _private: marker<(R, T)>,
+
+    /// A marker capturing the generic type `R`.
+    pub(crate) _private: PhantomData<R>,
 }
 
-unsafe impl<R, T> Send for ProcHandle<R, T> {}
-unsafe impl<R, T> Sync for ProcHandle<R, T> {}
+unsafe impl<R> Send for ProcHandle<R> {}
+unsafe impl<R> Sync for ProcHandle<R> {}
 
-impl<R, T> Unpin for ProcHandle<R, T> {}
+impl<R> Unpin for ProcHandle<R> {}
 
-impl<R, T> ProcHandle<R, T> {
+impl<R> ProcHandle<R> {
     /// Cancels the task.
     ///
     /// If the task has already completed, calling this method will have no effect.
@@ -71,18 +83,19 @@ impl<R, T> ProcHandle<R, T> {
         }
     }
 
-    pub fn stack(&self) -> &T {
-        let offset = ProcData::offset_tag::<T>();
+    /// Returns a reference to the tag stored inside the task.
+    pub fn stack(&self) -> &ProcStack {
+        let offset = ProcData::offset_stack();
         let ptr = self.raw_proc.as_ptr();
 
         unsafe {
-            let raw = (ptr as *mut u8).add(offset) as *const T;
+            let raw = (ptr as *mut u8).add(offset) as *const ProcStack;
             &*raw
         }
     }
 }
 
-impl<R, T> Drop for ProcHandle<R, T> {
+impl<R> Drop for ProcHandle<R> {
     fn drop(&mut self) {
         let ptr = self.raw_proc.as_ptr();
         let header = ptr as *const ProcData;
@@ -91,7 +104,7 @@ impl<R, T> Drop for ProcHandle<R, T> {
         let mut output = None;
 
         unsafe {
-            // Optimistically assume the `JoinHandle` is being dropped just after creating the
+            // Optimistically assume the `ProcHandle` is being dropped just after creating the
             // task. This is a common case so if the handle is not used, the overhead of it is only
             // one compare-exchange operation.
             if let Err(mut state) = (*header).state.compare_exchange_weak(
@@ -163,7 +176,7 @@ impl<R, T> Drop for ProcHandle<R, T> {
     }
 }
 
-impl<R, T> Future for ProcHandle<R, T> {
+impl<R> Future for ProcHandle<R> {
     type Output = Option<R>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -184,7 +197,11 @@ impl<R, T> Future for ProcHandle<R, T> {
 
                 // If the task is not completed, register the current task.
                 if state & COMPLETED == 0 {
-                    (*header).swap_awaiter(Some(cx.waker().clone()));
+                    // Replace the waker with one associated with the current task. We need a
+                    // safeguard against panics because dropping the previous waker can panic.
+                    abort_on_panic(|| {
+                        (*header).swap_awaiter(Some(cx.waker().clone()));
+                    });
 
                     // Reload the state after registering. It is possible that the task became
                     // completed or closed just before registration so we need to check for that.
@@ -229,13 +246,13 @@ impl<R, T> Future for ProcHandle<R, T> {
     }
 }
 
-impl<R, T> fmt::Debug for ProcHandle<R, T> {
+impl<R> fmt::Debug for ProcHandle<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ptr = self.raw_proc.as_ptr();
         let header = ptr as *const ProcData;
 
-        f.debug_struct("JoinHandle")
-            .field("procdata", unsafe { &(*header) })
+        f.debug_struct("ProcHandle")
+            .field("header", unsafe { &(*header) })
             .finish()
     }
 }
