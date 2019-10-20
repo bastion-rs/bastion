@@ -16,7 +16,10 @@ pub fn extend(layout: Layout, next: Layout) -> (Layout, usize) {
         .unwrap();
     let new_size = offset
         .checked_add(next.size())
-        .ok_or(Error::new(ErrorKind::Other, "New size can't be computed"))
+        .ok_or(Error::new(
+            ErrorKind::Other,
+            "New size can't be computed",
+        ))
         .unwrap();
 
     let layout = Layout::from_size_align(new_size, new_align).unwrap();
