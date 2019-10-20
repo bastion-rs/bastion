@@ -10,6 +10,7 @@ use fxhash::FxHashMap;
 use std::ops::RangeFrom;
 use std::task::Poll;
 
+#[derive(Debug)]
 pub struct Supervisor {
     bcast: Broadcast,
     order: Vec<BastionId>,
@@ -20,19 +21,20 @@ pub struct Supervisor {
     started: bool,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SupervisionStrategy {
     OneForOne,
     OneForAll,
     RestForOne,
 }
 
+#[derive(Debug)]
 enum Supervised {
     Supervisor(Supervisor),
     Children(Children),

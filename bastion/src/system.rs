@@ -14,6 +14,7 @@ lazy_static! {
     pub(super) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
 }
 
+#[derive(Debug)]
 pub(super) struct System {
     bcast: Broadcast,
     launched: FxHashMap<BastionId, Proc<Supervisor>>,

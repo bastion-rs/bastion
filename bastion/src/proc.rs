@@ -4,6 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+#[derive(Debug)]
 pub(super) struct Proc<T> {
     recver: Receiver<T>,
 }

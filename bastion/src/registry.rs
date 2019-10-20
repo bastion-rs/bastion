@@ -4,16 +4,18 @@ use crate::context::BastionId;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use dashmap::DashMap;
 
+#[derive(Debug)]
 pub(super) struct Registry {
     registered: DashMap<BastionId, Registrant>,
 }
 
+#[derive(Debug)]
 struct Registrant {
     sender: Sender,
     ty: RegistrantType,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Debug)]
 enum RegistrantType {
     Supervisor,
     Children,

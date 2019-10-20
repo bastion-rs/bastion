@@ -11,6 +11,7 @@ use std::task::{Context, Poll};
 pub(super) type Sender = UnboundedSender<BastionMessage>;
 pub(super) type Receiver = UnboundedReceiver<BastionMessage>;
 
+#[derive(Debug)]
 pub(super) struct Broadcast {
     id: BastionId,
     sender: Sender,
@@ -19,6 +20,7 @@ pub(super) struct Broadcast {
     children: FxHashMap<BastionId, Sender>,
 }
 
+#[derive(Debug)]
 pub(super) enum Parent {
     None,
     System,
@@ -26,6 +28,7 @@ pub(super) enum Parent {
     Children(ChildrenRef),
 }
 
+#[derive(Debug)]
 pub(super) enum BastionMessage {
     Start,
     Stop,
@@ -38,6 +41,7 @@ pub(super) enum BastionMessage {
     Faulted { id: BastionId },
 }
 
+#[derive(Debug)]
 pub(super) enum Deployment {
     Supervisor(Supervisor),
     Children(Children),

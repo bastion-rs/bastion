@@ -12,6 +12,7 @@ pub(super) const NIL_ID: BastionId = BastionId(Uuid::nil());
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct BastionId(Uuid);
 
+#[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
     children: ChildrenRef,
@@ -19,6 +20,7 @@ pub struct BastionContext {
     state: Qutex<ContextState>,
 }
 
+#[derive(Debug)]
 pub(super) struct ContextState {
     msgs: VecDeque<Box<dyn Message>>,
 }

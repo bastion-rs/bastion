@@ -11,7 +11,7 @@ use futures::stream::FuturesUnordered;
 use fxhash::FxHashMap;
 use qutex::Qutex;
 use std::any::Any;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
 use std::panic::AssertUnwindSafe;
@@ -61,7 +61,7 @@ pub(super) struct Children {
     started: bool,
 }
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct ChildrenRef {
     id: BastionId,
     sender: Sender,
@@ -400,5 +400,29 @@ impl Child {
 
             pending!();
         }
+    }
+}
+
+impl Debug for Children {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("Children")
+            .field("bcast", &self.bcast)
+            .field("supervisor", &self.supervisor)
+            .field("launched", &self.launched)
+            .field("redundancy", &self.redundancy)
+            .field("pre_start_msgs", &self.pre_start_msgs)
+            .field("started", &self.started)
+            .finish()
+    }
+}
+
+impl Debug for Child {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("Child")
+            .field("bcast", &self.bcast)
+            .field("state", &self.state)
+            .field("pre_start_msgs", &self.pre_start_msgs)
+            .field("started", &self.started)
+            .finish()
     }
 }
