@@ -6,9 +6,9 @@ use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
-use crate::state::*;
-use crate::proc_stack::*;
 use crate::proc_data::ProcData;
+use crate::proc_stack::*;
+use crate::state::*;
 
 /// A handle that awaits the result of a task.
 ///
@@ -125,8 +125,7 @@ impl<R> Drop for ProcHandle<R> {
                         ) {
                             Ok(_) => {
                                 // Read the output.
-                                output =
-                                    Some((((*pdata).vtable.get_output)(ptr) as *mut R).read());
+                                output = Some((((*pdata).vtable.get_output)(ptr) as *mut R).read());
 
                                 // Update the state variable because we're continuing the loop.
                                 state |= CLOSED;

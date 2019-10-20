@@ -1,7 +1,7 @@
+use std::fmt;
+use std::fmt::{Error, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::fmt::{Formatter, Error};
-use std::fmt;
 
 #[derive(Default)]
 pub struct ProcStack {

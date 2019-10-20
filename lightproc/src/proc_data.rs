@@ -6,10 +6,10 @@ use std::task::Waker;
 
 use crossbeam_utils::Backoff;
 
-use crate::state::*;
+use crate::layout_helpers::extend;
 use crate::proc_stack::*;
 use crate::proc_vtable::TaskVTable;
-use crate::layout_helpers::extend;
+use crate::state::*;
 
 /// The pdata of a task.
 ///

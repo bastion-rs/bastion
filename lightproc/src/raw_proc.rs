@@ -7,13 +7,13 @@ use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use crate::state::*;
+use crate::layout_helpers::extend;
+use crate::lightproc::LightProc;
+use crate::proc_data::ProcData;
+use crate::proc_layout::TaskLayout;
 use crate::proc_stack::*;
 use crate::proc_vtable::TaskVTable;
-use crate::proc_layout::TaskLayout;
-use crate::proc_data::ProcData;
-use crate::lightproc::LightProc;
-use crate::layout_helpers::extend;
+use crate::state::*;
 
 /// Raw pointers to the fields of a task.
 pub(crate) struct RawProc<F, R, S> {
@@ -42,7 +42,7 @@ impl<F, R, S> RawProc<F, R, S>
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
-    S: Fn(LightProc) + Send + Sync + 'static
+    S: Fn(LightProc) + Send + Sync + 'static,
 {
     /// Allocates a task with the given `future` and `schedule` function.
     ///
@@ -184,7 +184,7 @@ where
                         if state & (SCHEDULED | RUNNING) == 0 {
                             // Schedule the task.
                             let task = LightProc {
-                                raw_proc: NonNull::new_unchecked(ptr as *mut ())
+                                raw_proc: NonNull::new_unchecked(ptr as *mut ()),
                             };
                             (*raw.schedule)(task);
                         } else {
@@ -250,7 +250,7 @@ where
 
                             // Schedule the task.
                             let task = LightProc {
-                                raw_proc: NonNull::new_unchecked(ptr as *mut ())
+                                raw_proc: NonNull::new_unchecked(ptr as *mut ()),
                             };
                             (*raw.schedule)(task);
                         }
@@ -306,7 +306,7 @@ where
         let raw = Self::from_ptr(ptr);
 
         (*raw.schedule)(LightProc {
-            raw_proc: NonNull::new_unchecked(ptr as *mut ())
+            raw_proc: NonNull::new_unchecked(ptr as *mut ()),
         });
     }
 
@@ -514,7 +514,7 @@ where
         where
             F: Future<Output = R> + Send + 'static,
             R: Send + 'static,
-            S: Fn(LightProc) + Send + Sync + 'static
+            S: Fn(LightProc) + Send + Sync + 'static,
         {
             fn drop(&mut self) {
                 let raw = self.0;

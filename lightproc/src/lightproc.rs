@@ -5,10 +5,9 @@ use std::mem;
 use std::ptr::NonNull;
 
 use crate::proc_data::ProcData;
-use crate::raw_proc::RawProc;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::*;
-
+use crate::raw_proc::RawProc;
 
 pub struct LightProc {
     /// A pointer to the heap-allocated task.
@@ -20,15 +19,13 @@ unsafe impl Sync for LightProc {}
 
 impl LightProc {
     pub fn build<F, R, S>(future: F, schedule: S, stack: ProcStack) -> (LightProc, ProcHandle<R>)
-        where
-            F: Future<Output = R> + Send + 'static,
-            R: Send + 'static,
-            S: Fn(LightProc) + Send + Sync + 'static
+    where
+        F: Future<Output = R> + Send + 'static,
+        R: Send + 'static,
+        S: Fn(LightProc) + Send + Sync + 'static,
     {
         let raw_task = RawProc::<F, R, S>::allocate(stack, future, schedule);
-        let task = LightProc {
-            raw_proc: raw_task
-        };
+        let task = LightProc { raw_proc: raw_task };
         let handle = ProcHandle {
             raw_proc: raw_task,
             _marker: PhantomData,

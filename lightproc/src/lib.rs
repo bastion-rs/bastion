@@ -3,13 +3,13 @@ pub mod lightproc;
 pub mod proc_data;
 pub mod proc_handle;
 pub mod proc_layout;
+pub mod proc_stack;
 pub mod proc_vtable;
 pub mod raw_proc;
-pub mod proc_stack;
 pub mod state;
 
 pub mod prelude {
     pub use crate::lightproc::*;
-    pub use crate::proc_stack::*;
     pub use crate::proc_handle::*;
+    pub use crate::proc_stack::*;
 }

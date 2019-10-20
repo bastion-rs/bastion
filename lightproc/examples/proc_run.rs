@@ -10,9 +10,9 @@ use lightproc::prelude::*;
 use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
-    where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
 {
     let (sender, receiver) = channel::unbounded();
     let sender = Arc::new(sender);
@@ -34,8 +34,8 @@ fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
             })),
             before_start: Some(Arc::new(|| {
                 println!("Before start");
-            }))
-        }
+            })),
+        },
     );
 
     proc.schedule();
