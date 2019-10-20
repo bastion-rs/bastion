@@ -1,13 +1,13 @@
-use crate::broadcast::{BastionMessage, Broadcast, Parent, Sender};
+use crate::broadcast::{BastionMessage, Broadcast, Parent};
 use crate::children::Closure;
 use crate::context::NIL_ID;
 use crate::registry::Registry;
 use crate::supervisor::Supervisor;
-use crate::system::System;
+use crate::system::{STARTED, SYSTEM};
 use lazy_static::lazy_static;
+use std::thread;
 
 lazy_static! {
-    pub(super) static ref SYSTEM: Sender = System::init();
     pub(super) static ref REGISTRY: Registry = Registry::new();
 }
 
@@ -52,5 +52,15 @@ impl Bastion {
         let msg = BastionMessage::start();
         // FIXME: Err(Error)
         SYSTEM.unbounded_send(msg).ok();
+
+        loop {
+            // FIXME: panics
+            let started = STARTED.clone().lock().wait().unwrap();
+            if *started {
+                return;
+            }
+
+            thread::yield_now();
+        }
     }
 }

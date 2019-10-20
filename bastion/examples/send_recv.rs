@@ -28,6 +28,4 @@ fn main() {
     );
 
     Bastion::start();
-
-    loop {}
 }

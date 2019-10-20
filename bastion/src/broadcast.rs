@@ -1,7 +1,7 @@
-use crate::bastion::SYSTEM;
 use crate::children::{Children, ChildrenRef, Message};
 use crate::context::BastionId;
 use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
+use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;

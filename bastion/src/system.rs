@@ -7,11 +7,14 @@ use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
+use qutex::Qutex;
 use std::task::Poll;
 use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
+    pub(super) static ref SYSTEM: Sender = System::init();
     pub(super) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
+    pub(super) static ref STARTED: Qutex<bool> = Qutex::new(false);
 }
 
 #[derive(Debug)]
@@ -170,6 +173,10 @@ impl System {
     }
 
     async fn run(mut self) {
+        // FIXME: panics
+        let mut started = STARTED.clone().lock_async().await.unwrap();
+        *started = true;
+
         loop {
             if let Poll::Ready(Some(supervisor)) = poll!(&mut self.waiting.next()) {
                 let id = supervisor.id();
