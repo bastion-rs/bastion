@@ -7,6 +7,7 @@ use std::thread;
 use crossbeam::channel;
 use futures::executor;
 use lightproc::prelude::*;
+use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
     where
@@ -26,7 +27,15 @@ fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
     let (proc, handle) = LightProc::build(
         future,
         schedule,
-        ProcStack::default()
+        ProcStack {
+            pid: AtomicUsize::new(1),
+            after_complete: Some(Arc::new(|| {
+                println!("After complete");
+            })),
+            after_start: Some(Arc::new(|| {
+                println!("After start");
+            }))
+        }
     );
 
     proc.schedule();

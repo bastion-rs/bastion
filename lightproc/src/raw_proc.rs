@@ -438,6 +438,10 @@ where
                                 (*raw.pdata).notify();
                             }
 
+                            if let Some(after_complete_cb) = &(*raw.stack).after_complete {
+                                (*after_complete_cb)();
+                            }
+
                             // Drop the task reference.
                             Self::decrement(ptr);
                             break;
