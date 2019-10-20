@@ -1,7 +1,6 @@
 use std::alloc::{self, Layout};
 use std::cell::Cell;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -9,30 +8,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use crate::state::*;
-use crate::utils::{abort_on_panic};
-use crate::stack::ProcStack;
-use crate::layout_helpers::extend;
-use crate::proc_layout::ProcLayout;
-use rustc_hash::FxHashMap;
-use crate::lightproc::LightProc;
+use crate::stack::*;
+use crate::proc_vtable::TaskVTable;
+use crate::proc_layout::TaskLayout;
 use crate::proc_data::ProcData;
-use crate::proc_vtable::ProcVTable;
+use crate::lightproc::LightProc;
+use crate::layout_helpers::extend;
 
 /// Raw pointers to the fields of a task.
 pub(crate) struct RawProc<F, R, S> {
-    /// The task header.
     pub(crate) pdata: *const ProcData,
-
-    /// The schedule function.
     pub(crate) schedule: *const S,
-
-    /// The tag inside the task.
     pub(crate) stack: *mut ProcStack,
-
-    /// The future.
     pub(crate) future: *mut F,
-
-    /// The output of the future.
     pub(crate) output: *mut R,
 }
 
@@ -51,17 +39,17 @@ impl<F, R, S> Clone for RawProc<F, R, S> {
 }
 
 impl<F, R, S> RawProc<F, R, S>
-    where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
-        S: Fn(LightProc) + Send + Sync + 'static
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+    S: Fn(LightProc) + Send + Sync + 'static
 {
     /// Allocates a task with the given `future` and `schedule` function.
     ///
     /// It is assumed there are initially only the `Task` reference and the `JoinHandle`.
-    pub(crate) fn allocate(future: F, schedule: S, stack: ProcStack) -> NonNull<()> {
+    pub(crate) fn allocate(stack: ProcStack, future: F, schedule: S) -> NonNull<()> {
         // Compute the layout of the task for allocation. Abort if the computation fails.
-        let task_layout = abort_on_panic(|| Self::task_layout());
+        let task_layout = Self::task_layout();
 
         unsafe {
             // Allocate enough space for the entire task.
@@ -72,11 +60,11 @@ impl<F, R, S> RawProc<F, R, S>
 
             let raw = Self::from_ptr(raw_task.as_ptr());
 
-            // Write the header as the first field of the task.
+            // Write the pdata as the first field of the task.
             (raw.pdata as *mut ProcData).write(ProcData {
                 state: AtomicUsize::new(SCHEDULED | HANDLE | REFERENCE),
                 awaiter: Cell::new(None),
-                vtable: &ProcVTable {
+                vtable: &TaskVTable {
                     raw_waker: RawWakerVTable::new(
                         Self::clone_waker,
                         Self::wake,
@@ -92,7 +80,7 @@ impl<F, R, S> RawProc<F, R, S>
                 },
             });
 
-            // Write the tag as the second field of the task.
+            // Write the stack as the second field of the task.
             (raw.stack as *mut ProcStack).write(stack);
 
             // Write the schedule function as the third field of the task.
@@ -108,61 +96,46 @@ impl<F, R, S> RawProc<F, R, S>
     /// Creates a `RawTask` from a raw task pointer.
     #[inline]
     pub(crate) fn from_ptr(ptr: *const ()) -> Self {
-        let proc_layout = Self::task_layout();
+        let task_layout = Self::task_layout();
         let p = ptr as *const u8;
 
         unsafe {
             Self {
                 pdata: p as *const ProcData,
-                stack: p.add(
-                    proc_layout.offset_table.get("stack").cloned().unwrap()
-                ) as *mut ProcStack,
-                schedule: p.add(
-                    proc_layout.offset_table.get("schedule").cloned().unwrap()
-                ) as *const S,
-                future: p.add(
-                    proc_layout.offset_table.get("future").cloned().unwrap()
-                ) as *mut F,
-                output: p.add(
-                    proc_layout.offset_table.get("output").cloned().unwrap()
-                ) as *mut R,
+                stack: p.add(task_layout.offset_t) as *mut ProcStack,
+                schedule: p.add(task_layout.offset_s) as *const S,
+                future: p.add(task_layout.offset_f) as *mut F,
+                output: p.add(task_layout.offset_r) as *mut R,
             }
         }
     }
 
     /// Returns the memory layout for a task.
     #[inline]
-    fn task_layout() -> ProcLayout {
-        // Compute the layouts for `ProcData`, `T`, `S`, `F`, and `R`.
-        let layout_header = Layout::new::<ProcData>();
+    fn task_layout() -> TaskLayout {
+        let layout_pdata = Layout::new::<ProcData>();
         let layout_t = Layout::new::<ProcStack>();
         let layout_s = Layout::new::<S>();
         let layout_f = Layout::new::<F>();
         let layout_r = Layout::new::<R>();
 
-        // Compute the layout for `union { F, R }`.
         let size_union = layout_f.size().max(layout_r.size());
         let align_union = layout_f.align().max(layout_r.align());
         let layout_union = unsafe { Layout::from_size_align_unchecked(size_union, align_union) };
 
-        // Compute the layout for `ProcData` followed by `T`, then `S`, then `union { F, R }`.
-        let layout = layout_header;
+        let layout = layout_pdata;
         let (layout, offset_t) = extend(layout, layout_t);
         let (layout, offset_s) = extend(layout, layout_s);
         let (layout, offset_union) = extend(layout, layout_union);
         let offset_f = offset_union;
         let offset_r = offset_union;
 
-        let mut offset_table
-            = FxHashMap::default();
-        offset_table.insert("future", offset_f);
-        offset_table.insert("stack", offset_t);
-        offset_table.insert("output", offset_r);
-        offset_table.insert("schedule", offset_s);
-
-        ProcLayout {
+        TaskLayout {
             layout,
-            offset_table
+            offset_t,
+            offset_s,
+            offset_f,
+            offset_r,
         }
     }
 
@@ -316,11 +289,7 @@ impl<F, R, S> RawProc<F, R, S>
         let raw = Self::from_ptr(ptr);
 
         // Decrement the reference count.
-        let k = (*raw.pdata).state.load(Ordering::SeqCst);
-
-        let new = (*raw.pdata)
-            .state
-            .fetch_sub(REFERENCE, Ordering::AcqRel) - REFERENCE;
+        let new = (*raw.pdata).state.fetch_sub(REFERENCE, Ordering::AcqRel) - REFERENCE;
 
         // If this was the last reference to the task and the `JoinHandle` has been dropped as
         // well, then destroy the task.
@@ -347,9 +316,7 @@ impl<F, R, S> RawProc<F, R, S>
         let raw = Self::from_ptr(ptr);
 
         // We need a safeguard against panics because the destructor can panic.
-        abort_on_panic(|| {
-            raw.future.drop_in_place();
-        })
+        raw.future.drop_in_place();
     }
 
     /// Returns a pointer to the output inside a task.
@@ -361,20 +328,18 @@ impl<F, R, S> RawProc<F, R, S>
     /// Cleans up task's resources and deallocates it.
     ///
     /// If the task has not been closed, then its future or the output will be dropped. The
-    /// schedule function and the tag get dropped too.
+    /// schedule function and the stack get dropped too.
     #[inline]
     unsafe fn destroy(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
         let task_layout = Self::task_layout();
 
         // We need a safeguard against panics because destructors can panic.
-        abort_on_panic(|| {
-            // Drop the schedule function.
-            (raw.schedule as *mut S).drop_in_place();
+        // Drop the schedule function.
+        (raw.schedule as *mut S).drop_in_place();
 
-            // Drop the tag.
-            (raw.stack as *mut ProcStack).drop_in_place();
-        });
+        // Drop the stack.
+        (raw.stack as *mut ProcStack).drop_in_place();
 
         // Finally, deallocate the memory reserved by the task.
         alloc::dealloc(ptr as *mut u8, task_layout.layout);
@@ -387,7 +352,7 @@ impl<F, R, S> RawProc<F, R, S>
     unsafe fn run(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
 
-        // Create a context from the raw task pointer and the vtable inside the its header.
+        // Create a context from the raw task pointer and the vtable inside the its pdata.
         let waker = ManuallyDrop::new(Waker::from_raw(RawWaker::new(
             ptr,
             &(*raw.pdata).vtable.raw_waker,
@@ -410,7 +375,6 @@ impl<F, R, S> RawProc<F, R, S>
 
                 // Drop the task reference.
                 Self::decrement(ptr);
-
                 return;
             }
 
@@ -532,16 +496,16 @@ impl<F, R, S> RawProc<F, R, S>
 
         /// A guard that closes the task if polling its future panics.
         struct Guard<F, R, S>(RawProc<F, R, S>)
-            where
-                F: Future<Output = R> + Send + 'static,
-                R: Send + 'static,
-                S: Fn(LightProc) + Send + Sync + 'static;
+        where
+            F: Future<Output = R> + Send + 'static,
+            R: Send + 'static,
+            S: Fn(LightProc) + Send + Sync + 'static;
 
         impl<F, R, S> Drop for Guard<F, R, S>
-            where
-                F: Future<Output = R> + Send + 'static,
-                R: Send + 'static,
-                S: Fn(LightProc) + Send + Sync + 'static
+        where
+            F: Future<Output = R> + Send + 'static,
+            R: Send + 'static,
+            S: Fn(LightProc) + Send + Sync + 'static
         {
             fn drop(&mut self) {
                 let raw = self.0;

@@ -7,14 +7,13 @@ use std::task::Waker;
 use crossbeam_utils::Backoff;
 
 use crate::state::*;
-use crate::utils::{abort_on_panic};
-use crate::stack::ProcStack;
-use crate::proc_vtable::ProcVTable;
+use crate::stack::*;
+use crate::proc_vtable::TaskVTable;
 use crate::layout_helpers::extend;
 
-/// The header of a task.
+/// The pdata of a task.
 ///
-/// This header is stored right at the beginning of every heap-allocated task.
+/// This pdata is stored right at the beginning of every heap-allocated task.
 pub(crate) struct ProcData {
     /// Current state of the task.
     ///
@@ -30,7 +29,7 @@ pub(crate) struct ProcData {
     ///
     /// In addition to the actual waker virtual table, it also contains pointers to several other
     /// methods necessary for bookkeeping the heap-allocated task.
-    pub(crate) vtable: &'static ProcVTable,
+    pub(crate) vtable: &'static TaskVTable,
 }
 
 impl ProcData {
@@ -69,28 +68,24 @@ impl ProcData {
 
     /// Notifies the task blocked on the task.
     ///
-    /// If there is a registered waker, it will be removed from the header and woken.
+    /// If there is a registered waker, it will be removed from the pdata and woken.
     #[inline]
     pub(crate) fn notify(&self) {
         if let Some(waker) = self.swap_awaiter(None) {
             // We need a safeguard against panics because waking can panic.
-            abort_on_panic(|| {
-                waker.wake();
-            });
+            waker.wake();
         }
     }
 
     /// Notifies the task blocked on the task unless its waker matches `current`.
     ///
-    /// If there is a registered waker, it will be removed from the header.
+    /// If there is a registered waker, it will be removed from the pdata.
     #[inline]
     pub(crate) fn notify_unless(&self, current: &Waker) {
         if let Some(waker) = self.swap_awaiter(None) {
             if !waker.will_wake(current) {
                 // We need a safeguard against panics because waking can panic.
-                abort_on_panic(|| {
-                    waker.wake();
-                });
+                waker.wake();
             }
         }
     }
@@ -133,12 +128,11 @@ impl ProcData {
         old
     }
 
-    /// Returns the offset at which the tag of type `T` is stored.
     #[inline]
     pub(crate) fn offset_stack() -> usize {
-        let layout_header = Layout::new::<ProcData>();
+        let layout_pdata = Layout::new::<ProcData>();
         let layout_t = Layout::new::<ProcStack>();
-        let (_, offset_t) = extend(layout_header, layout_t);
+        let (_, offset_t) = extend(layout_pdata, layout_t);
         offset_t
     }
 }

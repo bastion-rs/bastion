@@ -1,6 +1,7 @@
 use std::task::RawWakerVTable;
 
-pub(crate) struct ProcVTable {
+/// The vtable for a task.
+pub(crate) struct TaskVTable {
     /// The raw waker vtable.
     pub(crate) raw_waker: RawWakerVTable,
 
