@@ -63,4 +63,16 @@ impl Bastion {
             thread::yield_now();
         }
     }
+
+    pub fn stop() {
+        let msg = BastionMessage::stop();
+        // FIXME: Err(Error)
+        SYSTEM.unbounded_send(msg).ok();
+    }
+
+    pub fn kill() {
+        let msg = BastionMessage::poison_pill();
+        // FIXME: Err(Error)
+        SYSTEM.unbounded_send(msg).ok();
+    }
 }

@@ -89,14 +89,6 @@ impl Broadcast {
         self.children.clear();
     }
 
-    /*pub(super) fn start_child(&mut self, id: &BastionId) {
-        self.send_child(id, BastionMessage::Start);
-    }
-
-    pub(super) fn start_children(&mut self) {
-        self.send_children(BastionMessage::Start);
-    }*/
-
     pub(super) fn stop_child(&mut self, id: &BastionId) {
         self.send_child(id, BastionMessage::Stop);
         self.unregister(id);
