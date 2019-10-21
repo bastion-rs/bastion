@@ -399,7 +399,7 @@ where
         let guard = Guard(raw);
 
         if let Some(before_start_cb) = &(*raw.stack).before_start {
-            (*before_start_cb)();
+            (*before_start_cb.clone())();
         }
 
         let poll = <F as Future>::poll(Pin::new_unchecked(&mut *raw.future), cx);
@@ -444,7 +444,7 @@ where
                             }
 
                             if let Some(after_complete_cb) = &(*raw.stack).after_complete {
-                                (*after_complete_cb)();
+                                (*after_complete_cb.clone())();
                             }
 
                             // Drop the task reference.
