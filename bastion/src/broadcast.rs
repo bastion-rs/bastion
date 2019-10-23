@@ -32,12 +32,12 @@ pub(super) enum Parent {
 pub(super) enum BastionMessage {
     Start,
     Stop,
-    PoisonPill,
+    Kill,
     Deploy(Deployment),
     Prune { id: BastionId },
     SuperviseWith(SupervisionStrategy),
     Message(Box<dyn Message>),
-    Dead { id: BastionId },
+    Stopped { id: BastionId },
     Faulted { id: BastionId },
 }
 
@@ -90,37 +90,51 @@ impl Broadcast {
     }
 
     pub(super) fn stop_child(&mut self, id: &BastionId) {
-        self.send_child(id, BastionMessage::Stop);
+        let msg = BastionMessage::stop();
+        self.send_child(id, msg);
+
         self.unregister(id);
     }
 
     pub(super) fn stop_children(&mut self) {
-        self.send_children(BastionMessage::Stop);
+        let msg = BastionMessage::stop();
+        self.send_children(msg);
+
         self.clear_children();
     }
 
     pub(super) fn kill_child(&mut self, id: &BastionId) {
-        self.send_child(id, BastionMessage::PoisonPill);
+        let msg = BastionMessage::kill();
+        self.send_child(id, msg);
+
         self.unregister(id);
     }
 
     pub(super) fn kill_children(&mut self) {
-        self.send_children(BastionMessage::PoisonPill);
+        let msg = BastionMessage::kill();
+        self.send_children(msg);
+
         self.clear_children();
     }
 
-    pub(super) fn dead(&mut self) {
+    pub(super) fn stopped(&mut self) {
         self.stop_children();
-        self.send_parent(BastionMessage::dead(self.id.clone()));
+
+        let msg = BastionMessage::stopped(self.id.clone());
+        // FIXME: Err(msg)
+        self.send_parent(msg).ok();
     }
 
     pub(super) fn faulted(&mut self) {
         self.kill_children();
-        self.send_parent(BastionMessage::faulted(self.id.clone()));
+
+        let msg = BastionMessage::faulted(self.id.clone());
+        // FIXME: Err(msg)
+        self.send_parent(msg).ok();
     }
 
-    pub(super) fn send_parent(&self, msg: BastionMessage) {
-        self.parent.send(msg);
+    pub(super) fn send_parent(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+        self.parent.send(msg)
     }
 
     pub(super) fn send_child(&self, id: &BastionId, msg: BastionMessage) {
@@ -161,20 +175,13 @@ impl Parent {
         Parent::Children(children)
     }
 
-    fn send(&self, msg: BastionMessage) {
+    fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
         match self {
             // FIXME
             Parent::None => unimplemented!(),
-            Parent::System => {
-                // FIXME: Err(Error)
-                SYSTEM.unbounded_send(msg).ok();
-            }
-            Parent::Supervisor(supervisor) => {
-                supervisor.send(msg);
-            }
-            Parent::Children(children) => {
-                children.send(msg);
-            }
+            Parent::System => SYSTEM.unbounded_send(msg).map_err(|err| err.into_inner()),
+            Parent::Supervisor(supervisor) => supervisor.send(msg),
+            Parent::Children(children) => children.send(msg),
         }
     }
 }
@@ -188,8 +195,8 @@ impl BastionMessage {
         BastionMessage::Stop
     }
 
-    pub(super) fn poison_pill() -> Self {
-        BastionMessage::PoisonPill
+    pub(super) fn kill() -> Self {
+        BastionMessage::Kill
     }
 
     pub(super) fn deploy_supervisor(supervisor: Supervisor) -> Self {
@@ -216,8 +223,8 @@ impl BastionMessage {
         BastionMessage::Message(msg)
     }
 
-    pub(super) fn dead(id: BastionId) -> Self {
-        BastionMessage::Dead { id }
+    pub(super) fn stopped(id: BastionId) -> Self {
+        BastionMessage::Stopped { id }
     }
 
     pub(super) fn faulted(id: BastionId) -> Self {
@@ -246,7 +253,7 @@ impl Clone for BastionMessage {
         match self {
             BastionMessage::Start => BastionMessage::start(),
             BastionMessage::Stop => BastionMessage::stop(),
-            BastionMessage::PoisonPill => BastionMessage::poison_pill(),
+            BastionMessage::Kill => BastionMessage::kill(),
             // FIXME
             BastionMessage::Deploy(_) => unimplemented!(),
             BastionMessage::Prune { id } => BastionMessage::prune(id.clone()),
@@ -257,8 +264,64 @@ impl Clone for BastionMessage {
                 let msg = objekt::clone_box(&**msg);
                 BastionMessage::message(msg)
             }
-            BastionMessage::Dead { id } => BastionMessage::dead(id.clone()),
+            BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
             BastionMessage::Faulted { id } => BastionMessage::faulted(id.clone()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BastionMessage, Broadcast, Parent};
+    use futures::poll;
+    use futures::prelude::*;
+    use std::task::Poll;
+    use tokio::runtime::Runtime;
+
+    #[test]
+    fn send_children() {
+        let mut parent = Broadcast::new(Parent::none());
+
+        let mut children = vec![];
+        for _ in 0..4 {
+            let child = Broadcast::new(Parent::none());
+            parent.register(&child);
+
+            children.push(child);
+        }
+
+        let runtime = Runtime::new().unwrap();
+        let msg = BastionMessage::start();
+
+        parent.send_children(msg.clone());
+        runtime.block_on(async {
+            for child in &mut children {
+                match poll!(child.next()) {
+                    Poll::Ready(Some(BastionMessage::Start)) => (),
+                    _ => panic!(),
+                }
+            }
+        });
+
+        parent.unregister(children[0].id());
+        parent.send_children(msg.clone());
+        runtime.block_on(async {
+            assert!(poll!(children[0].next()).is_pending());
+
+            for child in &mut children[1..] {
+                match poll!(child.next()) {
+                    Poll::Ready(Some(BastionMessage::Start)) => (),
+                    _ => panic!(),
+                }
+            }
+        });
+
+        parent.clear_children();
+        parent.send_children(msg);
+        runtime.block_on(async {
+            for child in &mut children[1..] {
+                assert!(poll!(child.next()).is_pending());
+            }
+        });
     }
 }

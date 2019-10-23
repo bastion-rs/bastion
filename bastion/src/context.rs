@@ -1,6 +1,5 @@
-use crate::bastion::REGISTRY;
 use crate::broadcast::BastionMessage;
-use crate::children::{ChildrenRef, Message};
+use crate::children::{ChildRef, ChildrenRef, Message};
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
@@ -10,11 +9,12 @@ use uuid::Uuid;
 pub(super) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub struct BastionId(Uuid);
+pub(super) struct BastionId(Uuid);
 
 #[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
+    child: ChildRef,
     children: ChildrenRef,
     supervisor: SupervisorRef,
     state: Qutex<ContextState>,
@@ -36,20 +36,22 @@ impl BastionId {
 impl BastionContext {
     pub(super) fn new(
         id: BastionId,
+        child: ChildRef,
         children: ChildrenRef,
         supervisor: SupervisorRef,
         state: Qutex<ContextState>,
     ) -> Self {
         BastionContext {
             id,
+            child,
             children,
             supervisor,
             state,
         }
     }
 
-    pub fn id(&self) -> &BastionId {
-        &self.id
+    pub fn as_ref(&self) -> &ChildRef {
+        &self.child
     }
 
     pub fn parent(&self) -> &ChildrenRef {
@@ -60,13 +62,10 @@ impl BastionContext {
         &self.supervisor
     }
 
-    pub fn send_msg(&self, id: &BastionId, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
+    pub fn send_msg(&self, child: &ChildRef, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
         let msg = BastionMessage::message(msg);
-
-        // TODO: Err(Error)
-        REGISTRY
-            .send_child(id, msg)
-            .map_err(|msg| msg.into_msg().unwrap())
+        // FIXME: panics?
+        child.send(msg).map_err(|msg| msg.into_msg().unwrap())
     }
 
     // TODO: Err(Error)

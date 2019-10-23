@@ -1,18 +1,19 @@
 use crate::broadcast::{BastionMessage, Broadcast, Deployment, Parent, Sender};
 use crate::context::{BastionId, NIL_ID};
 use crate::proc::Proc;
-use crate::supervisor::Supervisor;
+use crate::supervisor::{Supervisor, SupervisorRef};
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
-use qutex::Qutex;
+use qutex::{Qutex, QrwLock};
 use std::task::Poll;
 use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
     pub(super) static ref SYSTEM: Sender = System::init();
+    pub(super) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
     pub(super) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
     pub(super) static ref STARTED: Qutex<bool> = Qutex::new(false);
 }
@@ -53,10 +54,16 @@ impl System {
         let bcast = Broadcast::with_id(parent, NIL_ID);
 
         let supervisor = Supervisor::new(bcast);
+        let supervisor_ref = supervisor.as_ref();
+
         let msg = BastionMessage::deploy_supervisor(supervisor);
         system.bcast.send_self(msg);
 
         Proc::spawn(system.run());
+
+        // FIXME: panics?
+        let mut root_spv = ROOT_SPV.clone().write().wait().unwrap();
+        *root_spv = Some(supervisor_ref);
 
         sender
     }
@@ -121,7 +128,7 @@ impl System {
 
                 return Err(());
             }
-            BastionMessage::PoisonPill => {
+            BastionMessage::Kill => {
                 self.started = false;
 
                 self.kill().await;
@@ -131,6 +138,10 @@ impl System {
             BastionMessage::Deploy(deployment) => match deployment {
                 Deployment::Supervisor(supervisor) => {
                     self.bcast.register(supervisor.bcast());
+                    if self.started {
+                        let msg = BastionMessage::start();
+                        self.bcast.send_child(supervisor.id(), msg);
+                    }
 
                     let id = supervisor.id().clone();
                     let launched = Proc::spawn(supervisor.run());
@@ -151,7 +162,7 @@ impl System {
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
             BastionMessage::Message(_) => self.bcast.send_children(msg),
-            BastionMessage::Dead { id } => {
+            BastionMessage::Stopped { id } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {
                     self.waiting.push(launched);
@@ -192,6 +203,9 @@ impl System {
                 Poll::Ready(Some(BastionMessage::Start)) => {
                     self.started = true;
 
+                    let msg = BastionMessage::start();
+                    self.bcast.send_children(msg);
+
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
@@ -201,9 +215,6 @@ impl System {
                             return;
                         }
                     }
-
-                    let msg = BastionMessage::start();
-                    self.bcast.send_children(msg);
                 }
                 Poll::Ready(Some(msg)) if !self.started => self.pre_start_msgs.push(msg),
                 Poll::Ready(Some(msg)) => {
