@@ -1,7 +1,6 @@
 pub mod catch_unwind;
 pub mod layout_helpers;
 pub mod lightproc;
-pub mod panic_helpers;
 pub mod proc_data;
 pub mod proc_ext;
 pub mod proc_handle;
