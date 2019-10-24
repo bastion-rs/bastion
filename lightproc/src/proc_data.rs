@@ -11,42 +11,42 @@ use crate::proc_stack::*;
 use crate::proc_vtable::ProcVTable;
 use crate::state::*;
 
-/// The pdata of a task.
+/// The pdata of a proc.
 ///
-/// This pdata is stored right at the beginning of every heap-allocated task.
+/// This pdata is stored right at the beginning of every heap-allocated proc.
 pub(crate) struct ProcData {
-    /// Current state of the task.
+    /// Current state of the proc.
     ///
     /// Contains flags representing the current state and the reference count.
     pub(crate) state: AtomicUsize,
 
-    /// The task that is blocked on the `JoinHandle`.
+    /// The proc that is blocked on the `ProcHandle`.
     ///
-    /// This waker needs to be woken once the task completes or is closed.
+    /// This waker needs to be woken once the proc completes or is closed.
     pub(crate) awaiter: Cell<Option<Waker>>,
 
     /// The virtual table.
     ///
     /// In addition to the actual waker virtual table, it also contains pointers to several other
-    /// methods necessary for bookkeeping the heap-allocated task.
+    /// methods necessary for bookkeeping the heap-allocated proc.
     pub(crate) vtable: &'static ProcVTable,
 }
 
 impl ProcData {
-    /// Cancels the task.
+    /// Cancels the proc.
     ///
-    /// This method will only mark the task as closed and will notify the awaiter, but it won't
-    /// reschedule the task if it's not completed.
+    /// This method will only mark the proc as closed and will notify the awaiter, but it won't
+    /// reschedule the proc if it's not completed.
     pub(crate) fn cancel(&self) {
         let mut state = self.state.load(Ordering::Acquire);
 
         loop {
-            // If the task has been completed or closed, it can't be cancelled.
+            // If the proc has been completed or closed, it can't be cancelled.
             if state & (COMPLETED | CLOSED) != 0 {
                 break;
             }
 
-            // Mark the task as closed.
+            // Mark the proc as closed.
             match self.state.compare_exchange_weak(
                 state,
                 state | CLOSED,
@@ -54,7 +54,7 @@ impl ProcData {
                 Ordering::Acquire,
             ) {
                 Ok(_) => {
-                    // Notify the awaiter that the task has been closed.
+                    // Notify the awaiter that the proc has been closed.
                     if state & AWAITER != 0 {
                         self.notify();
                     }
@@ -66,7 +66,7 @@ impl ProcData {
         }
     }
 
-    /// Notifies the task blocked on the task.
+    /// Notifies the proc blocked on the proc.
     ///
     /// If there is a registered waker, it will be removed from the pdata and woken.
     #[inline]
@@ -77,7 +77,7 @@ impl ProcData {
         }
     }
 
-    /// Notifies the task blocked on the task unless its waker matches `current`.
+    /// Notifies the proc blocked on the proc unless its waker matches `current`.
     ///
     /// If there is a registered waker, it will be removed from the pdata.
     #[inline]

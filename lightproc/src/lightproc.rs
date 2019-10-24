@@ -13,7 +13,7 @@ use crate::recoverable_handle::RecoverableHandle;
 use std::panic::AssertUnwindSafe;
 
 pub struct LightProc {
-    /// A pointer to the heap-allocated task.
+    /// A pointer to the heap-allocated proc.
     pub(crate) raw_proc: NonNull<()>,
 }
 
@@ -42,13 +42,13 @@ impl LightProc {
         R: Send + 'static,
         S: Fn(LightProc) + Send + Sync + 'static,
     {
-        let raw_task = RawProc::allocate(stack, future, schedule);
-        let task = LightProc { raw_proc: raw_task };
+        let raw_proc = RawProc::allocate(stack, future, schedule);
+        let proc = LightProc { raw_proc: raw_proc };
         let handle = ProcHandle {
-            raw_proc: raw_task,
+            raw_proc: raw_proc,
             _marker: PhantomData,
         };
-        (task, handle)
+        (proc, handle)
     }
 
     pub fn schedule(self) {
@@ -97,13 +97,13 @@ impl Drop for LightProc {
         let pdata = ptr as *const ProcData;
 
         unsafe {
-            // Cancel the task.
+            // Cancel the proc.
             (*pdata).cancel();
 
             // Drop the future.
             ((*pdata).vtable.drop_future)(ptr);
 
-            // Drop the task reference.
+            // Drop the proc reference.
             ((*pdata).vtable.decrement)(ptr);
         }
     }
@@ -114,7 +114,7 @@ impl fmt::Debug for LightProc {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
 
-        f.debug_struct("Task")
+        f.debug_struct("LightProc")
             .field("pdata", unsafe { &(*pdata) })
             .field("stack", self.stack())
             .finish()

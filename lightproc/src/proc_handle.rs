@@ -10,14 +10,14 @@ use crate::proc_data::ProcData;
 use crate::proc_stack::*;
 use crate::state::*;
 
-/// A handle that awaits the result of a task.
+/// A handle that awaits the result of a proc.
 ///
 /// This type is a future that resolves to an `Option<R>` where:
 ///
-/// * `None` indicates the task has panicked or was cancelled
-/// * `Some(res)` indicates the task has completed with `res`
+/// * `None` indicates the proc has panicked or was cancelled
+/// * `Some(res)` indicates the proc has completed with `res`
 pub struct ProcHandle<R> {
-    /// A raw task pointer.
+    /// A raw proc pointer.
     pub(crate) raw_proc: NonNull<()>,
 
     /// A marker capturing the generic type `R`.
@@ -30,11 +30,11 @@ unsafe impl<R> Sync for ProcHandle<R> {}
 impl<R> Unpin for ProcHandle<R> {}
 
 impl<R> ProcHandle<R> {
-    /// Cancels the task.
+    /// Cancels the proc.
     ///
-    /// If the task has already completed, calling this method will have no effect.
+    /// If the proc has already completed, calling this method will have no effect.
     ///
-    /// When a task is cancelled, its future cannot be polled again and will be dropped instead.
+    /// When a proc is cancelled, its future cannot be polled again and will be dropped instead.
     pub fn cancel(&self) {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
@@ -43,19 +43,19 @@ impl<R> ProcHandle<R> {
             let mut state = (*pdata).state.load(Ordering::Acquire);
 
             loop {
-                // If the task has been completed or closed, it can't be cancelled.
+                // If the proc has been completed or closed, it can't be cancelled.
                 if state & (COMPLETED | CLOSED) != 0 {
                     break;
                 }
 
-                // If the task is not scheduled nor running, we'll need to schedule it.
+                // If the proc is not scheduled nor running, we'll need to schedule it.
                 let new = if state & (SCHEDULED | RUNNING) == 0 {
                     (state | SCHEDULED | CLOSED) + REFERENCE
                 } else {
                     state | CLOSED
                 };
 
-                // Mark the task as closed.
+                // Mark the proc as closed.
                 match (*pdata).state.compare_exchange_weak(
                     state,
                     new,
@@ -63,13 +63,13 @@ impl<R> ProcHandle<R> {
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        // If the task is not scheduled nor running, schedule it so that its future
+                        // If the proc is not scheduled nor running, schedule it so that its future
                         // gets dropped by the executor.
                         if state & (SCHEDULED | RUNNING) == 0 {
                             ((*pdata).vtable.schedule)(ptr);
                         }
 
-                        // Notify the awaiter that the task has been closed.
+                        // Notify the awaiter that the proc has been closed.
                         if state & AWAITER != 0 {
                             (*pdata).notify();
                         }
@@ -82,7 +82,7 @@ impl<R> ProcHandle<R> {
         }
     }
 
-    /// Returns a reference to the stack stored inside the task.
+    /// Returns a reference to the stack stored inside the proc.
     pub fn stack(&self) -> &ProcStack {
         let offset = ProcData::offset_stack();
         let ptr = self.raw_proc.as_ptr();
@@ -103,8 +103,8 @@ impl<R> Drop for ProcHandle<R> {
         let mut output = None;
 
         unsafe {
-            // Optimistically assume the `JoinHandle` is being dropped just after creating the
-            // task. This is a common case so if the handle is not used, the overhead of it is only
+            // Optimistically assume the `ProcHandle` is being dropped just after creating the
+            // proc. This is a common case so if the handle is not used, the overhead of it is only
             // one compare-exchange operation.
             if let Err(mut state) = (*pdata).state.compare_exchange_weak(
                 SCHEDULED | HANDLE | REFERENCE,
@@ -113,10 +113,10 @@ impl<R> Drop for ProcHandle<R> {
                 Ordering::Acquire,
             ) {
                 loop {
-                    // If the task has been completed but not yet closed, that means its output
+                    // If the proc has been completed but not yet closed, that means its output
                     // must be dropped.
                     if state & COMPLETED != 0 && state & CLOSED == 0 {
-                        // Mark the task as closed in order to grab its output.
+                        // Mark the proc as closed in order to grab its output.
                         match (*pdata).state.compare_exchange_weak(
                             state,
                             state | CLOSED,
@@ -133,7 +133,7 @@ impl<R> Drop for ProcHandle<R> {
                             Err(s) => state = s,
                         }
                     } else {
-                        // If this is the last reference to the task and it's not closed, then
+                        // If this is the last reference to the proc and it's not closed, then
                         // close it and schedule one more time so that its future gets dropped by
                         // the executor.
                         let new = if state & (!(REFERENCE - 1) | CLOSED) == 0 {
@@ -150,7 +150,7 @@ impl<R> Drop for ProcHandle<R> {
                             Ordering::Acquire,
                         ) {
                             Ok(_) => {
-                                // If this is the last reference to the task, we need to either
+                                // If this is the last reference to the proc, we need to either
                                 // schedule dropping its future or destroy it.
                                 if state & !(REFERENCE - 1) == 0 {
                                     if state & CLOSED == 0 {
@@ -169,7 +169,7 @@ impl<R> Drop for ProcHandle<R> {
             }
         }
 
-        // Drop the output if it was taken out of the task.
+        // Drop the output if it was taken out of the proc.
         drop(output);
     }
 }
@@ -185,39 +185,39 @@ impl<R> Future for ProcHandle<R> {
             let mut state = (*pdata).state.load(Ordering::Acquire);
 
             loop {
-                // If the task has been closed, notify the awaiter and return `None`.
+                // If the proc has been closed, notify the awaiter and return `None`.
                 if state & CLOSED != 0 {
-                    // Even though the awaiter is most likely the current task, it could also be
-                    // another task.
+                    // Even though the awaiter is most likely the current proc, it could also be
+                    // another proc.
                     (*pdata).notify_unless(cx.waker());
                     return Poll::Ready(None);
                 }
 
-                // If the task is not completed, register the current task.
+                // If the proc is not completed, register the current proc.
                 if state & COMPLETED == 0 {
-                    // Replace the waker with one associated with the current task. We need a
+                    // Replace the waker with one associated with the current proc. We need a
                     // safeguard against panics because dropping the previous waker can panic.
                     (*pdata).swap_awaiter(Some(cx.waker().clone()));
 
-                    // Reload the state after registering. It is possible that the task became
+                    // Reload the state after registering. It is possible that the proc became
                     // completed or closed just before registration so we need to check for that.
                     state = (*pdata).state.load(Ordering::Acquire);
 
-                    // If the task has been closed, notify the awaiter and return `None`.
+                    // If the proc has been closed, notify the awaiter and return `None`.
                     if state & CLOSED != 0 {
-                        // Even though the awaiter is most likely the current task, it could also
-                        // be another task.
+                        // Even though the awaiter is most likely the current proc, it could also
+                        // be another proc.
                         (*pdata).notify_unless(cx.waker());
                         return Poll::Ready(None);
                     }
 
-                    // If the task is still not completed, we're blocked on it.
+                    // If the proc is still not completed, we're blocked on it.
                     if state & COMPLETED == 0 {
                         return Poll::Pending;
                     }
                 }
 
-                // Since the task is now completed, mark it as closed in order to grab its output.
+                // Since the proc is now completed, mark it as closed in order to grab its output.
                 match (*pdata).state.compare_exchange(
                     state,
                     state | CLOSED,
@@ -226,12 +226,12 @@ impl<R> Future for ProcHandle<R> {
                 ) {
                     Ok(_) => {
                         // Notify the awaiter. Even though the awaiter is most likely the current
-                        // task, it could also be another task.
+                        // proc, it could also be another proc.
                         if state & AWAITER != 0 {
                             (*pdata).notify_unless(cx.waker());
                         }
 
-                        // Take the output from the task.
+                        // Take the output from the proc.
                         let output = ((*pdata).vtable.get_output)(ptr) as *mut R;
                         return Poll::Ready(Some(output.read()));
                     }
@@ -247,7 +247,7 @@ impl<R> fmt::Debug for ProcHandle<R> {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
 
-        f.debug_struct("JoinHandle")
+        f.debug_struct("ProcHandle")
             .field("pdata", unsafe { &(*pdata) })
             .finish()
     }

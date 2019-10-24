@@ -11,7 +11,7 @@ where
     R: Send + 'static,
 {
     lazy_static! {
-        // A channel that holds scheduled tasks.
+        // A channel that holds scheduled procs.
         static ref QUEUE: Sender<LightProc> = {
             let (sender, receiver) = unbounded::<LightProc>();
 

@@ -18,7 +18,7 @@ use crate::state::*;
 
 use std::panic::AssertUnwindSafe;
 
-/// Raw pointers to the fields of a task.
+/// Raw pointers to the fields of a proc.
 pub(crate) struct RawProc<F, R, S> {
     pub(crate) pdata: *const ProcData,
     pub(crate) schedule: *const S,
@@ -47,23 +47,23 @@ where
     R: Send + 'static,
     S: Fn(LightProc) + Send + Sync + 'static,
 {
-    /// Allocates a task with the given `future` and `schedule` function.
+    /// Allocates a proc with the given `future` and `schedule` function.
     ///
-    /// It is assumed there are initially only the `Task` reference and the `JoinHandle`.
+    /// It is assumed there are initially only the `LightProc` reference and the `ProcHandle`.
     pub(crate) fn allocate(stack: ProcStack, future: F, schedule: S) -> NonNull<()> {
-        // Compute the layout of the task for allocation. Abort if the computation fails.
-        let task_layout = Self::task_layout();
+        // Compute the layout of the proc for allocation. Abort if the computation fails.
+        let proc_layout = Self::proc_layout();
 
         unsafe {
-            // Allocate enough space for the entire task.
-            let raw_task = match NonNull::new(alloc::alloc(task_layout.layout) as *mut ()) {
+            // Allocate enough space for the entire proc.
+            let raw_proc = match NonNull::new(alloc::alloc(proc_layout.layout) as *mut ()) {
                 None => std::process::abort(),
                 Some(p) => p,
             };
 
-            let raw = Self::from_ptr(raw_task.as_ptr());
+            let raw = Self::from_ptr(raw_proc.as_ptr());
 
-            // Write the pdata as the first field of the task.
+            // Write the pdata as the first field of the proc.
             (raw.pdata as *mut ProcData).write(ProcData {
                 state: AtomicUsize::new(SCHEDULED | HANDLE | REFERENCE),
                 awaiter: Cell::new(None),
@@ -83,39 +83,39 @@ where
                 },
             });
 
-            // Write the stack as the second field of the task.
+            // Write the stack as the second field of the proc.
             (raw.stack as *mut ProcStack).write(stack);
 
-            // Write the schedule function as the third field of the task.
+            // Write the schedule function as the third field of the proc.
             (raw.schedule as *mut S).write(schedule);
 
-            // Write the future as the fourth field of the task.
+            // Write the future as the fourth field of the proc.
             raw.future.write(future);
 
-            raw_task
+            raw_proc
         }
     }
 
-    /// Creates a `RawTask` from a raw task pointer.
+    /// Creates a `RawProc` from a raw proc pointer.
     #[inline]
     pub(crate) fn from_ptr(ptr: *const ()) -> Self {
-        let task_layout = Self::task_layout();
+        let proc_layout = Self::proc_layout();
         let p = ptr as *const u8;
 
         unsafe {
             Self {
                 pdata: p as *const ProcData,
-                stack: p.add(task_layout.offset_t) as *mut ProcStack,
-                schedule: p.add(task_layout.offset_s) as *const S,
-                future: p.add(task_layout.offset_f) as *mut F,
-                output: p.add(task_layout.offset_r) as *mut R,
+                stack: p.add(proc_layout.offset_t) as *mut ProcStack,
+                schedule: p.add(proc_layout.offset_s) as *const S,
+                future: p.add(proc_layout.offset_f) as *mut F,
+                output: p.add(proc_layout.offset_r) as *mut R,
             }
         }
     }
 
-    /// Returns the memory layout for a task.
+    /// Returns the memory layout for a proc.
     #[inline]
-    fn task_layout() -> TaskLayout {
+    fn proc_layout() -> TaskLayout {
         let layout_pdata = Layout::new::<ProcData>();
         let layout_t = Layout::new::<ProcStack>();
         let layout_s = Layout::new::<S>();
@@ -149,15 +149,15 @@ where
         let mut state = (*raw.pdata).state.load(Ordering::Acquire);
 
         loop {
-            // If the task is completed or closed, it can't be woken.
+            // If the proc is completed or closed, it can't be woken.
             if state & (COMPLETED | CLOSED) != 0 {
                 // Drop the waker.
                 Self::decrement(ptr);
                 break;
             }
 
-            // If the task is already scheduled, we just need to synchronize with the thread that
-            // will run the task by "publishing" our current view of the memory.
+            // If the proc is already scheduled, we just need to synchronize with the thread that
+            // will run the proc by "publishing" our current view of the memory.
             if state & SCHEDULED != 0 {
                 // Update the state without actually modifying it.
                 match (*raw.pdata).state.compare_exchange_weak(
@@ -174,7 +174,7 @@ where
                     Err(s) => state = s,
                 }
             } else {
-                // Mark the task as scheduled.
+                // Mark the proc as scheduled.
                 match (*raw.pdata).state.compare_exchange_weak(
                     state,
                     state | SCHEDULED,
@@ -182,14 +182,14 @@ where
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        // If the task is not yet scheduled and isn't currently running, now is the
+                        // If the proc is not yet scheduled and isn't currently running, now is the
                         // time to schedule it.
                         if state & (SCHEDULED | RUNNING) == 0 {
-                            // Schedule the task.
-                            let task = LightProc {
+                            // Schedule the proc.
+                            let proc = LightProc {
                                 raw_proc: NonNull::new_unchecked(ptr as *mut ()),
                             };
-                            (*raw.schedule)(task);
+                            (*raw.schedule)(proc);
                         } else {
                             // Drop the waker.
                             Self::decrement(ptr);
@@ -210,13 +210,13 @@ where
         let mut state = (*raw.pdata).state.load(Ordering::Acquire);
 
         loop {
-            // If the task is completed or closed, it can't be woken.
+            // If the proc is completed or closed, it can't be woken.
             if state & (COMPLETED | CLOSED) != 0 {
                 break;
             }
 
-            // If the task is already scheduled, we just need to synchronize with the thread that
-            // will run the task by "publishing" our current view of the memory.
+            // If the proc is already scheduled, we just need to synchronize with the thread that
+            // will run the proc by "publishing" our current view of the memory.
             if state & SCHEDULED != 0 {
                 // Update the state without actually modifying it.
                 match (*raw.pdata).state.compare_exchange_weak(
@@ -229,14 +229,14 @@ where
                     Err(s) => state = s,
                 }
             } else {
-                // If the task is not scheduled nor running, we'll need to schedule after waking.
+                // If the proc is not scheduled nor running, we'll need to schedule after waking.
                 let new = if state & (SCHEDULED | RUNNING) == 0 {
                     (state | SCHEDULED) + REFERENCE
                 } else {
                     state | SCHEDULED
                 };
 
-                // Mark the task as scheduled.
+                // Mark the proc as scheduled.
                 match (*raw.pdata).state.compare_exchange_weak(
                     state,
                     new,
@@ -244,18 +244,18 @@ where
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        // If the task is not scheduled nor running, now is the time to schedule.
+                        // If the proc is not scheduled nor running, now is the time to schedule.
                         if state & (SCHEDULED | RUNNING) == 0 {
                             // If the reference count overflowed, abort.
                             if state > isize::max_value() as usize {
                                 std::process::abort();
                             }
 
-                            // Schedule the task.
-                            let task = LightProc {
+                            // Schedule the proc.
+                            let proc = LightProc {
                                 raw_proc: NonNull::new_unchecked(ptr as *mut ()),
                             };
-                            (*raw.schedule)(task);
+                            (*raw.schedule)(proc);
                         }
 
                         break;
@@ -283,10 +283,10 @@ where
         RawWaker::new(ptr, raw_waker)
     }
 
-    /// Drops a waker or a task.
+    /// Drops a waker or a proc.
     ///
     /// This function will decrement the reference count. If it drops down to zero and the
-    /// associated join handle has been dropped too, then the task gets destroyed.
+    /// associated join handle has been dropped too, then the proc gets destroyed.
     #[inline]
     unsafe fn decrement(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
@@ -294,16 +294,16 @@ where
         // Decrement the reference count.
         let new = (*raw.pdata).state.fetch_sub(REFERENCE, Ordering::AcqRel) - REFERENCE;
 
-        // If this was the last reference to the task and the `JoinHandle` has been dropped as
-        // well, then destroy the task.
+        // If this was the last reference to the proc and the `ProcHandle` has been dropped as
+        // well, then destroy the proc.
         if new & !(REFERENCE - 1) == 0 && new & HANDLE == 0 {
             Self::destroy(ptr);
         }
     }
 
-    /// Schedules a task for running.
+    /// Schedules a proc for running.
     ///
-    /// This function doesn't modify the state of the task. It only passes the task reference to
+    /// This function doesn't modify the state of the proc. It only passes the proc reference to
     /// its schedule function.
     unsafe fn schedule(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
@@ -313,7 +313,7 @@ where
         });
     }
 
-    /// Drops the future inside a task.
+    /// Drops the future inside a proc.
     #[inline]
     unsafe fn drop_future(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
@@ -322,20 +322,20 @@ where
         raw.future.drop_in_place();
     }
 
-    /// Returns a pointer to the output inside a task.
+    /// Returns a pointer to the output inside a proc.
     unsafe fn get_output(ptr: *const ()) -> *const () {
         let raw = Self::from_ptr(ptr);
         raw.output as *const ()
     }
 
-    /// Cleans up task's resources and deallocates it.
+    /// Cleans up proc's resources and deallocates it.
     ///
-    /// If the task has not been closed, then its future or the output will be dropped. The
+    /// If the proc has not been closed, then its future or the output will be dropped. The
     /// schedule function and the stack get dropped too.
     #[inline]
     unsafe fn destroy(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
-        let task_layout = Self::task_layout();
+        let proc_layout = Self::proc_layout();
 
         // We need a safeguard against panics because destructors can panic.
         // Drop the schedule function.
@@ -344,18 +344,18 @@ where
         // Drop the stack.
         (raw.stack as *mut ProcStack).drop_in_place();
 
-        // Finally, deallocate the memory reserved by the task.
-        alloc::dealloc(ptr as *mut u8, task_layout.layout);
+        // Finally, deallocate the memory reserved by the proc.
+        alloc::dealloc(ptr as *mut u8, proc_layout.layout);
     }
 
-    /// Runs a task.
+    /// Runs a proc.
     ///
-    /// If polling its future panics, the task will be closed and the panic propagated into the
+    /// If polling its future panics, the proc will be closed and the panic propagated into the
     /// caller.
     unsafe fn run(ptr: *const ()) {
         let raw = Self::from_ptr(ptr);
 
-        // Create a context from the raw task pointer and the vtable inside the its pdata.
+        // Create a context from the raw proc pointer and the vtable inside the its pdata.
         let waker = ManuallyDrop::new(Waker::from_raw(RawWaker::new(
             ptr,
             &(*raw.pdata).vtable.raw_waker,
@@ -364,11 +364,11 @@ where
 
         let mut state = (*raw.pdata).state.load(Ordering::Acquire);
 
-        // Update the task's state before polling its future.
+        // Update the proc's state before polling its future.
         loop {
-            // If the task has been closed, drop the task reference and return.
+            // If the proc has been closed, drop the proc reference and return.
             if state & CLOSED != 0 {
-                // Notify the awaiter that the task has been closed.
+                // Notify the awaiter that the proc has been closed.
                 if state & AWAITER != 0 {
                     (*raw.pdata).notify();
                 }
@@ -376,12 +376,12 @@ where
                 // Drop the future.
                 Self::drop_future(ptr);
 
-                // Drop the task reference.
+                // Drop the proc reference.
                 Self::decrement(ptr);
                 return;
             }
 
-            // Mark the task as unscheduled and running.
+            // Mark the proc as unscheduled and running.
             match (*raw.pdata).state.compare_exchange_weak(
                 state,
                 (state & !SCHEDULED) | RUNNING,
@@ -397,7 +397,7 @@ where
             }
         }
 
-        // Poll the inner future, but surround it with a guard that closes the task in case polling
+        // Poll the inner future, but surround it with a guard that closes the proc in case polling
         // panics.
         let guard = Guard(raw);
 
@@ -417,7 +417,7 @@ where
                 // A place where the output will be stored in case it needs to be dropped.
                 let mut output = None;
 
-                // The task is now completed.
+                // The proc is now completed.
                 loop {
                     // If the handle is dropped, we'll need to close it and drop the output.
                     let new = if state & HANDLE == 0 {
@@ -426,7 +426,7 @@ where
                         (state & !RUNNING & !SCHEDULED) | COMPLETED
                     };
 
-                    // Mark the task as not running and completed.
+                    // Mark the proc as not running and completed.
                     match (*raw.pdata).state.compare_exchange_weak(
                         state,
                         new,
@@ -434,14 +434,14 @@ where
                         Ordering::Acquire,
                     ) {
                         Ok(_) => {
-                            // If the handle is dropped or if the task was closed while running,
+                            // If the handle is dropped or if the proc was closed while running,
                             // now it's time to drop the output.
                             if state & HANDLE == 0 || state & CLOSED != 0 {
                                 // Read the output.
                                 output = Some(raw.output.read());
                             }
 
-                            // Notify the awaiter that the task has been completed.
+                            // Notify the awaiter that the proc has been completed.
                             if state & AWAITER != 0 {
                                 (*raw.pdata).notify();
                             }
@@ -450,7 +450,7 @@ where
                                 (*after_complete_cb.clone())();
                             }
 
-                            // Drop the task reference.
+                            // Drop the proc reference.
                             Self::decrement(ptr);
                             break;
                         }
@@ -458,13 +458,13 @@ where
                     }
                 }
 
-                // Drop the output if it was taken out of the task.
+                // Drop the output if it was taken out of the proc.
                 drop(output);
             }
             Poll::Pending => {
-                // The task is still not completed.
+                // The proc is still not completed.
                 loop {
-                    // If the task was closed while running, we'll need to unschedule in case it
+                    // If the proc was closed while running, we'll need to unschedule in case it
                     // was woken and then clean up its resources.
                     let new = if state & CLOSED != 0 {
                         state & !RUNNING & !SCHEDULED
@@ -472,7 +472,7 @@ where
                         state & !RUNNING
                     };
 
-                    // Mark the task as not running.
+                    // Mark the proc as not running.
                     match (*raw.pdata).state.compare_exchange_weak(
                         state,
                         new,
@@ -480,22 +480,22 @@ where
                         Ordering::Acquire,
                     ) {
                         Ok(state) => {
-                            // If the task was closed while running, we need to drop its future.
-                            // If the task was woken while running, we need to schedule it.
-                            // Otherwise, we just drop the task reference.
+                            // If the proc was closed while running, we need to drop its future.
+                            // If the proc was woken while running, we need to schedule it.
+                            // Otherwise, we just drop the proc reference.
                             if state & CLOSED != 0 {
-                                // The thread that closed the task didn't drop the future because
+                                // The thread that closed the proc didn't drop the future because
                                 // it was running so now it's our responsibility to do so.
                                 Self::drop_future(ptr);
 
-                                // Drop the task reference.
+                                // Drop the proc reference.
                                 Self::decrement(ptr);
                             } else if state & SCHEDULED != 0 {
-                                // The thread that has woken the task didn't reschedule it because
+                                // The thread that has woken the proc didn't reschedule it because
                                 // it was running so now it's our responsibility to do so.
                                 Self::schedule(ptr);
                             } else {
-                                // Drop the task reference.
+                                // Drop the proc reference.
                                 Self::decrement(ptr);
                             }
                             break;
@@ -506,7 +506,7 @@ where
             }
         }
 
-        /// A guard that closes the task if polling its future panics.
+        /// A guard that closes the proc if polling its future panics.
         struct Guard<F, R, S>(RawProc<F, R, S>)
         where
             F: Future<Output = R> + Send + 'static,
@@ -527,23 +527,23 @@ where
                     let mut state = (*raw.pdata).state.load(Ordering::Acquire);
 
                     loop {
-                        // If the task was closed while running, then unschedule it, drop its
-                        // future, and drop the task reference.
+                        // If the proc was closed while running, then unschedule it, drop its
+                        // future, and drop the proc reference.
                         if state & CLOSED != 0 {
-                            // We still need to unschedule the task because it is possible it was
+                            // We still need to unschedule the proc because it is possible it was
                             // woken while running.
                             (*raw.pdata).state.fetch_and(!SCHEDULED, Ordering::AcqRel);
 
-                            // The thread that closed the task didn't drop the future because it
+                            // The thread that closed the proc didn't drop the future because it
                             // was running so now it's our responsibility to do so.
                             RawProc::<F, R, S>::drop_future(ptr);
 
-                            // Drop the task reference.
+                            // Drop the proc reference.
                             RawProc::<F, R, S>::decrement(ptr);
                             break;
                         }
 
-                        // Mark the task as not running, not scheduled, and closed.
+                        // Mark the proc as not running, not scheduled, and closed.
                         match (*raw.pdata).state.compare_exchange_weak(
                             state,
                             (state & !RUNNING & !SCHEDULED) | CLOSED,
@@ -551,15 +551,15 @@ where
                             Ordering::Acquire,
                         ) {
                             Ok(state) => {
-                                // Drop the future because the task is now closed.
+                                // Drop the future because the proc is now closed.
                                 RawProc::<F, R, S>::drop_future(ptr);
 
-                                // Notify the awaiter that the task has been closed.
+                                // Notify the awaiter that the proc has been closed.
                                 if state & AWAITER != 0 {
                                     (*raw.pdata).notify();
                                 }
 
-                                // Drop the task reference.
+                                // Drop the proc reference.
                                 RawProc::<F, R, S>::decrement(ptr);
                                 break;
                             }
