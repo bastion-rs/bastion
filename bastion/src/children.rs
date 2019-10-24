@@ -66,7 +66,7 @@ pub(super) struct Children {
     started: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// A "reference" to a children group, allowing to communicate
 /// with it.
 pub struct ChildrenRef {
@@ -91,7 +91,7 @@ pub(super) struct Child {
     started: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// A "reference" to an element of a children group, allowing to
 /// communicate with it.
 pub struct ChildRef {
@@ -141,7 +141,8 @@ impl Children {
             let state = Qutex::new(state);
 
             let init = objekt::clone_box(&*self.init);
-            let ctx = BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
+            let ctx =
+                BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
             let exec = AssertUnwindSafe(init(ctx).0).catch_unwind();
 
             self.bcast.register(&bcast);
@@ -303,7 +304,11 @@ impl Children {
 
 impl ChildrenRef {
     fn new(id: BastionId, sender: Sender, children: Vec<ChildRef>) -> Self {
-        ChildrenRef { id, sender, children }
+        ChildrenRef {
+            id,
+            sender,
+            children,
+        }
     }
 
     /// Returns a list of [`ChildRef`] referencing the elements
@@ -392,7 +397,7 @@ impl ChildrenRef {
     /// is referencing to tell it to stop all of its running
     /// elements.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -420,7 +425,7 @@ impl ChildrenRef {
     /// is referencing to tell it to kill all of its running
     /// elements.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -445,7 +450,9 @@ impl ChildrenRef {
     }
 
     pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        self.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+        self.sender
+            .unbounded_send(msg)
+            .map_err(|err| err.into_inner())
     }
 }
 
@@ -597,7 +604,7 @@ impl ChildRef {
     /// Sends a message to the child this `ChildRef` is referencing
     /// to tell it to stop its execution.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -625,7 +632,7 @@ impl ChildRef {
     /// Sends a message to the child this `ChildRef` is referencing
     /// to tell it to suicide.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -651,7 +658,9 @@ impl ChildRef {
     }
 
     pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        self.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+        self.sender
+            .unbounded_send(msg)
+            .map_err(|err| err.into_inner())
     }
 }
 
@@ -661,7 +670,7 @@ impl Debug for Children {
             .field("bcast", &self.bcast)
             .field("supervisor", &self.supervisor)
             .field("launched", &self.launched)
-            .field("init", "Closure")
+            .field("init", &"Closure")
             .field("redundancy", &self.redundancy)
             .field("pre_start_msgs", &self.pre_start_msgs)
             .field("started", &self.started)
@@ -673,7 +682,7 @@ impl Debug for Child {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         fmt.debug_struct("Child")
             .field("bcast", &self.bcast)
-            .field("exec", "Exec")
+            .field("exec", &"Exec")
             .field("state", &self.state)
             .field("pre_start_msgs", &self.pre_start_msgs)
             .field("started", &self.started)

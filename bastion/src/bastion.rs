@@ -144,14 +144,15 @@ impl Bastion {
     /// ```
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`BastionContext`]: context/struct.BastionContext.html
+    /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
     pub fn children<F>(init: F, redundancy: usize) -> Result<ChildrenRef, ()>
     where
         F: Closure,
     {
         // FIXME: panics
-        ROOT_SPV.clone()
+        ROOT_SPV
+            .clone()
             .read()
             .wait()
             .unwrap()

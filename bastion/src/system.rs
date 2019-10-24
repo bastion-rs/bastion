@@ -7,7 +7,7 @@ use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
-use qutex::{Qutex, QrwLock};
+use qutex::{QrwLock, Qutex};
 use std::task::Poll;
 use tokio::runtime::{Builder, Runtime};
 

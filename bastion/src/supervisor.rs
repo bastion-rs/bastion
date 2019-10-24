@@ -333,7 +333,7 @@ impl Supervisor {
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children_ref`]: #method.children_ref
-    /// [`BastionContext`]: context/struct.BastionContext.html
+    /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
     pub fn children<F>(self, child: F, redundancy: usize) -> Self
     where
@@ -410,7 +410,7 @@ impl Supervisor {
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children`]: #method.children
-    /// [`BastionContext`]: context/struct.BastionContext.html
+    /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
     pub fn children_ref<F>(&mut self, init: F, redundancy: usize) -> ChildrenRef
     where
@@ -856,7 +856,7 @@ impl SupervisorRef {
     /// ```
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`BastionContext`]: context/struct.BastionContext.html
+    /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
     pub fn children<F>(&self, init: F, redundancy: usize) -> Result<ChildrenRef, ()>
     where
@@ -985,7 +985,7 @@ impl SupervisorRef {
     /// is referencing to tell it to stop every running children
     /// groups and supervisors that it is supervising.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -1013,7 +1013,7 @@ impl SupervisorRef {
     /// is referencing to tell it to kill every running children
     /// groups and supervisors that it is supervising.
     ///
-    /// This methods returns `()` if it succeeded, or `Err(())`
+    /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -1038,7 +1038,9 @@ impl SupervisorRef {
     }
 
     pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        self.sender.unbounded_send(msg).map_err(|err| err.into_inner())
+        self.sender
+            .unbounded_send(msg)
+            .map_err(|err| err.into_inner())
     }
 }
 
