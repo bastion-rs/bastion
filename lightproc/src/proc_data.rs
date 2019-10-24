@@ -8,7 +8,7 @@ use crossbeam_utils::Backoff;
 
 use crate::layout_helpers::extend;
 use crate::proc_stack::*;
-use crate::proc_vtable::TaskVTable;
+use crate::proc_vtable::ProcVTable;
 use crate::state::*;
 
 /// The pdata of a task.
@@ -29,7 +29,7 @@ pub(crate) struct ProcData {
     ///
     /// In addition to the actual waker virtual table, it also contains pointers to several other
     /// methods necessary for bookkeeping the heap-allocated task.
-    pub(crate) vtable: &'static TaskVTable,
+    pub(crate) vtable: &'static ProcVTable,
 }
 
 impl ProcData {

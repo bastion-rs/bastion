@@ -8,12 +8,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use crate::layout_helpers::extend;
-use crate::lightproc::LightProc;
+use crate::lightproc::{LightProc};
 use crate::proc_data::ProcData;
 use crate::proc_layout::TaskLayout;
 use crate::proc_stack::*;
-use crate::proc_vtable::TaskVTable;
+use crate::proc_vtable::ProcVTable;
 use crate::state::*;
+use std::panic::AssertUnwindSafe;
+use crate::catch_unwind::CatchUnwind;
+use std::any::Any;
+
+pub type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;
 
 /// Raw pointers to the fields of a task.
 pub(crate) struct RawProc<F, R, S> {
@@ -26,7 +31,8 @@ pub(crate) struct RawProc<F, R, S> {
 
 impl<F, R, S> Copy for RawProc<F, R, S> {}
 
-impl<F, R, S> Clone for RawProc<F, R, S> {
+impl<F, R, S> Clone for RawProc<F, R, S>
+{
     fn clone(&self) -> Self {
         Self {
             pdata: self.pdata,
@@ -64,7 +70,7 @@ where
             (raw.pdata as *mut ProcData).write(ProcData {
                 state: AtomicUsize::new(SCHEDULED | HANDLE | REFERENCE),
                 awaiter: Cell::new(None),
-                vtable: &TaskVTable {
+                vtable: &ProcVTable {
                     raw_waker: RawWakerVTable::new(
                         Self::clone_waker,
                         Self::wake,
@@ -116,7 +122,7 @@ where
         let layout_pdata = Layout::new::<ProcData>();
         let layout_t = Layout::new::<ProcStack>();
         let layout_s = Layout::new::<S>();
-        let layout_f = Layout::new::<F>();
+        let layout_f = Layout::new::<ProcFuture<F>>();
         let layout_r = Layout::new::<R>();
 
         let size_union = layout_f.size().max(layout_r.size());

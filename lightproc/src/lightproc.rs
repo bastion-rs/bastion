@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, thread};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem;
@@ -7,7 +7,11 @@ use std::ptr::NonNull;
 use crate::proc_data::ProcData;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::*;
-use crate::raw_proc::RawProc;
+use crate::raw_proc::{RawProc, ProcFuture};
+use std::panic::AssertUnwindSafe;
+use crate::proc_ext::ProcFutureExt;
+use crate::catch_unwind::CatchUnwind;
+use crate::recoverable_handle::RecoverableHandle;
 
 pub struct LightProc {
     /// A pointer to the heap-allocated task.
@@ -18,13 +22,25 @@ unsafe impl Send for LightProc {}
 unsafe impl Sync for LightProc {}
 
 impl LightProc {
+    pub fn recoverable<F, R, S>(future: F, schedule: S, stack: ProcStack) -> (LightProc, RecoverableHandle<R>)
+        where
+            F: Future<Output = R> + Send + 'static,
+            R: Send + 'static,
+            S: Fn(LightProc) + Send + Sync + 'static,
+    {
+        let recovery_future = AssertUnwindSafe(future).catch_unwind();
+        let (proc, handle) = Self::build(recovery_future, schedule, stack);
+        (proc, RecoverableHandle(handle))
+    }
+
+
     pub fn build<F, R, S>(future: F, schedule: S, stack: ProcStack) -> (LightProc, ProcHandle<R>)
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
         S: Fn(LightProc) + Send + Sync + 'static,
     {
-        let raw_task = RawProc::<F, R, S>::allocate(stack, future, schedule);
+        let raw_task = RawProc::allocate(stack, future, schedule);
         let task = LightProc { raw_proc: raw_task };
         let handle = ProcHandle {
             raw_proc: raw_task,
