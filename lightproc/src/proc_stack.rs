@@ -16,6 +16,37 @@ pub struct ProcStack {
     pub after_panic: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
+impl ProcStack {
+    pub fn with_pid(mut self, pid: usize) -> Self {
+        self.pid = AtomicUsize::new(pid);
+        self
+    }
+
+    pub fn with_before_start<T>(mut self, callback: T) -> Self
+    where
+        T: Fn() + Send + Sync + 'static
+    {
+        self.before_start = Some(Arc::new(callback));
+        self
+    }
+
+    pub fn with_after_complete<T>(mut self, callback: T) -> Self
+    where
+        T: Fn() + Send + Sync + 'static
+    {
+        self.after_complete = Some(Arc::new(callback));
+        self
+    }
+
+    pub fn with_after_panic<T>(mut self, callback: T) -> Self
+    where
+        T: Fn() + Send + Sync + 'static
+    {
+        self.after_panic = Some(Arc::new(callback));
+        self
+    }
+}
+
 impl fmt::Debug for ProcStack {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("ProcStack")

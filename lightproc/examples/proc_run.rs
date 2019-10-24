@@ -27,16 +27,10 @@ where
     let (proc, handle) = LightProc::build(
         future,
         schedule,
-        ProcStack {
-            pid: AtomicUsize::new(1),
-            after_complete: Some(Arc::new(|| {
-                println!("After complete");
-            })),
-            before_start: Some(Arc::new(|| {
-                println!("Before start");
-            })),
-            after_panic: None,
-        },
+        ProcStack::default()
+            .with_pid(1)
+            .with_before_start(|| { println!("Before start"); })
+            .with_after_complete(|| { println!("After complete"); })
     );
 
     proc.schedule();
