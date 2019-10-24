@@ -7,7 +7,6 @@ use std::thread;
 use crossbeam::channel;
 use futures::executor;
 use lightproc::prelude::*;
-use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
 where
@@ -29,8 +28,12 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|| { println!("Before start"); })
-            .with_after_complete(|| { println!("After complete"); })
+            .with_before_start(|| {
+                println!("Before start");
+            })
+            .with_after_complete(|| {
+                println!("After complete");
+            }),
     );
 
     proc.schedule();

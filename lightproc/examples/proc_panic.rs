@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::sync::Arc;
+
 use std::thread;
 
 use crossbeam::channel::{unbounded, Sender};
@@ -8,8 +8,6 @@ use lazy_static::lazy_static;
 use lightproc::prelude::*;
 
 use lightproc::recoverable_handle::RecoverableHandle;
-
-use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
 where
@@ -38,9 +36,15 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|| { println!("Before start"); })
-            .with_after_complete(|| { println!("After complete"); })
-            .with_after_panic(|| { println!("After panic"); })
+            .with_before_start(|| {
+                println!("Before start");
+            })
+            .with_after_complete(|| {
+                println!("After complete");
+            })
+            .with_after_panic(|| {
+                println!("After panic");
+            }),
     );
 
     proc.schedule();

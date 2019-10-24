@@ -24,7 +24,7 @@ impl ProcStack {
 
     pub fn with_before_start<T>(mut self, callback: T) -> Self
     where
-        T: Fn() + Send + Sync + 'static
+        T: Fn() + Send + Sync + 'static,
     {
         self.before_start = Some(Arc::new(callback));
         self
@@ -32,7 +32,7 @@ impl ProcStack {
 
     pub fn with_after_complete<T>(mut self, callback: T) -> Self
     where
-        T: Fn() + Send + Sync + 'static
+        T: Fn() + Send + Sync + 'static,
     {
         self.after_complete = Some(Arc::new(callback));
         self
@@ -40,7 +40,7 @@ impl ProcStack {
 
     pub fn with_after_panic<T>(mut self, callback: T) -> Self
     where
-        T: Fn() + Send + Sync + 'static
+        T: Fn() + Send + Sync + 'static,
     {
         self.after_panic = Some(Arc::new(callback));
         self
