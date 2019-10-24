@@ -2,7 +2,7 @@ use std::alloc::Layout;
 use std::io::{Error, ErrorKind};
 
 #[inline]
-pub fn extend(layout: Layout, next: Layout) -> (Layout, usize) {
+pub(crate) fn extend(layout: Layout, next: Layout) -> (Layout, usize) {
     let new_align = std::cmp::max(layout.align(), next.align());
     let pad = padding_needed_for(layout, next.align());
 
