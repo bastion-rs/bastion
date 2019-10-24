@@ -1,10 +1,10 @@
-use std::{fmt, mem};
 use std::future::Future;
 use std::marker::{PhantomData, Unpin};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
+use std::{fmt, mem};
 
 use crate::proc_data::ProcData;
 use crate::proc_stack::*;
@@ -242,7 +242,6 @@ impl<R> Future for ProcHandle<R> {
         }
     }
 }
-
 
 impl<R> fmt::Debug for ProcHandle<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

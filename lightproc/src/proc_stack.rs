@@ -12,7 +12,7 @@ pub struct ProcStack {
 
     // After action callbacks
     pub after_complete: Option<Arc<dyn Fn() + Send + Sync>>,
-    
+
     pub after_panic: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 

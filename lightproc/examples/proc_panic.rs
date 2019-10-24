@@ -4,18 +4,17 @@ use std::thread;
 
 use crossbeam::channel::{unbounded, Sender};
 use futures::{executor, FutureExt};
-use lightproc::prelude::*;
-use std::sync::atomic::AtomicUsize;
 use lazy_static::lazy_static;
-use std::panic::AssertUnwindSafe;
+use lightproc::prelude::*;
 use lightproc::proc_ext::ProcFutureExt;
 use lightproc::recoverable_handle::RecoverableHandle;
-
+use std::panic::AssertUnwindSafe;
+use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
-    where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
 {
     lazy_static! {
         // A channel that holds scheduled tasks.
@@ -47,7 +46,7 @@ fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
             })),
             after_panic: Some(Arc::new(|| {
                 println!("After panic");
-            }))
+            })),
         },
     );
 

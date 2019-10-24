@@ -35,7 +35,7 @@ where
             before_start: Some(Arc::new(|| {
                 println!("Before start");
             })),
-            after_panic: None
+            after_panic: None,
         },
     );
 

@@ -7,16 +7,16 @@ use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+use crate::catch_unwind::CatchUnwind;
 use crate::layout_helpers::extend;
-use crate::lightproc::{LightProc};
+use crate::lightproc::LightProc;
 use crate::proc_data::ProcData;
 use crate::proc_layout::TaskLayout;
 use crate::proc_stack::*;
 use crate::proc_vtable::ProcVTable;
 use crate::state::*;
-use std::panic::AssertUnwindSafe;
-use crate::catch_unwind::CatchUnwind;
 use std::any::Any;
+use std::panic::AssertUnwindSafe;
 
 pub type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;
 
@@ -31,8 +31,7 @@ pub(crate) struct RawProc<F, R, S> {
 
 impl<F, R, S> Copy for RawProc<F, R, S> {}
 
-impl<F, R, S> Clone for RawProc<F, R, S>
-{
+impl<F, R, S> Clone for RawProc<F, R, S> {
     fn clone(&self) -> Self {
         Self {
             pdata: self.pdata,

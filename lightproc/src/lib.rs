@@ -1,16 +1,16 @@
+pub mod catch_unwind;
 pub mod layout_helpers;
 pub mod lightproc;
+pub mod panic_helpers;
 pub mod proc_data;
+pub mod proc_ext;
 pub mod proc_handle;
 pub mod proc_layout;
 pub mod proc_stack;
 pub mod proc_vtable;
 pub mod raw_proc;
-pub mod state;
-pub mod panic_helpers;
-pub mod catch_unwind;
-pub mod proc_ext;
 pub mod recoverable_handle;
+pub mod state;
 
 pub mod prelude {
     pub use crate::lightproc::*;

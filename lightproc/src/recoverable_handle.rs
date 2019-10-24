@@ -1,9 +1,9 @@
 use crate::proc_handle::ProcHandle;
-use std::thread;
 use std::future::Future;
-use std::task::{Context, Poll};
-use std::pin::Pin;
 use std::panic::resume_unwind;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::thread;
 
 pub struct RecoverableHandle<R>(pub ProcHandle<thread::Result<R>>);
 
@@ -21,7 +21,7 @@ impl<R> Future for RecoverableHandle<R> {
                 }
 
                 resume_unwind(err)
-            },
+            }
         }
     }
 }
