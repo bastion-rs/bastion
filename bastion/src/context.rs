@@ -1,4 +1,3 @@
-use crate::broadcast::BastionMessage;
 use crate::children::{ChildRef, ChildrenRef, Message};
 use crate::supervisor::SupervisorRef;
 use futures::pending;
@@ -50,25 +49,183 @@ impl BastionContext {
         }
     }
 
-    pub fn as_ref(&self) -> &ChildRef {
+    /// Returns a [`ChildRef`] referencing the children group's
+    /// element that is linked to this `BastionContext`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     Bastion::children(|ctx: BastionContext|
+    ///         async move {
+    ///             let current: &ChildRef = ctx.current();
+    ///             // Stop or kill the current element (note that this will
+    ///             // only take effect after this future becomes "pending")...
+    ///
+    ///             Ok(())
+    ///         }.into(),
+    ///         1,
+    ///     ).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`ChildRef`]: children/struct.ChildRef.html
+    pub fn current(&self) -> &ChildRef {
         &self.child
     }
 
+    /// Returns a [`ChildrenRef`] referencing the children group
+    /// of the element that is linked to this `BastionContext`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     Bastion::children(|ctx: BastionContext|
+    ///         async move {
+    ///             let parent: &ChildrenRef = ctx.parent();
+    ///             // Get the other elements of the group, broadcast message,
+    ///             // or stop or kill the children group...
+    ///
+    ///             Ok(())
+    ///         }.into(),
+    ///         1,
+    ///     ).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn parent(&self) -> &ChildrenRef {
         &self.children
     }
 
+    /// Returns a [`SupervisorRef`] referencing the supervisor
+    /// that supervises the element that is linked to this
+    /// `BastionContext`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     Bastion::children(|ctx: BastionContext|
+    ///         async move {
+    ///             let supervisor: &SupervisorRef = ctx.supervisor();
+    ///             // Add new children or nested supervisors, broadcast messages,
+    ///             // or stop or kill the supervisor...
+    ///
+    ///             Ok(())
+    ///         }.into(),
+    ///         1,
+    ///     ).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     pub fn supervisor(&self) -> &SupervisorRef {
         &self.supervisor
     }
 
-    pub fn send_msg(&self, child: &ChildRef, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
-        let msg = BastionMessage::message(msg);
-        // FIXME: panics?
-        child.send(msg).map_err(|msg| msg.into_msg().unwrap())
+    /// Tries to retrieve asynchronously a message received by
+    /// the element this `BastionContext` is linked to.
+    ///
+    /// If you need to wait (always asynchronously) until at
+    /// least one message can be retrieved, use [`recv`] instead.
+    ///
+    /// This method returns `Box<dyn Message>` if a message was
+    /// available, or `None` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     Bastion::children(|ctx: BastionContext|
+    ///         async move {
+    ///             let opt_msg: Option<Box<dyn Message>> = ctx.try_recv().await;
+    ///             // If a message was received by the element, `opt_msg` will
+    ///             // be `Some(Box<dyn Message>)`, otherwise it will be `None`.
+    ///
+    ///             Ok(())
+    ///         }.into(),
+    ///         1,
+    ///     ).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`recv`]: #method.recv
+    pub async fn try_recv(&self) -> Option<Box<dyn Message>> {
+        // TODO: Err(Error)
+        let mut state = self.state.clone().lock_async().await.ok()?;
+
+        state.msgs.pop_front()
     }
 
-    // TODO: Err(Error)
+    /// Retrieves asynchronously a message received by the element
+    /// this `BastionContext` is linked to and waits (always
+    /// asynchronously) for one if none has been received yet.
+    ///
+    /// If you don't need to wait until at least one message
+    /// can be retrieved, use [`try_recv`] instead.
+    ///
+    /// This method returns `Box<dyn Message>` if it succeeded, or
+    /// `Err(())` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     Bastion::children(|ctx: BastionContext|
+    ///         async move {
+    ///             // This will block until a message has been received...
+    ///             let msg: Box<dyn Message> = ctx.recv().await?;
+    ///
+    ///             Ok(())
+    ///         }.into(),
+    ///         1,
+    ///     ).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`try_recv`]: #method.try_recv
     pub async fn recv(&self) -> Result<Box<dyn Message>, ()> {
         loop {
             // TODO: Err(Error)
@@ -82,13 +239,6 @@ impl BastionContext {
 
             pending!();
         }
-    }
-
-    pub async fn try_recv(&self) -> Option<Box<dyn Message>> {
-        // TODO: Err(Error)
-        let mut state = self.state.clone().lock_async().await.ok()?;
-
-        state.msgs.pop_front()
     }
 }
 
