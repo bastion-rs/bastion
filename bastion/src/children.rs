@@ -355,9 +355,25 @@ impl ChildrenRef {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
-    /// let msg = "A message containing data.".to_string();
+    /// let msg = "A message containing data.";
     /// children_ref.broadcast(Box::new(msg)).expect("Couldn't send the message.");
-    /// // Every element of the children group will receive the message.
+    ///
+    ///     # Bastion::children(|ctx: BastionContext|
+    ///         # async move {
+    /// // And then in every of the children group's elements' futures...
+    /// message! { ctx.recv().await?,
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, &"A message containing data.");
+    ///     },
+    ///     // We are only sending a `&'static str` in this example,
+    ///     // so we know that this won't happen...
+    ///     _ => unreachable!(),
+    /// }
+    ///             #
+    ///             # Ok(())
+    ///         # }.into(),
+    ///         # 1,
+    ///     # ).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -543,6 +559,39 @@ impl Child {
 impl ChildRef {
     fn new(id: BastionId, sender: Sender) -> ChildRef {
         ChildRef { id, sender }
+    }
+
+    /// Sends a message to the child this `ChildRef` is referencing.
+    ///
+    /// This method returns `()` if it succeeded, or `Err(msg)`
+    /// otherwise.
+    ///
+    /// # Argument
+    ///
+    /// * `msg` - The message to send, inside a `Box`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let child_ref = &children_ref.elems()[0];
+    /// let msg = "A message containing data.";
+    /// child_ref.send_msg(Box::new(msg)).expect("Couldn't send the message.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn send_msg(&self, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
+        let msg = BastionMessage::message(msg);
+        // FIXME: panics?
+        self.send(msg).map_err(|msg| msg.into_msg().unwrap())
     }
 
     /// Sends a message to the child this `ChildRef` is referencing
