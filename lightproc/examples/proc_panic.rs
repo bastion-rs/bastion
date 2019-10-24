@@ -1,13 +1,10 @@
-use std::future::Future;
-
-use std::thread;
-
 use crossbeam::channel::{unbounded, Sender};
 use futures::executor;
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
+use std::future::Future;
+use std::thread;
 
-use lightproc::recoverable_handle::RecoverableHandle;
 
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
 where
