@@ -18,7 +18,7 @@ use crate::state::*;
 
 use std::panic::AssertUnwindSafe;
 
-pub type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;
+pub(crate) type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;
 
 /// Raw pointers to the fields of a task.
 pub(crate) struct RawProc<F, R, S> {
