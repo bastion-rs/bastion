@@ -18,8 +18,6 @@ use crate::state::*;
 
 use std::panic::AssertUnwindSafe;
 
-pub(crate) type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;
-
 /// Raw pointers to the fields of a task.
 pub(crate) struct RawProc<F, R, S> {
     pub(crate) pdata: *const ProcData,
@@ -121,7 +119,7 @@ where
         let layout_pdata = Layout::new::<ProcData>();
         let layout_t = Layout::new::<ProcStack>();
         let layout_s = Layout::new::<S>();
-        let layout_f = Layout::new::<ProcFuture<F>>();
+        let layout_f = Layout::new::<CatchUnwind<AssertUnwindSafe<F>>>();
         let layout_r = Layout::new::<R>();
 
         let size_union = layout_f.size().max(layout_r.size());
