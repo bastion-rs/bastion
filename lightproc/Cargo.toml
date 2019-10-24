@@ -8,7 +8,7 @@ categories = ["concurrency", "asynchronous"]
 edition = "2018"
 
 [dependencies]
-crossbeam-utils = "0.6.6"
+crossbeam-utils = "0.6"
 pin-utils = "0.1.0-alpha.4"
 
 [dev-dependencies]
