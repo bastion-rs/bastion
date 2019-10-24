@@ -948,11 +948,27 @@ impl SupervisorRef {
     ///     # Bastion::init();
     ///     #
     ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
-    /// let msg = "A message containing data.".to_string();
+    /// let msg = "A message containing data.";
     /// sp_ref.broadcast(Box::new(msg)).expect("Couldn't send the message.");
-    /// // Every element of every children groups supervised by the
-    /// // supervisor of one of its supervised supervisors will
-    /// // receive the message.
+    ///
+    ///     # Bastion::children(|ctx: BastionContext|
+    ///         # async move {
+    /// // And then in every future of the elements of the children
+    /// // groups that are supervised by this supervisor or one of
+    /// // its supervised supervisors (etc.)...
+    /// message! { ctx.recv().await?,
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, &"A message containing data.");
+    ///     },
+    ///     // We are only sending a `&'static str` in this example,
+    ///     // so we know that this won't happen...
+    ///     _ => unreachable!(),
+    /// }
+    ///             #
+    ///             # Ok(())
+    ///         # }.into(),
+    ///         # 1,
+    ///     # ).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
