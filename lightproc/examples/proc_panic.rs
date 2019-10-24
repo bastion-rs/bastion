@@ -5,7 +5,6 @@ use lightproc::prelude::*;
 use std::future::Future;
 use std::thread;
 
-
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
 where
     F: Future<Output = R> + Send + 'static,
