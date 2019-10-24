@@ -1,12 +1,9 @@
-//! A function that runs a future to completion on a dedicated thread.
-
-use std::future::Future;
-use std::sync::Arc;
-use std::thread;
-
 use crossbeam::channel;
 use futures::executor;
 use lightproc::prelude::*;
+use std::future::Future;
+use std::sync::Arc;
+use std::thread;
 
 fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
 where
