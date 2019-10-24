@@ -24,7 +24,7 @@ pub fn extend(layout: Layout, next: Layout) -> (Layout, usize) {
 }
 
 #[inline]
-pub fn padding_needed_for(layout: Layout, align: usize) -> usize {
+pub(crate) fn padding_needed_for(layout: Layout, align: usize) -> usize {
     let len = layout.size();
     let len_rounded_up = len.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1);
     len_rounded_up.wrapping_sub(len)
