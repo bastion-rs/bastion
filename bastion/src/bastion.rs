@@ -1,5 +1,5 @@
 use crate::broadcast::{BastionMessage, Broadcast, Parent};
-use crate::children::{ChildrenRef, Closure};
+use crate::children::{ChildrenRef, Closure, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{ROOT_SPV, STARTED, SYSTEM};
 use std::thread;
@@ -158,6 +158,58 @@ impl Bastion {
             .as_ref()
             .unwrap()
             .children(init, redundancy)
+    }
+
+    /// Sends a message to the system which will then send it to all
+    /// the root-level supervisors and their supervised children and
+    /// supervisors, etc.
+    ///
+    /// This method returns `()` if it succeeded, or `Err(msg)`
+    /// otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - The message to send, inside a `Box`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// let msg = "A message containing data.";
+    /// Bastion::broadcast(Box::new(msg)).expect("Couldn't send the message.");
+    ///
+    ///     # Bastion::children(|ctx: BastionContext|
+    ///         # async move {
+    /// // And then in every children groups's elements' future...
+    /// message! { ctx.recv().await?,
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, &"A message containing data.");
+    ///     },
+    ///     // We are only sending a `&'static str` in this example,
+    ///     // so we know that this won't happen...
+    ///     _ => unreachable!(),
+    /// }
+    ///             #
+    ///             # Ok(())
+    ///         # }.into(),
+    ///         # 1,
+    ///     # ).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn broadcast(msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
+        let msg = BastionMessage::message(msg);
+        // FIXME: panics?
+        SYSTEM
+            .unbounded_send(msg)
+            .map_err(|err| err.into_inner().into_msg().unwrap())
     }
 
     /// Sends a message to the system to tell it to start
