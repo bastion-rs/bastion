@@ -1,15 +1,14 @@
+use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr::NonNull;
-use std::{fmt, thread};
 
-use crate::catch_unwind::CatchUnwind;
 use crate::proc_data::ProcData;
 use crate::proc_ext::ProcFutureExt;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::*;
-use crate::raw_proc::{ProcFuture, RawProc};
+use crate::raw_proc::RawProc;
 use crate::recoverable_handle::RecoverableHandle;
 use std::panic::AssertUnwindSafe;
 

@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::thread;
 
 use crossbeam::channel::{unbounded, Sender};
-use futures::{executor, FutureExt};
+use futures::executor;
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
-use lightproc::proc_ext::ProcFutureExt;
+
 use lightproc::recoverable_handle::RecoverableHandle;
-use std::panic::AssertUnwindSafe;
+
 use std::sync::atomic::AtomicUsize;
 
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>

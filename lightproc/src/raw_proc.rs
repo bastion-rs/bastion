@@ -15,7 +15,7 @@ use crate::proc_layout::TaskLayout;
 use crate::proc_stack::*;
 use crate::proc_vtable::ProcVTable;
 use crate::state::*;
-use std::any::Any;
+
 use std::panic::AssertUnwindSafe;
 
 pub type ProcFuture<F> = CatchUnwind<AssertUnwindSafe<F>>;

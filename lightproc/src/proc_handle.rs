@@ -1,15 +1,14 @@
+use std::fmt;
 use std::future::Future;
 use std::marker::{PhantomData, Unpin};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
-use std::{fmt, mem};
 
 use crate::proc_data::ProcData;
 use crate::proc_stack::*;
 use crate::state::*;
-use std::any::Any;
 
 /// A handle that awaits the result of a task.
 ///
