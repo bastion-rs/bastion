@@ -32,16 +32,10 @@ travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-#backtrace = "0.3.32"
-#crossbeam-channel = "0.3.8"
-#ctrlc = "3.1.3"
-#env_logger = "0.6.1"
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
-#log = "0.4.7"
 objekt = "0.1"
 qutex = { version = "0.2", features = ["async_await"] }
-#ratelimit = "0.4.4"
 tokio = "=0.2.0-alpha.6"
 uuid = { version = "0.8", features = ["v4"] }
