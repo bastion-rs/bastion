@@ -5,3 +5,10 @@ description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
 categories = []
+edition = "2018"
+
+
+[dependencies]
+lazy_static = "1.4"
+libc = "0.2"
+num_cpus = "1.10"
