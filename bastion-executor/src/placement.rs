@@ -280,7 +280,7 @@ fn set_for_current_helper(core_id: CoreId) {
 mod macos {
     use std::mem;
 
-    use libc::{c_int, c_uint, c_void, pthread_self};
+    use libc::{c_int, c_uint, pthread_self};
 
     use num_cpus;
 
