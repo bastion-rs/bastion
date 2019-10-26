@@ -1,13 +1,11 @@
-
-use std::thread;
 use crate::placement;
 use crate::placement::CoreId;
-
+use std::thread;
 
 pub(crate) struct Distributor {
     pub round: usize,
     pub last_dead: usize,
-    pub cores: Vec<CoreId>
+    pub cores: Vec<CoreId>,
 }
 
 impl Distributor {
@@ -15,14 +13,13 @@ impl Distributor {
         Distributor {
             round: 0_usize,
             last_dead: usize::max_value(),
-            cores: placement::get_core_ids()
-                .expect("Core mapping couldn't be fetched")
+            cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
         }
     }
 
     pub fn assign<P>(mut self, thunk: P)
     where
-        P: Fn() + Send + Sync + Copy + 'static
+        P: Fn() + Send + Sync + Copy + 'static,
     {
         for core in self.cores {
             self.round = core.id;

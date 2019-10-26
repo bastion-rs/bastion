@@ -1,9 +1,7 @@
-use lazy_static::*;
 use crate::distributor::Distributor;
+use lazy_static::*;
 
-pub struct Pool {
-
-}
+pub struct Pool {}
 
 #[inline]
 pub fn get() -> &'static Pool {
