@@ -288,30 +288,30 @@ mod macos {
 
     use super::CoreId;
 
-    type kern_return_t = c_int;
-    type integer_t = c_int;
-    type natural_t = c_uint;
-    type thread_t = c_uint;
-    type thread_policy_flavor_t = natural_t;
-    type mach_msg_type_number_t = natural_t;
+    type KernReturnT = c_int;
+    type IntegerT = c_int;
+    type NaturalT = c_uint;
+    type ThreadT = c_uint;
+    type ThreadPolicyFlavorT = NaturalT;
+    type MachMsgTypeNumberT = NaturalT;
 
     #[repr(C)]
-    struct thread_affinity_policy_data_t {
-        affinity_tag: integer_t,
+    struct ThreadAffinityPolicyDataT {
+        affinity_tag: IntegerT,
     }
 
-    type thread_policy_t = *mut thread_affinity_policy_data_t;
+    type ThreadPolicyT = *mut ThreadAffinityPolicyDataT;
 
-    const THREAD_AFFINITY_POLICY: thread_policy_flavor_t = 4;
+    const THREAD_AFFINITY_POLICY: ThreadPolicyFlavorT = 4;
 
     #[link(name = "System", kind = "framework")]
     extern "C" {
         fn thread_policy_set(
-            thread: thread_t,
-            flavor: thread_policy_flavor_t,
-            policy_info: thread_policy_t,
-            count: mach_msg_type_number_t,
-        ) -> kern_return_t;
+            thread: ThreadT,
+            flavor: ThreadPolicyFlavorT,
+            policy_info: ThreadPolicyT,
+            count: MachMsgTypeNumberT,
+        ) -> KernReturnT;
     }
 
     pub fn get_core_ids() -> Option<Vec<CoreId>> {
@@ -324,20 +324,20 @@ mod macos {
     }
 
     pub fn set_for_current(core_id: CoreId) {
-        let THREAD_AFFINITY_POLICY_COUNT: mach_msg_type_number_t =
-            mem::size_of::<thread_affinity_policy_data_t>() as mach_msg_type_number_t
-                / mem::size_of::<integer_t>() as mach_msg_type_number_t;
+        let thread_affinity_policy_count: MachMsgTypeNumberT =
+            mem::size_of::<ThreadAffinityPolicyDataT>() as MachMsgTypeNumberT
+                / mem::size_of::<IntegerT>() as MachMsgTypeNumberT;
 
-        let mut info = thread_affinity_policy_data_t {
-            affinity_tag: core_id.id as integer_t,
+        let mut info = ThreadAffinityPolicyDataT {
+            affinity_tag: core_id.id as IntegerT,
         };
 
         unsafe {
             thread_policy_set(
-                pthread_self() as thread_t,
+                pthread_self() as ThreadT,
                 THREAD_AFFINITY_POLICY,
-                &mut info as thread_policy_t,
-                THREAD_AFFINITY_POLICY_COUNT,
+                &mut info as ThreadPolicyT,
+                thread_affinity_policy_count,
             );
         }
     }
