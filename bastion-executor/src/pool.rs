@@ -27,7 +27,7 @@ pub fn get() -> &'static Pool {
     lazy_static! {
         static ref POOL: Pool = {
             let distributor = Distributor::new();
-            let stealers = distributor.assign(|| {
+            let (stealers, workers) = distributor.assign(|| {
                 println!("1,2,3");
             });
 
