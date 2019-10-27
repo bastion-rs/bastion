@@ -348,6 +348,15 @@ impl<T> Worker<T> {
         }
     }
 
+    pub fn run_queue_size(&self) -> usize {
+        let b = self.inner.back.load(Ordering::Relaxed);
+        let f = self.inner.front.load(Ordering::SeqCst);
+        match b.wrapping_sub(f) {
+            x if x <= 0 => 0_usize,
+            y@_ => y as usize
+        }
+    }
+
     /// Creates a stealer for this queue.
     ///
     /// The returned stealer can be shared among threads and cloned.
