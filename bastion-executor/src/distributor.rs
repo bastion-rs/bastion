@@ -3,6 +3,8 @@ use super::placement::CoreId;
 use std::thread;
 use super::run_queue::{Worker, Stealer};
 use lightproc::prelude::*;
+use super::worker;
+use std::sync::Arc;
 
 pub(crate) struct Distributor {
     pub round: usize,
@@ -19,9 +21,7 @@ impl Distributor {
         }
     }
 
-    pub fn assign<P>(mut self, thunk: P) -> (Vec<Stealer<LightProc>>, Vec<Worker<LightProc>>)
-    where
-        P: Fn() + Send + Sync + Copy + 'static,
+    pub fn assign(mut self) -> (Vec<Stealer<LightProc>>, Vec<Worker<LightProc>>)
     {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
         let mut workers = Vec::<Worker<LightProc>>::new();
@@ -29,9 +29,9 @@ impl Distributor {
         for core in self.cores {
             self.round = core.id;
 
-            let worker = Worker::new_fifo();
-            stealers.push(worker.stealer());
-            workers.push(worker);
+            let wrk = Worker::new_fifo();
+            stealers.push(wrk.stealer());
+            workers.push(wrk);
 
             thread::Builder::new()
                 .name("bastion-async-thread".to_string())
@@ -40,7 +40,7 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // actual execution
-                    thunk();
+//                    worker::main_loop(wrk);x
                 })
                 .expect("cannot start the thread for running proc");
         }

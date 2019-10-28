@@ -348,7 +348,7 @@ impl<T> Worker<T> {
         }
     }
 
-    pub fn run_queue_size(&self) -> usize {
+    pub fn worker_run_queue_size(&self) -> usize {
         let b = self.inner.back.load(Ordering::Relaxed);
         let f = self.inner.front.load(Ordering::SeqCst);
         match b.wrapping_sub(f) {
@@ -668,6 +668,18 @@ impl<T> Stealer<T> {
         let b = self.inner.back.load(Ordering::Acquire);
         b.wrapping_sub(f) <= 0
     }
+
+
+    pub fn run_queue_size(&self) -> usize {
+        let b = self.inner.back.load(Ordering::Acquire);
+        atomic::fence(Ordering::SeqCst);
+        let f = self.inner.front.load(Ordering::Acquire);
+        match b.wrapping_sub(f) {
+            x if x <= 0 => 0_usize,
+            y@_ => y as usize
+        }
+    }
+
 
     /// Steals a task from the queue.
     ///
