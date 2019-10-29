@@ -1,14 +1,14 @@
-use crate::children::{ChildRef, ChildrenRef, Message};
+use crate::children::{ChildRef, ChildrenRef, Msg};
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use uuid::Uuid;
 
-pub(super) const NIL_ID: BastionId = BastionId(Uuid::nil());
+pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub(super) struct BastionId(Uuid);
+pub(crate) struct BastionId(Uuid);
 
 #[derive(Debug)]
 pub struct BastionContext {
@@ -20,12 +20,12 @@ pub struct BastionContext {
 }
 
 #[derive(Debug)]
-pub(super) struct ContextState {
-    msgs: VecDeque<Box<dyn Message>>,
+pub(crate) struct ContextState {
+    msgs: VecDeque<Msg>,
 }
 
 impl BastionId {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let uuid = Uuid::new_v4();
 
         BastionId(uuid)
@@ -33,7 +33,7 @@ impl BastionId {
 }
 
 impl BastionContext {
-    pub(super) fn new(
+    pub(crate) fn new(
         id: BastionId,
         child: ChildRef,
         children: ChildrenRef,
@@ -155,8 +155,8 @@ impl BastionContext {
     /// If you need to wait (always asynchronously) until at
     /// least one message can be retrieved, use [`recv`] instead.
     ///
-    /// This method returns `Box<dyn Message>` if a message was
-    /// available, or `None` otherwise.
+    /// This method returns [`Msg`] if a message was available, or
+    /// `None otherwise.
     ///
     /// # Example
     ///
@@ -168,9 +168,9 @@ impl BastionContext {
     ///     #
     ///     Bastion::children(|ctx: BastionContext|
     ///         async move {
-    ///             let opt_msg: Option<Box<dyn Message>> = ctx.try_recv().await;
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
     ///             // If a message was received by the element, `opt_msg` will
-    ///             // be `Some(Box<dyn Message>)`, otherwise it will be `None`.
+    ///             // be `Some(Msg)`, otherwise it will be `None`.
     ///
     ///             Ok(())
     ///         }.into(),
@@ -184,7 +184,8 @@ impl BastionContext {
     /// ```
     ///
     /// [`recv`]: #method.recv
-    pub async fn try_recv(&self) -> Option<Box<dyn Message>> {
+    /// [`Msg`]: children/struct.Msg.html
+    pub async fn try_recv(&self) -> Option<Msg> {
         // TODO: Err(Error)
         let mut state = self.state.clone().lock_async().await.ok()?;
 
@@ -198,8 +199,8 @@ impl BastionContext {
     /// If you don't need to wait until at least one message
     /// can be retrieved, use [`try_recv`] instead.
     ///
-    /// This method returns `Box<dyn Message>` if it succeeded, or
-    /// `Err(())` otherwise.
+    /// This method returns [`Msg`] if it succeeded, or `Err(())`
+    /// otherwise.
     ///
     /// # Example
     ///
@@ -212,7 +213,7 @@ impl BastionContext {
     ///     Bastion::children(|ctx: BastionContext|
     ///         async move {
     ///             // This will block until a message has been received...
-    ///             let msg: Box<dyn Message> = ctx.recv().await?;
+    ///             let msg: Msg = ctx.recv().await?;
     ///
     ///             Ok(())
     ///         }.into(),
@@ -226,7 +227,8 @@ impl BastionContext {
     /// ```
     ///
     /// [`try_recv`]: #method.try_recv
-    pub async fn recv(&self) -> Result<Box<dyn Message>, ()> {
+    /// [`Msg`]: children/struct.Msg.html
+    pub async fn recv(&self) -> Result<Msg, ()> {
         loop {
             // TODO: Err(Error)
             let mut state = self.state.clone().lock_async().await.unwrap();
@@ -243,13 +245,13 @@ impl BastionContext {
 }
 
 impl ContextState {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let msgs = VecDeque::new();
 
         ContextState { msgs }
     }
 
-    pub(super) fn push_msg(&mut self, msg: Box<dyn Message>) {
+    pub(crate) fn push_msg(&mut self, msg: Msg) {
         self.msgs.push_back(msg)
     }
 }

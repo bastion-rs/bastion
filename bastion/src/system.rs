@@ -12,14 +12,14 @@ use std::task::Poll;
 use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
-    pub(super) static ref SYSTEM: Sender = System::init();
-    pub(super) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
-    pub(super) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
-    pub(super) static ref STARTED: Qutex<bool> = Qutex::new(false);
+    pub(crate) static ref SYSTEM: Sender = System::init();
+    pub(crate) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
+    pub(crate) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
+    pub(crate) static ref STARTED: Qutex<bool> = Qutex::new(false);
 }
 
 #[derive(Debug)]
-pub(super) struct System {
+pub(crate) struct System {
     bcast: Broadcast,
     launched: FxHashMap<BastionId, Proc<Supervisor>>,
     // TODO: set limit
@@ -30,7 +30,7 @@ pub(super) struct System {
 }
 
 impl System {
-    pub(super) fn init() -> Sender {
+    pub(crate) fn init() -> Sender {
         let parent = Parent::none();
         let bcast = Broadcast::with_id(parent, NIL_ID);
         let launched = FxHashMap::default();
@@ -161,7 +161,7 @@ impl System {
             }
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(_) => self.bcast.send_children(msg),
+            BastionMessage::Tell(_) => self.bcast.send_children(msg),
             BastionMessage::Stopped { id } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {

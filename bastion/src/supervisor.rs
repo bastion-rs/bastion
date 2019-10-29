@@ -74,7 +74,7 @@ enum Supervised {
 }
 
 impl Supervisor {
-    pub(super) fn new(bcast: Broadcast) -> Self {
+    pub(crate) fn new(bcast: Broadcast) -> Self {
         let order = Vec::new();
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
@@ -95,7 +95,7 @@ impl Supervisor {
         supervisor
     }
 
-    pub(super) async fn reset(&mut self, bcast: Broadcast) {
+    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
         // TODO: stop or kill?
         let killed = self.kill(0..).await;
 
@@ -127,7 +127,7 @@ impl Supervisor {
         }
     }
 
-    pub(super) fn id(&self) -> &BastionId {
+    pub(crate) fn id(&self) -> &BastionId {
         &self.bcast.id()
     }
 
@@ -162,7 +162,7 @@ impl Supervisor {
         SupervisorRef::new(id, sender)
     }
 
-    pub(super) fn bcast(&self) -> &Broadcast {
+    pub(crate) fn bcast(&self) -> &Broadcast {
         &self.bcast
     }
 
@@ -314,10 +314,10 @@ impl Supervisor {
     /// sp.children(|ctx: BastionContext|
     ///     async move {
     ///         // Send and receive messages...
-    ///         let opt_msg: Option<Box<dyn Message>> = ctx.try_recv().await;
+    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///
     ///         // ...and return `Ok(())` or `Err(())` when you are done...
     ///         Ok(())
-    ///
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
     ///     }.into(),
@@ -390,10 +390,10 @@ impl Supervisor {
     /// let children_ref: ChildrenRef = sp.children_ref(|ctx: BastionContext|
     ///     async move {
     ///         // Send and receive messages...
-    ///         let opt_msg: Option<Box<dyn Message>> = ctx.try_recv().await;
+    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///
     ///         // ...and return `Ok(())` or `Err(())` when you are done...
     ///         Ok(())
-    ///
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
     ///     }.into(),
@@ -678,7 +678,7 @@ impl Supervisor {
             BastionMessage::SuperviseWith(strategy) => {
                 self.strategy = strategy;
             }
-            BastionMessage::Message(_) => {
+            BastionMessage::Tell(_) => {
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
@@ -704,7 +704,7 @@ impl Supervisor {
         Ok(())
     }
 
-    pub(super) async fn run(mut self) -> Self {
+    pub(crate) async fn run(mut self) -> Self {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -745,7 +745,7 @@ impl Supervisor {
 }
 
 impl SupervisorRef {
-    pub(super) fn new(id: BastionId, sender: Sender) -> Self {
+    pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
         SupervisorRef { id, sender }
     }
 
@@ -839,10 +839,10 @@ impl SupervisorRef {
     /// let children_ref: ChildrenRef = sp_ref.children(|ctx: BastionContext|
     ///     async move {
     ///         // Send and receive messages...
-    ///         let opt_msg: Option<Box<dyn Message>> = ctx.try_recv().await;
+    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///
     ///         // ...and return `Ok(())` or `Err(())` when you are done...
     ///         Ok(())
-    ///
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
     ///     }.into(),
@@ -937,7 +937,7 @@ impl SupervisorRef {
     ///
     /// # Arguments
     ///
-    /// * `msg` - The message to send, inside a `Box`.
+    /// * `msg` - The message to send.
     ///
     /// # Example
     ///
@@ -949,7 +949,7 @@ impl SupervisorRef {
     ///     #
     ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// let msg = "A message containing data.";
-    /// sp_ref.broadcast(Box::new(msg)).expect("Couldn't send the message.");
+    /// sp_ref.broadcast(msg).expect("Couldn't send the message.");
     ///
     ///     # Bastion::children(|ctx: BastionContext|
     ///         # async move {
@@ -957,12 +957,12 @@ impl SupervisorRef {
     /// // groups that are supervised by this supervisor or one of
     /// // its supervised supervisors (etc.)...
     /// message! { ctx.recv().await?,
-    ///     msg: &'static str => {
+    ///     ref msg: &'static str => {
     ///         assert_eq!(msg, &"A message containing data.");
     ///     },
-    ///     // We are only sending a `&'static str` in this example,
-    ///     // so we know that this won't happen...
-    ///     _ => unreachable!(),
+    ///     // We are only broadcasting a `&'static str` in this
+    ///     // example, so we know that this won't happen...
+    ///     _: _ => (),
     /// }
     ///             #
     ///             # Ok(())
@@ -975,8 +975,8 @@ impl SupervisorRef {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    pub fn broadcast(&self, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
-        let msg = BastionMessage::message(msg);
+    pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
+        let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
     }
@@ -1037,7 +1037,7 @@ impl SupervisorRef {
         self.send(msg).map_err(|_| ())
     }
 
-    pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())

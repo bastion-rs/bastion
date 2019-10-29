@@ -15,20 +15,102 @@ use std::future::Future;
 use std::iter::FromIterator;
 use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Poll;
 
-pub trait Shell: objekt::Clone + Send + Sync + Any + 'static {}
-impl<T> Shell for T where T: objekt::Clone + Send + Sync + Any + 'static {}
+pub trait Shell: Send + Sync + Any + 'static {}
+impl<T> Shell for T where T: Send + Sync + Any + 'static {}
 
-pub trait Message: Shell + Debug {
-    fn as_any(&self) -> &dyn Any;
+pub trait Message: Shell + Debug {}
+impl<T> Message for T where T: Shell + Debug {}
+
+#[derive(Debug)]
+pub struct Msg(MsgInner);
+
+#[derive(Debug)]
+enum MsgInner {
+    Shared(Arc<dyn Any + Send + Sync + 'static>),
+    Owned(Box<dyn Any + Send + Sync + 'static>),
 }
-impl<T> Message for T
-where
-    T: Shell + Debug,
-{
-    fn as_any(&self) -> &dyn Any {
-        self
+
+impl Msg {
+    pub(crate) fn shared<M: Message>(msg: M) -> Self {
+        let inner = MsgInner::Shared(Arc::new(msg));
+        Msg(inner)
+    }
+
+    pub(crate) fn owned<M: Message>(msg: M) -> Self {
+        let inner = MsgInner::Owned(Box::new(msg));
+        Msg(inner)
+    }
+
+    pub fn is_broadcast(&self) -> bool {
+        if let MsgInner::Shared(_) = self.0 {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn downcast<M: Any>(self) -> Result<M, Self> {
+        if let MsgInner::Owned(msg) = self.0 {
+            if msg.is::<M>() {
+                let msg: Box<dyn Any + 'static> = msg;
+                Ok(*msg.downcast().unwrap())
+            } else {
+                let inner = MsgInner::Owned(msg);
+                Err(Msg(inner))
+            }
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn downcast_ref<M>(&self) -> Option<Arc<M>>
+    where
+        M: Any + Send + Sync + 'static,
+    {
+        if let MsgInner::Shared(msg) = &self.0 {
+            if msg.is::<M>() {
+                return Some(msg.clone().downcast::<M>().unwrap());
+            }
+        }
+
+        None
+    }
+
+    pub(crate) fn try_clone(&self) -> Option<Self> {
+        if let MsgInner::Shared(msg) = &self.0 {
+            let inner = MsgInner::Shared(msg.clone());
+            Some(Msg(inner))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn try_unwrap<M>(self) -> Result<M, Self>
+    where
+        M: Any + Send + Sync + 'static,
+    {
+        if let MsgInner::Shared(msg) = self.0 {
+            match msg.downcast() {
+                Ok(msg) => {
+                    match Arc::try_unwrap(msg) {
+                        Ok(msg) => Ok(msg),
+                        Err(msg) => {
+                            let inner = MsgInner::Shared(msg);
+                            Err(Msg(inner))
+                        }
+                    }
+                }
+                Err(msg) => {
+                    let inner = MsgInner::Shared(msg);
+                    Err(Msg(inner))
+                }
+            }
+        } else {
+            self.downcast()
+        }
     }
 }
 
@@ -50,7 +132,7 @@ where
     }
 }
 
-pub(super) struct Children {
+pub(crate) struct Children {
     bcast: Broadcast,
     supervisor: SupervisorRef,
     // The currently launched elements of the group.
@@ -75,7 +157,7 @@ pub struct ChildrenRef {
     children: Vec<ChildRef>,
 }
 
-pub(super) struct Child {
+pub(crate) struct Child {
     bcast: Broadcast,
     // The future that this child is executing.
     exec: Exec,
@@ -100,7 +182,7 @@ pub struct ChildRef {
 }
 
 impl Children {
-    pub(super) fn new(
+    pub(crate) fn new(
         init: Box<dyn Closure>,
         bcast: Broadcast,
         supervisor: SupervisorRef,
@@ -140,10 +222,9 @@ impl Children {
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let init = objekt::clone_box(&*self.init);
             let ctx =
                 BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
-            let exec = AssertUnwindSafe(init(ctx).0).catch_unwind();
+            let exec = AssertUnwindSafe((self.init)(ctx).0).catch_unwind();
 
             self.bcast.register(&bcast);
 
@@ -154,7 +235,7 @@ impl Children {
         }
     }
 
-    pub(super) async fn reset(&mut self, bcast: Broadcast, supervisor: SupervisorRef) {
+    pub(crate) async fn reset(&mut self, bcast: Broadcast, supervisor: SupervisorRef) {
         // TODO: stop or kill?
         self.kill().await;
 
@@ -164,15 +245,15 @@ impl Children {
         self.new_elems();
     }
 
-    pub(super) fn id(&self) -> &BastionId {
+    pub(crate) fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
-    pub(super) fn bcast(&self) -> &Broadcast {
+    pub(crate) fn bcast(&self) -> &Broadcast {
         &self.bcast
     }
 
-    pub(super) fn as_ref(&self) -> ChildrenRef {
+    pub(crate) fn as_ref(&self) -> ChildrenRef {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
@@ -234,7 +315,7 @@ impl Children {
             BastionMessage::Prune { .. } => unimplemented!(),
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(_) => {
+            BastionMessage::Tell(_) => {
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
@@ -262,7 +343,7 @@ impl Children {
         Ok(())
     }
 
-    pub(super) async fn run(mut self) -> Self {
+    pub(crate) async fn run(mut self) -> Self {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -349,7 +430,7 @@ impl ChildrenRef {
     ///
     /// # Arguments
     ///
-    /// * `msg` - The message to send, inside a `Box`.
+    /// * `msg` - The message to send.
     ///
     /// # Example
     ///
@@ -361,18 +442,18 @@ impl ChildrenRef {
     ///     #
     ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
     /// let msg = "A message containing data.";
-    /// children_ref.broadcast(Box::new(msg)).expect("Couldn't send the message.");
+    /// children_ref.broadcast(msg).expect("Couldn't send the message.");
     ///
     ///     # Bastion::children(|ctx: BastionContext|
     ///         # async move {
     /// // And then in every of the children group's elements' futures...
     /// message! { ctx.recv().await?,
-    ///     msg: &'static str => {
+    ///     ref msg: &'static str => {
     ///         assert_eq!(msg, &"A message containing data.");
     ///     },
-    ///     // We are only sending a `&'static str` in this example,
-    ///     // so we know that this won't happen...
-    ///     _ => unreachable!(),
+    ///     // We are only sending a `&'static str` in this
+    ///     // example, so we know that this won't happen...
+    ///     _: _ => (),
     /// }
     ///             #
     ///             # Ok(())
@@ -387,8 +468,8 @@ impl ChildrenRef {
     /// ```
     ///
     /// [`elems`]: #method.elems
-    pub fn broadcast(&self, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
-        let msg = BastionMessage::message(msg);
+    pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
+        let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
         self.send(msg).map_err(|err| err.into_msg().unwrap())
     }
@@ -449,7 +530,7 @@ impl ChildrenRef {
         self.send(msg).map_err(|_| ())
     }
 
-    pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())
@@ -494,7 +575,7 @@ impl Child {
             BastionMessage::Prune { .. } => unimplemented!(),
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(msg) => {
+            BastionMessage::Tell(msg) => {
                 let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
                 state.push_msg(msg);
             }
@@ -575,7 +656,7 @@ impl ChildRef {
     ///
     /// # Argument
     ///
-    /// * `msg` - The message to send, inside a `Box`.
+    /// * `msg` - The message to send.
     ///
     /// # Example
     ///
@@ -588,15 +669,15 @@ impl ChildRef {
     ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// let msg = "A message containing data.";
-    /// child_ref.send_msg(Box::new(msg)).expect("Couldn't send the message.");
+    /// child_ref.send_msg(msg).expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    pub fn send_msg(&self, msg: Box<dyn Message>) -> Result<(), Box<dyn Message>> {
-        let msg = BastionMessage::message(msg);
+    pub fn send_msg<M: Message>(&self, msg: M) -> Result<(), M> {
+        let msg = BastionMessage::tell(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
     }
@@ -657,7 +738,7 @@ impl ChildRef {
         self.send(msg).map_err(|_| ())
     }
 
-    pub(super) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())

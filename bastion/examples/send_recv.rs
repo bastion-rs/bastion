@@ -10,15 +10,15 @@ fn main() {
                 let try_recv = ctx.try_recv().await;
                 println!("try_recv.is_some() == {}", try_recv.is_some()); // false
 
-                ctx.current().send_msg(Box::new("Hello World!")).ok();
+                ctx.current().send_msg("Hello World!").ok();
 
                 message! { ctx.recv().await?,
                     msg: &'static str => {
-                        println!(r#"msg == "Hello World!" => {}"#, msg == &"Hello World!"); // true
+                        println!(r#"msg == "Hello World!" => {}"#, msg == "Hello World!"); // true
                     },
                     // This won't happen because we know that this
                     // example only sends a `&'static str`...
-                    _ => unreachable!(),
+                    _: _ => (),
                 }
 
                 // Panicking will restart the children group.

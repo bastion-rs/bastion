@@ -35,7 +35,6 @@ maintenance = { status = "actively-developed" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
-objekt = "0.1"
 qutex = { version = "0.2", features = ["async_await"] }
 tokio = "=0.2.0-alpha.6"
 uuid = { version = "0.8", features = ["v4"] }

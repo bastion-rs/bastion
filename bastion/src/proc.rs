@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[derive(Debug)]
-pub(super) struct Proc<T> {
+pub(crate) struct Proc<T> {
     recver: Receiver<T>,
 }
 
@@ -13,7 +13,7 @@ impl<T> Proc<T>
 where
     T: Send + 'static,
 {
-    pub(super) fn spawn<F>(fut: F) -> Self
+    pub(crate) fn spawn<F>(fut: F) -> Self
     where
         F: Future<Output = T> + Send + 'static,
     {
