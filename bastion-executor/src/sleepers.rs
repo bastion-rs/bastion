@@ -5,6 +5,7 @@ use std::sync::{Condvar, Mutex};
 ///
 /// Similar to how thread parking works, if a notification comes up while no threads are sleeping,
 /// the next thread that attempts to go to sleep will pick up the notification immediately.
+#[derive(Debug)]
 pub struct Sleepers {
     /// How many threads are currently a sleep.
     sleep: Mutex<usize>,

@@ -1,13 +1,11 @@
 use super::placement;
 use lazy_static::*;
 
-use std::{thread, time};
+use std::thread;
 
 use super::load_balancer;
 use crossbeam_utils::sync::ShardedLock;
 use rustc_hash::FxHashMap;
-
-const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
 
 pub struct LoadBalancer();
 

@@ -1,9 +1,19 @@
+//!
+//!
+//!
+//! NUMA-aware SMP based Fault-tolerant Executor
+//!
+
+// Executing asm in some places
 #![feature(asm)]
 // Allocator features
 #![feature(allocator_api)]
 #![feature(core_intrinsics)]
 #![feature(libstd_sys_internals)]
 #![feature(thread_local)]
+// Force missing implementations
+#![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
 
 pub mod allocator;
 pub mod blocking_pool;
