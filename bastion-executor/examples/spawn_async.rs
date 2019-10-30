@@ -2,20 +2,18 @@ use bastion_executor::prelude::*;
 use lightproc::proc_stack::ProcStack;
 use std::{thread, time};
 
-const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(4000);
-
 fn main() {
+    let pid = 1;
     let stack = ProcStack::default()
-        .with_pid(1)
-        .with_after_panic(|| {println!("after panic")});
+        .with_pid(pid)
+        .with_after_panic(move || {println!("after panic {}", pid.clone())});
 
     let handle = spawn(async {
-        panic!("test");
+        println!("test");
     }, stack);
 
-    let stack = ProcStack::default()
-        .with_pid(2)
-        .with_after_panic(|| {println!("after panic")});
+    let pid = 2;
+    let stack = ProcStack::default().with_pid(pid);
 
     run(
         async {

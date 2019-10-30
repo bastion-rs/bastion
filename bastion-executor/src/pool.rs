@@ -7,6 +7,8 @@ use super::worker;
 use lazy_static::*;
 use lightproc::prelude::*;
 use std::future::Future;
+use std::iter;
+use crate::load_balancer;
 
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
 where
@@ -28,7 +30,30 @@ impl Pool {
         unimplemented!()
     }
 
-    pub fn fetch_proc(&self, local: &Worker<LightProc>) -> Option<LightProc> {
+    pub fn fetch_proc(&self, affinity: usize, local: &Worker<LightProc>) -> Option<LightProc> {
+        if let Ok(mut stats) = load_balancer::stats().try_write() {
+            stats.smp_queues.insert(affinity, local.worker_run_queue_size());
+        }
+
+        if let Ok(stats) = load_balancer::stats().try_read() {
+            if local.worker_run_queue_size() == 0 {
+                while let Some(proc) = self.injector.steal_batch_and_pop(local).success() {
+                    return Some(proc);
+                }
+            } else {
+                let affine_core =
+                    *stats.smp_queues.iter()
+                        .max_by_key(|&(core, stat)| stat).unwrap().1;
+                let stealer =
+                    self.stealers.get(affine_core).unwrap();
+                if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
+                    if let Some(proc) = stealer.steal_batch_and_pop_with_amount(local, amount.wrapping_add(1)).success() {
+                        return Some(proc);
+                    }
+                }
+            }
+        }
+
         // Pop only from the local queue with full trust
         local.pop()
     }
@@ -56,9 +81,7 @@ pub fn get() -> &'static Pool {
     lazy_static! {
         static ref POOL: Pool = {
             let distributor = Distributor::new();
-            let (stealers, workers) = distributor.assign();
-
-//            LoadBalancer().start(workers);
+            let stealers = distributor.assign();
 
             Pool {
                 injector: Injector::new(),

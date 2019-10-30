@@ -73,12 +73,12 @@ pub(crate) fn schedule(proc: LightProc) {
     pool::get().sleepers.notify_one();
 }
 
-pub(crate) fn main_loop(worker: Worker<LightProc>) {
+pub(crate) fn main_loop(affinity: usize, worker: Worker<LightProc>) {
     IS_WORKER.with(|is_worker| is_worker.set(true));
     QUEUE.with(|queue| queue.set(Some(worker)));
 
     loop {
-        match get_queue(|q| pool::get().fetch_proc(q)) {
+        match get_queue(|q| pool::get().fetch_proc(affinity, q)) {
             Some(proc) => set_stack(proc.stack(), || proc.run()),
             None => pool::get().sleepers.wait(),
         }

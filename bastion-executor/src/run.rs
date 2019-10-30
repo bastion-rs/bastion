@@ -32,6 +32,9 @@ pub fn run<F, T>(future: F, stack: ProcStack) -> T
         let child_id = stack.get_pid();
         let parent_id = worker::get_proc_stack(|t| t.get_pid()).unwrap_or(0);
 
+        dbg!(parent_id);
+        dbg!(child_id);
+
         // Wrap the future into one that drops task-local variables on exit.
         // let future = task_local::add_finalizer(future);
 

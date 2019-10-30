@@ -22,16 +22,14 @@ impl Distributor {
         }
     }
 
-    pub fn assign(mut self) -> (Vec<Stealer<LightProc>>, Vec<Worker<LightProc>>) {
+    pub fn assign(mut self) -> Vec<Stealer<LightProc>> {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
-        let mut workers = Vec::<Worker<LightProc>>::new();
 
         for core in self.cores {
             self.round = core.id;
 
             let wrk = Worker::new_fifo();
             stealers.push(wrk.stealer());
-//            workers.push(wrk);
 
             thread::Builder::new()
                 .name("bastion-async-thread".to_string())
@@ -40,11 +38,11 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // actual execution
-                    worker::main_loop(wrk);
+                    worker::main_loop(core.id.clone(), wrk);
                 })
                 .expect("cannot start the thread for running proc");
         }
 
-        (stealers, workers)
+        stealers
     }
 }
