@@ -1,6 +1,7 @@
-use crate::broadcast::{BastionMessage, Broadcast, Deployment, Parent, Sender};
-use crate::children::{Children, ChildrenRef, Closure, Message};
+use crate::broadcast::{Broadcast, Parent, Sender};
+use crate::children::{Children, ChildrenRef, Closure};
 use crate::context::BastionId;
+use crate::message::{BastionMessage, Deployment, Message};
 use crate::proc::Proc;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
@@ -956,13 +957,13 @@ impl SupervisorRef {
     /// // And then in every future of the elements of the children
     /// // groups that are supervised by this supervisor or one of
     /// // its supervised supervisors (etc.)...
-    /// message! { ctx.recv().await?,
+    /// msg! { ctx.recv().await?,
     ///     ref msg: &'static str => {
     ///         assert_eq!(msg, &"A message containing data.");
-    ///     },
+    ///     };
     ///     // We are only broadcasting a `&'static str` in this
     ///     // example, so we know that this won't happen...
-    ///     _: _ => (),
+    ///     _: _ => ();
     /// }
     ///             #
     ///             # Ok(())

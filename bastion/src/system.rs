@@ -1,5 +1,6 @@
-use crate::broadcast::{BastionMessage, Broadcast, Deployment, Parent, Sender};
+use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionId, NIL_ID};
+use crate::message::{BastionMessage, Deployment};
 use crate::proc::Proc;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use futures::prelude::*;

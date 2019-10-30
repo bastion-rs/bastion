@@ -1,5 +1,6 @@
-use crate::broadcast::{BastionMessage, Broadcast, Parent, Sender};
+use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::message::{BastionMessage, Message};
 use crate::proc::Proc;
 use crate::supervisor::SupervisorRef;
 use futures::future::CatchUnwind;
@@ -20,99 +21,6 @@ use std::task::Poll;
 
 pub trait Shell: Send + Sync + Any + 'static {}
 impl<T> Shell for T where T: Send + Sync + Any + 'static {}
-
-pub trait Message: Shell + Debug {}
-impl<T> Message for T where T: Shell + Debug {}
-
-#[derive(Debug)]
-pub struct Msg(MsgInner);
-
-#[derive(Debug)]
-enum MsgInner {
-    Shared(Arc<dyn Any + Send + Sync + 'static>),
-    Owned(Box<dyn Any + Send + Sync + 'static>),
-}
-
-impl Msg {
-    pub(crate) fn shared<M: Message>(msg: M) -> Self {
-        let inner = MsgInner::Shared(Arc::new(msg));
-        Msg(inner)
-    }
-
-    pub(crate) fn owned<M: Message>(msg: M) -> Self {
-        let inner = MsgInner::Owned(Box::new(msg));
-        Msg(inner)
-    }
-
-    pub fn is_broadcast(&self) -> bool {
-        if let MsgInner::Shared(_) = self.0 {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn downcast<M: Any>(self) -> Result<M, Self> {
-        if let MsgInner::Owned(msg) = self.0 {
-            if msg.is::<M>() {
-                let msg: Box<dyn Any + 'static> = msg;
-                Ok(*msg.downcast().unwrap())
-            } else {
-                let inner = MsgInner::Owned(msg);
-                Err(Msg(inner))
-            }
-        } else {
-            Err(self)
-        }
-    }
-
-    pub fn downcast_ref<M>(&self) -> Option<Arc<M>>
-    where
-        M: Any + Send + Sync + 'static,
-    {
-        if let MsgInner::Shared(msg) = &self.0 {
-            if msg.is::<M>() {
-                return Some(msg.clone().downcast::<M>().unwrap());
-            }
-        }
-
-        None
-    }
-
-    pub(crate) fn try_clone(&self) -> Option<Self> {
-        if let MsgInner::Shared(msg) = &self.0 {
-            let inner = MsgInner::Shared(msg.clone());
-            Some(Msg(inner))
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn try_unwrap<M>(self) -> Result<M, Self>
-    where
-        M: Any + Send + Sync + 'static,
-    {
-        if let MsgInner::Shared(msg) = self.0 {
-            match msg.downcast() {
-                Ok(msg) => {
-                    match Arc::try_unwrap(msg) {
-                        Ok(msg) => Ok(msg),
-                        Err(msg) => {
-                            let inner = MsgInner::Shared(msg);
-                            Err(Msg(inner))
-                        }
-                    }
-                }
-                Err(msg) => {
-                    let inner = MsgInner::Shared(msg);
-                    Err(Msg(inner))
-                }
-            }
-        } else {
-            self.downcast()
-        }
-    }
-}
 
 pub trait Closure: Fn(BastionContext) -> Fut + Shell {}
 impl<T> Closure for T where T: Fn(BastionContext) -> Fut + Shell {}
@@ -447,13 +355,13 @@ impl ChildrenRef {
     ///     # Bastion::children(|ctx: BastionContext|
     ///         # async move {
     /// // And then in every of the children group's elements' futures...
-    /// message! { ctx.recv().await?,
+    /// msg! { ctx.recv().await?,
     ///     ref msg: &'static str => {
     ///         assert_eq!(msg, &"A message containing data.");
-    ///     },
+    ///     };
     ///     // We are only sending a `&'static str` in this
     ///     // example, so we know that this won't happen...
-    ///     _: _ => (),
+    ///     _: _ => ();
     /// }
     ///             #
     ///             # Ok(())

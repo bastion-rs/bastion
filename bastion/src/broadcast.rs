@@ -1,5 +1,6 @@
-use crate::children::{Children, ChildrenRef, Message, Msg};
+use crate::children::{Children, ChildrenRef};
 use crate::context::BastionId;
+use crate::message::{BastionMessage, Message, Msg};
 use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -27,25 +28,6 @@ pub(crate) enum Parent {
     System,
     Supervisor(SupervisorRef),
     Children(ChildrenRef),
-}
-
-#[derive(Debug)]
-pub(crate) enum BastionMessage {
-    Start,
-    Stop,
-    Kill,
-    Deploy(Deployment),
-    Prune { id: BastionId },
-    SuperviseWith(SupervisionStrategy),
-    Tell(Msg),
-    Stopped { id: BastionId },
-    Faulted { id: BastionId },
-}
-
-#[derive(Debug)]
-pub(crate) enum Deployment {
-    Supervisor(Supervisor),
-    Children(Children),
 }
 
 impl Broadcast {
@@ -186,88 +168,6 @@ impl Parent {
             Parent::System => SYSTEM.unbounded_send(msg).map_err(|err| err.into_inner()),
             Parent::Supervisor(supervisor) => supervisor.send(msg),
             Parent::Children(children) => children.send(msg),
-        }
-    }
-}
-
-impl BastionMessage {
-    pub(crate) fn start() -> Self {
-        BastionMessage::Start
-    }
-
-    pub(crate) fn stop() -> Self {
-        BastionMessage::Stop
-    }
-
-    pub(crate) fn kill() -> Self {
-        BastionMessage::Kill
-    }
-
-    pub(crate) fn deploy_supervisor(supervisor: Supervisor) -> Self {
-        let deployment = Deployment::Supervisor(supervisor);
-
-        BastionMessage::Deploy(deployment)
-    }
-
-    pub(crate) fn deploy_children(children: Children) -> Self {
-        let deployment = Deployment::Children(children);
-
-        BastionMessage::Deploy(deployment)
-    }
-
-    pub(crate) fn prune(id: BastionId) -> Self {
-        BastionMessage::Prune { id }
-    }
-
-    pub(crate) fn supervise_with(strategy: SupervisionStrategy) -> Self {
-        BastionMessage::SuperviseWith(strategy)
-    }
-
-    pub(crate) fn broadcast<M: Message>(msg: M) -> Self {
-        let msg = Msg::shared(msg);
-        BastionMessage::Tell(msg)
-    }
-
-    pub(crate) fn tell<M: Message>(msg: M) -> Self {
-        let msg = Msg::owned(msg);
-        BastionMessage::Tell(msg)
-    }
-
-    pub(crate) fn stopped(id: BastionId) -> Self {
-        BastionMessage::Stopped { id }
-    }
-
-    pub(crate) fn faulted(id: BastionId) -> Self {
-        BastionMessage::Faulted { id }
-    }
-
-    pub(crate) fn try_clone(&self) -> Option<Self> {
-        let clone = match self {
-            BastionMessage::Start => BastionMessage::start(),
-            BastionMessage::Stop => BastionMessage::stop(),
-            BastionMessage::Kill => BastionMessage::kill(),
-            // FIXME
-            BastionMessage::Deploy(_) => unimplemented!(),
-            BastionMessage::Prune { id } => BastionMessage::prune(id.clone()),
-            BastionMessage::SuperviseWith(strategy) => {
-                BastionMessage::supervise_with(strategy.clone())
-            }
-            BastionMessage::Tell(msg) => BastionMessage::Tell(msg.try_clone()?),
-            BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
-            BastionMessage::Faulted { id } => BastionMessage::faulted(id.clone()),
-        };
-
-        Some(clone)
-    }
-
-    pub(crate) fn into_msg<M>(self) -> Option<M>
-    where
-        M: Any + Send + Sync + 'static,
-    {
-        if let BastionMessage::Tell(msg) = self {
-            msg.try_unwrap().ok()
-        } else {
-            None
         }
     }
 }

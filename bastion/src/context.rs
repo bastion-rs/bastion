@@ -1,4 +1,5 @@
-use crate::children::{ChildRef, ChildrenRef, Msg};
+use crate::children::{ChildRef, ChildrenRef};
+use crate::message::Msg;
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};

@@ -1,5 +1,6 @@
-use crate::broadcast::{BastionMessage, Broadcast, Parent};
-use crate::children::{ChildrenRef, Closure, Message, Msg};
+use crate::broadcast::{Broadcast, Parent};
+use crate::children::{ChildrenRef, Closure};
+use crate::message::{BastionMessage, Message, Msg};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{ROOT_SPV, STARTED, SYSTEM};
 use std::thread;
@@ -186,13 +187,13 @@ impl Bastion {
     ///     # Bastion::children(|ctx: BastionContext|
     ///         # async move {
     /// // And then in every children groups's elements' future...
-    /// message! { ctx.recv().await?,
+    /// msg! { ctx.recv().await?,
     ///     ref msg: &'static str => {
     ///         assert_eq!(msg, &"A message containing data.");
-    ///     },
+    ///     };
     ///     // We are only broadcasting a `&'static str` in this
     ///     // example, so we know that this won't happen...
-    ///     _: _ => (),
+    ///     _: _ => ();
     /// }
     ///             #
     ///             # Ok(())

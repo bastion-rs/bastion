@@ -12,13 +12,13 @@ fn main() {
 
                 ctx.current().send_msg("Hello World!").ok();
 
-                message! { ctx.recv().await?,
+                msg! { ctx.recv().await?,
                     msg: &'static str => {
                         println!(r#"msg == "Hello World!" => {}"#, msg == "Hello World!"); // true
-                    },
+                    };
                     // This won't happen because we know that this
                     // example only sends a `&'static str`...
-                    _: _ => (),
+                    _: _ => ();
                 }
 
                 // Panicking will restart the children group.
