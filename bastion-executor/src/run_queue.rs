@@ -38,42 +38,6 @@
 //! In contrast to push and pop operations, stealing can spuriously fail with [`Steal::Retry`], in
 //! which case the steal operation needs to be retried.
 //!
-//! # Examples
-//!
-//! Suppose a thread in a work-stealing scheduler is idle and looking for the next task to run. To
-//! find an available task, it might do the following:
-//!
-//! 1. Try popping one task from the local worker queue.
-//! 2. Try stealing a batch of tasks from the global injector queue.
-//! 3. Try stealing one task from another thread using the stealer list.
-//!
-//! An implementation of this work-stealing strategy:
-//!
-//! ```
-//! use crossbeam_deque::{Injector, Steal, Stealer, Worker};
-//! use std::iter;
-//!
-//! fn find_task<T>(
-//!     local: &Worker<T>,
-//!     global: &Injector<T>,
-//!     stealers: &[Stealer<T>],
-//! ) -> Option<T> {
-//!     // Pop a task from the local queue, if not empty.
-//!     local.pop().or_else(|| {
-//!         // Otherwise, we need to look for a task elsewhere.
-//!         iter::repeat_with(|| {
-//!             // Try stealing a batch of tasks from the global queue.
-//!             global.steal_batch_and_pop(local)
-//!                 // Or try stealing a task from one of the other threads.
-//!                 .or_else(|| stealers.iter().map(|s| s.steal()).collect())
-//!         })
-//!         // Loop while no task was stolen and any steal operation needs to be retried.
-//!         .find(|s| !s.is_retry())
-//!         // Extract the stolen task, if there is one.
-//!         .and_then(|s| s.success())
-//!     })
-//! }
-//! ```
 //!
 //! [`Worker`]: struct.Worker.html
 //! [`Stealer`]: struct.Stealer.html
@@ -239,42 +203,6 @@ enum Flavor {
 ///
 /// This is a FIFO or LIFO queue that is owned by a single thread, but other threads may steal
 /// tasks from it. Task schedulers typically create a single worker queue per thread.
-///
-/// # Examples
-///
-/// A FIFO worker:
-///
-/// ```
-/// use crossbeam_deque::{Steal, Worker};
-///
-/// let w = Worker::new_fifo();
-/// let s = w.stealer();
-///
-/// w.push(1);
-/// w.push(2);
-/// w.push(3);
-///
-/// assert_eq!(s.steal(), Steal::Success(1));
-/// assert_eq!(w.pop(), Some(2));
-/// assert_eq!(w.pop(), Some(3));
-/// ```
-///
-/// A LIFO worker:
-///
-/// ```
-/// use crossbeam_deque::{Steal, Worker};
-///
-/// let w = Worker::new_lifo();
-/// let s = w.stealer();
-///
-/// w.push(1);
-/// w.push(2);
-/// w.push(3);
-///
-/// assert_eq!(s.steal(), Steal::Success(1));
-/// assert_eq!(w.pop(), Some(3));
-/// assert_eq!(w.pop(), Some(2));
-/// ```
 pub struct Worker<T> {
     /// A reference to the inner representation of the queue.
     inner: Arc<CachePadded<Inner<T>>>,
@@ -293,16 +221,6 @@ unsafe impl<T: Send> Send for Worker<T> {}
 
 impl<T> Worker<T> {
     /// Creates a FIFO worker queue.
-    ///
-    /// Tasks are pushed and popped from opposite ends.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::<i32>::new_fifo();
-    /// ```
     pub fn new_fifo() -> Worker<T> {
         let buffer = Buffer::alloc(MIN_CAP);
 
@@ -321,16 +239,6 @@ impl<T> Worker<T> {
     }
 
     /// Creates a LIFO worker queue.
-    ///
-    /// Tasks are pushed and popped from the same end.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::<i32>::new_lifo();
-    /// ```
     pub fn new_lifo() -> Worker<T> {
         let buffer = Buffer::alloc(MIN_CAP);
 

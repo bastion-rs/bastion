@@ -17,7 +17,7 @@ fn main() {
 
     run(
         async {
-            handle.await
+            handle.await;
         },
         stack.clone()
     );
