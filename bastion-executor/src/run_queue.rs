@@ -268,15 +268,6 @@ impl<T> Worker<T> {
     /// Creates a stealer for this queue.
     ///
     /// The returned stealer can be shared among threads and cloned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::<i32>::new_lifo();
-    /// let s = w.stealer();
-    /// ```
     pub fn stealer(&self) -> Stealer<T> {
         Stealer {
             inner: self.inner.clone(),
@@ -348,16 +339,6 @@ impl<T> Worker<T> {
     }
 
     /// Returns `true` if the queue is empty.
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::new_lifo();
-    ///
-    /// assert!(w.is_empty());
-    /// w.push(1);
-    /// assert!(!w.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         let b = self.inner.back.load(Ordering::Relaxed);
         let f = self.inner.front.load(Ordering::SeqCst);
@@ -365,16 +346,6 @@ impl<T> Worker<T> {
     }
 
     /// Pushes a task into the queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::new_lifo();
-    /// w.push(1);
-    /// w.push(2);
-    /// ```
     pub fn push(&self, task: T) {
         // Load the back index, front index, and buffer.
         let b = self.inner.back.load(Ordering::Relaxed);
@@ -408,20 +379,6 @@ impl<T> Worker<T> {
     }
 
     /// Pops a task from the queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::new_fifo();
-    /// w.push(1);
-    /// w.push(2);
-    ///
-    /// assert_eq!(w.pop(), Some(1));
-    /// assert_eq!(w.pop(), Some(2));
-    /// assert_eq!(w.pop(), None);
-    /// ```
     pub fn pop(&self) -> Option<T> {
         // Load the back and front index.
         let b = self.inner.back.load(Ordering::Relaxed);
@@ -531,21 +488,6 @@ impl<T> fmt::Debug for Worker<T> {
 /// Stealers can be shared among threads.
 ///
 /// Task schedulers typically have a single worker queue per worker thread.
-///
-/// # Examples
-///
-/// ```
-/// use crossbeam_deque::{Steal, Worker};
-///
-/// let w = Worker::new_lifo();
-/// w.push(1);
-/// w.push(2);
-///
-/// let s = w.stealer();
-/// assert_eq!(s.steal(), Steal::Success(1));
-/// assert_eq!(s.steal(), Steal::Success(2));
-/// assert_eq!(s.steal(), Steal::Empty);
-/// ```
 pub struct Stealer<T> {
     /// A reference to the inner representation of the queue.
     inner: Arc<CachePadded<Inner<T>>>,
@@ -559,17 +501,6 @@ unsafe impl<T: Send> Sync for Stealer<T> {}
 
 impl<T> Stealer<T> {
     /// Returns `true` if the queue is empty.
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w = Worker::new_lifo();
-    /// let s = w.stealer();
-    ///
-    /// assert!(s.is_empty());
-    /// w.push(1);
-    /// assert!(!s.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         let f = self.inner.front.load(Ordering::Acquire);
         atomic::fence(Ordering::SeqCst);
@@ -588,20 +519,6 @@ impl<T> Stealer<T> {
     }
 
     /// Steals a task from the queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::{Steal, Worker};
-    ///
-    /// let w = Worker::new_lifo();
-    /// w.push(1);
-    /// w.push(2);
-    ///
-    /// let s = w.stealer();
-    /// assert_eq!(s.steal(), Steal::Success(1));
-    /// assert_eq!(s.steal(), Steal::Success(2));
-    /// ```
     pub fn steal(&self) -> Steal<T> {
         // Load the front index.
         let f = self.inner.front.load(Ordering::Acquire);
@@ -649,25 +566,6 @@ impl<T> Stealer<T> {
     ///
     /// How many tasks exactly will be stolen is not specified. That said, this method will try to
     /// steal around half of the tasks in the queue, but also not more than some constant limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Worker;
-    ///
-    /// let w1 = Worker::new_fifo();
-    /// w1.push(1);
-    /// w1.push(2);
-    /// w1.push(3);
-    /// w1.push(4);
-    ///
-    /// let s = w1.stealer();
-    /// let w2 = Worker::new_fifo();
-    ///
-    /// s.steal_batch(&w2);
-    /// assert_eq!(w2.pop(), Some(1));
-    /// assert_eq!(w2.pop(), Some(2));
-    /// ```
     pub fn steal_batch(&self, dest: &Worker<T>) -> Steal<()> {
         // Load the front index.
         let mut f = self.inner.front.load(Ordering::Acquire);
@@ -827,24 +725,6 @@ impl<T> Stealer<T> {
     ///
     /// How many tasks exactly will be stolen is not specified. That said, this method will try to
     /// steal around half of the tasks in the queue, but also not more than some constant limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::{Steal, Worker};
-    ///
-    /// let w1 = Worker::new_fifo();
-    /// w1.push(1);
-    /// w1.push(2);
-    /// w1.push(3);
-    /// w1.push(4);
-    ///
-    /// let s = w1.stealer();
-    /// let w2 = Worker::new_fifo();
-    ///
-    /// assert_eq!(s.steal_batch_and_pop(&w2), Steal::Success(1));
-    /// assert_eq!(w2.pop(), Some(2));
-    /// ```
     pub fn steal_batch_and_pop(&self, dest: &Worker<T>) -> Steal<T> {
         // Load the front index.
         let mut f = self.inner.front.load(Ordering::Acquire);
@@ -1296,20 +1176,6 @@ struct Position<T> {
 ///
 /// This is a FIFO queue that can be shared among multiple threads. Task schedulers typically have
 /// a single injector queue, which is the entry point for new tasks.
-///
-/// # Examples
-///
-/// ```
-/// use crossbeam_deque::{Injector, Steal};
-///
-/// let q = Injector::new();
-/// q.push(1);
-/// q.push(2);
-///
-/// assert_eq!(q.steal(), Steal::Success(1));
-/// assert_eq!(q.steal(), Steal::Success(2));
-/// assert_eq!(q.steal(), Steal::Empty);
-/// ```
 pub struct Injector<T> {
     /// The head of the queue.
     head: CachePadded<Position<T>>,
@@ -1326,14 +1192,6 @@ unsafe impl<T: Send> Sync for Injector<T> {}
 
 impl<T> Injector<T> {
     /// Creates a new injector queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Injector;
-    ///
-    /// let q = Injector::<i32>::new();
-    /// ```
     pub fn new() -> Injector<T> {
         let block = Box::into_raw(Box::new(Block::<T>::new()));
         Injector {
@@ -1350,16 +1208,6 @@ impl<T> Injector<T> {
     }
 
     /// Pushes a task into the queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Injector;
-    ///
-    /// let w = Injector::new();
-    /// w.push(1);
-    /// w.push(2);
-    /// ```
     pub fn push(&self, task: T) {
         let backoff = Backoff::new();
         let mut tail = self.tail.index.load(Ordering::Acquire);
@@ -1421,20 +1269,6 @@ impl<T> Injector<T> {
     }
 
     /// Steals a task from the queue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::{Injector, Steal};
-    ///
-    /// let q = Injector::new();
-    /// q.push(1);
-    /// q.push(2);
-    ///
-    /// assert_eq!(q.steal(), Steal::Success(1));
-    /// assert_eq!(q.steal(), Steal::Success(2));
-    /// assert_eq!(q.steal(), Steal::Empty);
-    /// ```
     pub fn steal(&self) -> Steal<T> {
         let mut head;
         let mut block;
@@ -1518,23 +1352,6 @@ impl<T> Injector<T> {
     ///
     /// How many tasks exactly will be stolen is not specified. That said, this method will try to
     /// steal around half of the tasks in the queue, but also not more than some constant limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::{Injector, Worker};
-    ///
-    /// let q = Injector::new();
-    /// q.push(1);
-    /// q.push(2);
-    /// q.push(3);
-    /// q.push(4);
-    ///
-    /// let w = Worker::new_fifo();
-    /// q.steal_batch(&w);
-    /// assert_eq!(w.pop(), Some(1));
-    /// assert_eq!(w.pop(), Some(2));
-    /// ```
     pub fn steal_batch(&self, dest: &Worker<T>) -> Steal<()> {
         let mut head;
         let mut block;
@@ -1680,22 +1497,6 @@ impl<T> Injector<T> {
     ///
     /// How many tasks exactly will be stolen is not specified. That said, this method will try to
     /// steal around half of the tasks in the queue, but also not more than some constant limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::{Injector, Steal, Worker};
-    ///
-    /// let q = Injector::new();
-    /// q.push(1);
-    /// q.push(2);
-    /// q.push(3);
-    /// q.push(4);
-    ///
-    /// let w = Worker::new_fifo();
-    /// assert_eq!(q.steal_batch_and_pop(&w), Steal::Success(1));
-    /// assert_eq!(w.pop(), Some(2));
-    /// ```
     pub fn steal_batch_and_pop(&self, dest: &Worker<T>) -> Steal<T> {
         let mut head;
         let mut block;
@@ -1844,18 +1645,6 @@ impl<T> Injector<T> {
     }
 
     /// Returns `true` if the queue is empty.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Injector;
-    ///
-    /// let q = Injector::new();
-    ///
-    /// assert!(q.is_empty());
-    /// q.push(1);
-    /// assert!(!q.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         let head = self.head.index.load(Ordering::SeqCst);
         let tail = self.tail.index.load(Ordering::SeqCst);
@@ -1905,23 +1694,6 @@ impl<T> fmt::Debug for Injector<T> {
 }
 
 /// Possible outcomes of a steal operation.
-///
-/// # Examples
-///
-/// There are lots of ways to chain results of steal operations together:
-///
-/// ```
-/// use crossbeam_deque::Steal::{self, Empty, Retry, Success};
-///
-/// let collect = |v: Vec<Steal<i32>>| v.into_iter().collect::<Steal<i32>>();
-///
-/// assert_eq!(collect(vec![Empty, Empty, Empty]), Empty);
-/// assert_eq!(collect(vec![Empty, Retry, Empty]), Retry);
-/// assert_eq!(collect(vec![Retry, Success(1), Empty]), Success(1));
-///
-/// assert_eq!(collect(vec![Empty, Empty]).or_else(|| Retry), Retry);
-/// assert_eq!(collect(vec![Retry, Empty]).or_else(|| Success(1)), Success(1));
-/// ```
 #[must_use]
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub enum Steal<T> {
@@ -1937,17 +1709,6 @@ pub enum Steal<T> {
 
 impl<T> Steal<T> {
     /// Returns `true` if the queue was empty at the time of stealing.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Steal::{Empty, Retry, Success};
-    ///
-    /// assert!(!Success(7).is_empty());
-    /// assert!(!Retry::<i32>.is_empty());
-    ///
-    /// assert!(Empty::<i32>.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         match self {
             Steal::Empty => true,
@@ -1956,17 +1717,6 @@ impl<T> Steal<T> {
     }
 
     /// Returns `true` if at least one task was stolen.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Steal::{Empty, Retry, Success};
-    ///
-    /// assert!(!Empty::<i32>.is_success());
-    /// assert!(!Retry::<i32>.is_success());
-    ///
-    /// assert!(Success(7).is_success());
-    /// ```
     pub fn is_success(&self) -> bool {
         match self {
             Steal::Success(_) => true,
@@ -1975,17 +1725,6 @@ impl<T> Steal<T> {
     }
 
     /// Returns `true` if the steal operation needs to be retried.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Steal::{Empty, Retry, Success};
-    ///
-    /// assert!(!Empty::<i32>.is_retry());
-    /// assert!(!Success(7).is_retry());
-    ///
-    /// assert!(Retry::<i32>.is_retry());
-    /// ```
     pub fn is_retry(&self) -> bool {
         match self {
             Steal::Retry => true,
@@ -1994,17 +1733,6 @@ impl<T> Steal<T> {
     }
 
     /// Returns the result of the operation, if successful.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Steal::{Empty, Retry, Success};
-    ///
-    /// assert_eq!(Empty::<i32>.success(), None);
-    /// assert_eq!(Retry::<i32>.success(), None);
-    ///
-    /// assert_eq!(Success(7).success(), Some(7));
-    /// ```
     pub fn success(self) -> Option<T> {
         match self {
             Steal::Success(res) => Some(res),
@@ -2019,20 +1747,6 @@ impl<T> Steal<T> {
     /// * If the second steal resulted in `Success`, it is returned.
     /// * If both steals were unsuccessful but any resulted in `Retry`, then `Retry` is returned.
     /// * If both resulted in `None`, then `None` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use crossbeam_deque::Steal::{Empty, Retry, Success};
-    ///
-    /// assert_eq!(Success(1).or_else(|| Success(2)), Success(1));
-    /// assert_eq!(Retry.or_else(|| Success(2)), Success(2));
-    ///
-    /// assert_eq!(Retry.or_else(|| Empty), Retry::<i32>);
-    /// assert_eq!(Empty.or_else(|| Retry), Retry::<i32>);
-    ///
-    /// assert_eq!(Empty.or_else(|| Empty), Empty::<i32>);
-    /// ```
     pub fn or_else<F>(self, f: F) -> Steal<T>
     where
         F: FnOnce() -> Steal<T>,
