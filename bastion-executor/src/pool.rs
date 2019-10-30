@@ -1,5 +1,5 @@
 use super::distributor::Distributor;
-use super::load_balancer;
+
 use super::load_balancer::LoadBalancer;
 use super::run_queue::{Injector, Stealer, Worker};
 use super::sleepers::Sleepers;
@@ -7,7 +7,6 @@ use super::worker;
 use lazy_static::*;
 use lightproc::prelude::*;
 use std::future::Future;
-use std::sync::Arc;
 
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
 where

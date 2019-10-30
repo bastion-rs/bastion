@@ -1,11 +1,8 @@
-use super::placement;
 use super::pool;
-use super::run_queue::{Stealer, Worker};
+use super::run_queue::Worker;
 use lazy_static::*;
 use lightproc::lightproc::LightProc;
-use std::collections::VecDeque;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
+
 use std::{thread, time};
 
 const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);

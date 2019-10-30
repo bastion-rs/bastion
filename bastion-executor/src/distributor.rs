@@ -1,9 +1,9 @@
 use super::placement;
 use super::placement::CoreId;
 use super::run_queue::{Stealer, Worker};
-use super::worker;
+
 use lightproc::prelude::*;
-use std::sync::Arc;
+
 use std::thread;
 
 pub(crate) struct Distributor {
