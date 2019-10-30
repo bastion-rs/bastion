@@ -9,7 +9,7 @@ fn main() {
         .with_after_panic(move || {println!("after panic {}", pid.clone())});
 
     let handle = spawn(async {
-        println!("test");
+        panic!("test");
     }, stack);
 
     let pid = 2;
