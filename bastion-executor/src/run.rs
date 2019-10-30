@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crossbeam_utils::sync::Parker;
 use std::mem::ManuallyDrop;
 use std::task::{Waker, RawWaker, Context, Poll, RawWakerVTable};
-use pin_utils::*;
+
 
 pub fn run<F, T>(future: F, stack: ProcStack) -> T
     where
@@ -29,8 +29,8 @@ pub fn run<F, T>(future: F, stack: ProcStack) -> T
         };
 
         // Log this `block_on` operation.
-        let child_id = stack.get_pid();
-        let parent_id = worker::get_proc_stack(|t| t.get_pid()).unwrap_or(0);
+        let _child_id = stack.get_pid();
+        let _parent_id = worker::get_proc_stack(|t| t.get_pid()).unwrap_or(0);
 
         // Wrap the future into one that drops task-local variables on exit.
         // let future = task_local::add_finalizer(future);

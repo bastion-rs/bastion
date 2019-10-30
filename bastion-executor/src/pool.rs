@@ -1,13 +1,13 @@
 use super::distributor::Distributor;
 
-use super::load_balancer::LoadBalancer;
+
 use super::run_queue::{Injector, Stealer, Worker};
 use super::sleepers::Sleepers;
 use super::worker;
 use lazy_static::*;
 use lightproc::prelude::*;
 use std::future::Future;
-use std::iter;
+
 use crate::load_balancer;
 
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
@@ -43,7 +43,7 @@ impl Pool {
             } else {
                 let affine_core =
                     *stats.smp_queues.iter()
-                        .max_by_key(|&(core, stat)| stat).unwrap().1;
+                        .max_by_key(|&(_core, stat)| stat).unwrap().1;
                 let stealer =
                     self.stealers.get(affine_core).unwrap();
                 if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
@@ -64,8 +64,8 @@ impl Pool {
         T: Send + 'static,
     {
         // Log this `spawn` operation.
-        let child_id = stack.get_pid() as u64;
-        let parent_id = worker::get_proc_stack(|t| t.get_pid() as u64).unwrap_or(0);
+        let _child_id = stack.get_pid() as u64;
+        let _parent_id = worker::get_proc_stack(|t| t.get_pid() as u64).unwrap_or(0);
 
         let (task, handle) = LightProc::recoverable(future, worker::schedule, stack);
         task.schedule();
