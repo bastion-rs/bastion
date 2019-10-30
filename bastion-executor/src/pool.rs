@@ -58,7 +58,7 @@ pub fn get() -> &'static Pool {
             let distributor = Distributor::new();
             let (stealers, workers) = distributor.assign();
 
-            LoadBalancer().start(workers);
+//            LoadBalancer().start(workers);
 
             Pool {
                 injector: Injector::new(),

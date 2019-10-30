@@ -15,6 +15,7 @@ lazy_static = "1.4"
 libc = "0.2"
 num_cpus = "1.10"
 rustc-hash = "1.0.1"
+pin-utils = "0.1.0-alpha.4"
 
 # Allocator
 context-allocator = "0.2"

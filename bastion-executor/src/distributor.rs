@@ -5,6 +5,7 @@ use super::run_queue::{Stealer, Worker};
 use lightproc::prelude::*;
 
 use std::thread;
+use crate::worker;
 
 pub(crate) struct Distributor {
     pub round: usize,
@@ -30,7 +31,7 @@ impl Distributor {
 
             let wrk = Worker::new_fifo();
             stealers.push(wrk.stealer());
-            workers.push(wrk);
+//            workers.push(wrk);
 
             thread::Builder::new()
                 .name("bastion-async-thread".to_string())
@@ -39,7 +40,7 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // actual execution
-                    //                    worker::main_loop(wrk);x
+                    worker::main_loop(wrk);
                 })
                 .expect("cannot start the thread for running proc");
         }

@@ -1,11 +1,13 @@
 use super::pool;
 use super::run_queue::Worker;
+use super::placement;
 use lazy_static::*;
 use lightproc::lightproc::LightProc;
 
 use std::{thread, time};
 use std::sync::atomic::AtomicUsize;
 use std::collections::HashMap;
+use std::sync::RwLock;
 use rustc_hash::FxHashMap;
 
 const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
@@ -13,31 +15,12 @@ const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
 pub struct LoadBalancer();
 
 impl LoadBalancer {
-    pub fn start(self, workers: Vec<Worker<LightProc>>) -> LoadBalancer {
+    pub fn sample(self, workers: Vec<Worker<LightProc>>) -> LoadBalancer {
         thread::Builder::new()
             .name("load-balancer-thread".to_string())
             .spawn(move || {
                 loop {
-                    workers.iter().for_each(|w| {
-                        pool::get().injector.steal_batch_and_pop(w);
-                    });
 
-                    let stealer = pool::get()
-                        .stealers
-                        .iter()
-                        .min_by_key(|e| e.run_queue_size())
-                        .unwrap();
-
-                    let worker = workers
-                        .iter()
-                        .min_by_key(|e| e.worker_run_queue_size())
-                        .unwrap();
-
-                    let big = worker.worker_run_queue_size();
-                    let small = stealer.run_queue_size();
-                    let m = (big & small) + ((big ^ small) >> 1);
-
-                    stealer.steal_batch_and_pop_with_amount(&worker, big.wrapping_sub(m));
 
                     // General suspending is equal to cache line size in ERTS
                     // https://github.com/erlang/otp/blob/master/erts/emulator/beam/erl_process.c#L10887
@@ -64,13 +47,18 @@ unsafe impl Send for Stats {}
 unsafe impl Sync for Stats {}
 
 #[inline]
-pub fn stats() -> &'static Stats {
+pub fn stats() -> &'static RwLock<Stats> {
     lazy_static! {
-        static ref LB_STATS: Stats = {
-            Stats {
+        static ref LB_STATS: RwLock<Stats> = {
+            let stats = Stats {
                 global_run_queue: 0,
-                smp_queues: FxHashMap::default()
-            }
+                smp_queues: FxHashMap::with_capacity_and_hasher(
+                    placement::get_core_ids().unwrap().len(),
+                    Default::default()
+                )
+            };
+
+            RwLock::new(stats)
         };
     }
     &*LB_STATS
