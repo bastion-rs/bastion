@@ -4,6 +4,9 @@ use lazy_static::*;
 use lightproc::lightproc::LightProc;
 
 use std::{thread, time};
+use std::sync::atomic::AtomicUsize;
+use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
 
@@ -51,15 +54,24 @@ impl LoadBalancer {
     }
 }
 
+#[derive(Clone)]
 pub struct Stats {
-    //    global_run_queue: AtomicUsize,
-//    smp_queues: Vec<AtomicUsize>,
+    global_run_queue: usize,
+    smp_queues: FxHashMap<usize, usize>,
 }
+
+unsafe impl Send for Stats {}
+unsafe impl Sync for Stats {}
 
 #[inline]
 pub fn stats() -> &'static Stats {
     lazy_static! {
-        static ref LB_STATS: Stats = { Stats {} };
+        static ref LB_STATS: Stats = {
+            Stats {
+                global_run_queue: 0,
+                smp_queues: FxHashMap::default()
+            }
+        };
     }
     &*LB_STATS
 }
