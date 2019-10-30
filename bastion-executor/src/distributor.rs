@@ -1,10 +1,10 @@
 use super::placement;
 use super::placement::CoreId;
-use std::thread;
-use super::run_queue::{Worker, Stealer};
-use lightproc::prelude::*;
+use super::run_queue::{Stealer, Worker};
 use super::worker;
+use lightproc::prelude::*;
 use std::sync::Arc;
+use std::thread;
 
 pub(crate) struct Distributor {
     pub round: usize,
@@ -21,8 +21,7 @@ impl Distributor {
         }
     }
 
-    pub fn assign(mut self) -> (Vec<Stealer<LightProc>>, Vec<Worker<LightProc>>)
-    {
+    pub fn assign(mut self) -> (Vec<Stealer<LightProc>>, Vec<Worker<LightProc>>) {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
         let mut workers = Vec::<Worker<LightProc>>::new();
 
@@ -40,7 +39,7 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // actual execution
-//                    worker::main_loop(wrk);x
+                    //                    worker::main_loop(wrk);x
                 })
                 .expect("cannot start the thread for running proc");
         }

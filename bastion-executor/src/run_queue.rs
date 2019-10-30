@@ -353,7 +353,7 @@ impl<T> Worker<T> {
         let f = self.inner.front.load(Ordering::SeqCst);
         match b.wrapping_sub(f) {
             x if x <= 0 => 0_usize,
-            y@_ => y as usize
+            y @ _ => y as usize,
         }
     }
 
@@ -669,17 +669,15 @@ impl<T> Stealer<T> {
         b.wrapping_sub(f) <= 0
     }
 
-
     pub fn run_queue_size(&self) -> usize {
         let b = self.inner.back.load(Ordering::Acquire);
         atomic::fence(Ordering::SeqCst);
         let f = self.inner.front.load(Ordering::Acquire);
         match b.wrapping_sub(f) {
             x if x <= 0 => 0_usize,
-            y@_ => y as usize
+            y @ _ => y as usize,
         }
     }
-
 
     /// Steals a task from the queue.
     ///
@@ -2128,8 +2126,8 @@ impl<T> Steal<T> {
     /// assert_eq!(Empty.or_else(|| Empty), Empty::<i32>);
     /// ```
     pub fn or_else<F>(self, f: F) -> Steal<T>
-        where
-            F: FnOnce() -> Steal<T>,
+    where
+        F: FnOnce() -> Steal<T>,
     {
         match self {
             Steal::Empty => f(),
@@ -2161,8 +2159,8 @@ impl<T> FromIterator<Steal<T>> for Steal<T> {
     /// If no `Success` was found, but there was at least one `Retry`, then returns `Retry`.
     /// Otherwise, `Empty` is returned.
     fn from_iter<I>(iter: I) -> Steal<T>
-        where
-            I: IntoIterator<Item = Steal<T>>,
+    where
+        I: IntoIterator<Item = Steal<T>>,
     {
         let mut retry = false;
         for s in iter {

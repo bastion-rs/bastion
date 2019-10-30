@@ -1,19 +1,18 @@
 use super::distributor::Distributor;
-use super::run_queue::{Worker, Injector, Stealer};
-use lazy_static::*;
-use lightproc::prelude::*;
-use super::sleepers::Sleepers;
 use super::load_balancer;
 use super::load_balancer::LoadBalancer;
-use std::future::Future;
+use super::run_queue::{Injector, Stealer, Worker};
+use super::sleepers::Sleepers;
 use super::worker;
+use lazy_static::*;
+use lightproc::prelude::*;
+use std::future::Future;
 use std::sync::Arc;
 
-
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
-    where
-        F: Future<Output = T> + Send + 'static,
-        T: Send + 'static,
+where
+    F: Future<Output = T> + Send + 'static,
+    T: Send + 'static,
 {
     self::get().spawn(future, stack)
 }
@@ -36,21 +35,18 @@ impl Pool {
     }
 
     pub fn spawn<F, T>(&self, future: F, stack: ProcStack) -> RecoverableHandle<T>
-        where
-            F: Future<Output = T> + Send + 'static,
-            T: Send + 'static,
+    where
+        F: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
     {
         // Log this `spawn` operation.
         let child_id = stack.get_pid() as u64;
-        let parent_id =
-            worker::get_proc_stack(|t| t.get_pid() as u64)
-                .unwrap_or(0);
+        let parent_id = worker::get_proc_stack(|t| t.get_pid() as u64).unwrap_or(0);
 
         dbg!(parent_id);
         dbg!(child_id);
 
-        let (task, handle) =
-            LightProc::recoverable(future, worker::schedule, stack);
+        let (task, handle) = LightProc::recoverable(future, worker::schedule, stack);
         task.schedule();
         handle
     }

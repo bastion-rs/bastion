@@ -1,11 +1,12 @@
-use lazy_static::*;
-use std::{thread, time};
-use std::collections::VecDeque;
-use lightproc::lightproc::LightProc;
-use super::run_queue::{Worker, Stealer};
-use super::pool;
 use super::placement;
+use super::pool;
+use super::run_queue::{Stealer, Worker};
+use lazy_static::*;
+use lightproc::lightproc::LightProc;
+use std::collections::VecDeque;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::{thread, time};
 
 const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
 
@@ -21,30 +22,29 @@ impl LoadBalancer {
                         pool::get().injector.steal_batch_and_pop(w);
                     });
 
-                    let stealer =
-                        pool::get().stealers.iter().min_by_key(|e| e.run_queue_size())
-                            .unwrap();
+                    let stealer = pool::get()
+                        .stealers
+                        .iter()
+                        .min_by_key(|e| e.run_queue_size())
+                        .unwrap();
 
-                    let worker =
-                        workers.iter().min_by_key(|e| e.worker_run_queue_size())
-                            .unwrap();
+                    let worker = workers
+                        .iter()
+                        .min_by_key(|e| e.worker_run_queue_size())
+                        .unwrap();
 
                     let big = worker.worker_run_queue_size();
                     let small = stealer.run_queue_size();
                     let m = (big & small) + ((big ^ small) >> 1);
 
-                    stealer
-                        .steal_batch_and_pop_with_amount(
-                            &worker,
-                            big.wrapping_sub(m)
-                        );
+                    stealer.steal_batch_and_pop_with_amount(&worker, big.wrapping_sub(m));
 
                     // General suspending is equal to cache line size in ERTS
                     // https://github.com/erlang/otp/blob/master/erts/emulator/beam/erl_process.c#L10887
                     // https://github.com/erlang/otp/blob/ea7d6c39f2179b2240d55df4a1ddd515b6d32832/erts/emulator/beam/erl_thr_progress.c#L237
                     // thread::sleep(SIXTY_MILLIS);
-                    (0..64).for_each(|_| {
-                        unsafe { asm!("NOP"); }
+                    (0..64).for_each(|_| unsafe {
+                        asm!("NOP");
                     })
                 }
             })
@@ -52,4 +52,17 @@ impl LoadBalancer {
 
         self
     }
+}
+
+pub struct Stats {
+    //    global_run_queue: AtomicUsize,
+//    smp_queues: Vec<AtomicUsize>,
+}
+
+#[inline]
+pub fn stats() -> &'static Stats {
+    lazy_static! {
+        static ref LB_STATS: Stats = { Stats {} };
+    }
+    &*LB_STATS
 }

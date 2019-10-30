@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::ptr;
 
 use super::pool;
-use lightproc::prelude::*;
 use super::run_queue::Worker;
+use lightproc::prelude::*;
 
 pub fn current() -> ProcStack {
     get_proc_stack(|proc| proc.clone())
@@ -15,8 +15,8 @@ thread_local! {
 }
 
 pub(crate) fn set_stack<F, R>(stack: *const ProcStack, f: F) -> R
-    where
-        F: FnOnce() -> R,
+where
+    F: FnOnce() -> R,
 {
     struct ResetStack<'a>(&'a Cell<*const ProcStack>);
 
@@ -35,12 +35,10 @@ pub(crate) fn set_stack<F, R>(stack: *const ProcStack, f: F) -> R
 }
 
 pub(crate) fn get_proc_stack<F, R>(f: F) -> Option<R>
-    where
-        F: FnOnce(&ProcStack) -> R,
+where
+    F: FnOnce(&ProcStack) -> R,
 {
-    let res = STACK.try_with(|st| unsafe {
-        st.get().as_ref().map(f)
-    });
+    let res = STACK.try_with(|st| unsafe { st.get().as_ref().map(f) });
 
     match res {
         Ok(Some(val)) => Some(val),
