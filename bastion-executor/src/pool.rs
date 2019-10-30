@@ -67,9 +67,6 @@ impl Pool {
         let child_id = stack.get_pid() as u64;
         let parent_id = worker::get_proc_stack(|t| t.get_pid() as u64).unwrap_or(0);
 
-        dbg!(parent_id);
-        dbg!(child_id);
-
         let (task, handle) = LightProc::recoverable(future, worker::schedule, stack);
         task.schedule();
         handle
