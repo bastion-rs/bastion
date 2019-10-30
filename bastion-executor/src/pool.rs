@@ -1,6 +1,5 @@
 use super::distributor::Distributor;
 
-
 use super::run_queue::{Injector, Stealer, Worker};
 use super::sleepers::Sleepers;
 use super::worker;
@@ -32,7 +31,9 @@ impl Pool {
 
     pub fn fetch_proc(&self, affinity: usize, local: &Worker<LightProc>) -> Option<LightProc> {
         if let Ok(mut stats) = load_balancer::stats().try_write() {
-            stats.smp_queues.insert(affinity, local.worker_run_queue_size());
+            stats
+                .smp_queues
+                .insert(affinity, local.worker_run_queue_size());
         }
 
         if let Ok(stats) = load_balancer::stats().try_read() {
@@ -41,13 +42,18 @@ impl Pool {
                     return Some(proc);
                 }
             } else {
-                let affine_core =
-                    *stats.smp_queues.iter()
-                        .max_by_key(|&(_core, stat)| stat).unwrap().1;
-                let stealer =
-                    self.stealers.get(affine_core).unwrap();
+                let affine_core = *stats
+                    .smp_queues
+                    .iter()
+                    .max_by_key(|&(_core, stat)| stat)
+                    .unwrap()
+                    .1;
+                let stealer = self.stealers.get(affine_core).unwrap();
                 if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
-                    if let Some(proc) = stealer.steal_batch_and_pop_with_amount(local, amount.wrapping_add(1)).success() {
+                    if let Some(proc) = stealer
+                        .steal_batch_and_pop_with_amount(local, amount.wrapping_add(1))
+                        .success()
+                    {
                         return Some(proc);
                     }
                 }

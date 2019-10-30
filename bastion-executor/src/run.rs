@@ -1,19 +1,18 @@
-use std::future::Future;
-use std::cell::UnsafeCell;
-use std::cell::Cell;
-use std::pin::Pin;
-use std::{mem, panic};
-use lightproc::proc_stack::ProcStack;
 use super::worker;
-use std::sync::Arc;
 use crossbeam_utils::sync::Parker;
+use lightproc::proc_stack::ProcStack;
+use std::cell::Cell;
+use std::cell::UnsafeCell;
+use std::future::Future;
 use std::mem::ManuallyDrop;
-use std::task::{Waker, RawWaker, Context, Poll, RawWakerVTable};
-
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::{mem, panic};
 
 pub fn run<F, T>(future: F, stack: ProcStack) -> T
-    where
-        F: Future<Output = T>,
+where
+    F: Future<Output = T>,
 {
     unsafe {
         // A place on the stack where the result will be stored.
@@ -59,11 +58,9 @@ pub fn run<F, T>(future: F, stack: ProcStack) -> T
     }
 }
 
-
-
 fn block<F, T>(f: F) -> T
-    where
-        F: Future<Output = T>,
+where
+    F: Future<Output = T>,
 {
     thread_local! {
         // May hold a pre-allocated parker that can be reused for efficiency.

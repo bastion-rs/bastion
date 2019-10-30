@@ -4,8 +4,8 @@ use super::run_queue::{Stealer, Worker};
 
 use lightproc::prelude::*;
 
-use std::thread;
 use crate::worker;
+use std::thread;
 
 pub(crate) struct Distributor {
     pub round: usize,

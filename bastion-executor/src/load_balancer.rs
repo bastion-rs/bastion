@@ -1,15 +1,11 @@
-
-
 use super::placement;
 use lazy_static::*;
 
-
 use std::{thread, time};
 
-
+use super::load_balancer;
 use crossbeam_utils::sync::ShardedLock;
 use rustc_hash::FxHashMap;
-use super::load_balancer;
 
 const SIXTY_MILLIS: time::Duration = time::Duration::from_millis(60);
 
@@ -23,7 +19,10 @@ impl LoadBalancer {
                 loop {
                     let mut m = 0_usize;
                     if let Ok(stats) = load_balancer::stats().try_read() {
-                        m = stats.smp_queues.values().sum::<usize>()
+                        m = stats
+                            .smp_queues
+                            .values()
+                            .sum::<usize>()
                             .wrapping_div(placement::get_core_ids().unwrap().len());
                     }
 
