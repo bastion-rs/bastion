@@ -18,7 +18,5 @@ rustc-hash = "1.0.1"
 
 # Allocator
 context-allocator = "0.2"
-libc-extra = "^0.3.2"
-likely = "^0.1.0"
 
 lightproc = { "path" = "../lightproc" }
