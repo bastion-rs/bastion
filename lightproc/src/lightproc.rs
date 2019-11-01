@@ -1,16 +1,15 @@
-use std::fmt;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::mem;
-use std::ptr::NonNull;
-
 use crate::proc_data::ProcData;
 use crate::proc_ext::ProcFutureExt;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::*;
 use crate::raw_proc::RawProc;
 use crate::recoverable_handle::RecoverableHandle;
+use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::mem;
 use std::panic::AssertUnwindSafe;
+use std::ptr::NonNull;
 
 pub struct LightProc {
     /// A pointer to the heap-allocated proc.
@@ -91,6 +90,18 @@ impl LightProc {
     }
 }
 
+impl Debug for LightProc {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        let ptr = self.raw_proc.as_ptr();
+        let pdata = ptr as *const ProcData;
+
+        fmt.debug_struct("LightProc")
+            .field("pdata", unsafe { &(*pdata) })
+            .field("stack", self.stack())
+            .finish()
+    }
+}
+
 impl Drop for LightProc {
     fn drop(&mut self) {
         let ptr = self.raw_proc.as_ptr();
@@ -106,17 +117,5 @@ impl Drop for LightProc {
             // Drop the proc reference.
             ((*pdata).vtable.decrement)(ptr);
         }
-    }
-}
-
-impl fmt::Debug for LightProc {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ptr = self.raw_proc.as_ptr();
-        let pdata = ptr as *const ProcData;
-
-        f.debug_struct("LightProc")
-            .field("pdata", unsafe { &(*pdata) })
-            .field("stack", self.stack())
-            .finish()
     }
 }

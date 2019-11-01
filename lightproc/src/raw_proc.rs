@@ -1,22 +1,20 @@
-use std::alloc::{self, Layout};
-use std::cell::Cell;
-use std::future::Future;
-use std::mem::{self, ManuallyDrop};
-use std::pin::Pin;
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-
 use crate::catch_unwind::CatchUnwind;
 use crate::layout_helpers::extend;
 use crate::lightproc::LightProc;
 use crate::proc_data::ProcData;
-use crate::proc_layout::TaskLayout;
-use crate::proc_stack::*;
+use crate::proc_layout::ProcLayout;
+use crate::proc_stack::ProcStack;
 use crate::proc_vtable::ProcVTable;
 use crate::state::*;
-
+use std::alloc::{self, Layout};
+use std::cell::Cell;
+use std::future::Future;
+use std::mem::{self, ManuallyDrop};
 use std::panic::AssertUnwindSafe;
+use std::pin::Pin;
+use std::ptr::NonNull;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 /// Raw pointers to the fields of a proc.
 pub(crate) struct RawProc<F, R, S> {
@@ -27,19 +25,12 @@ pub(crate) struct RawProc<F, R, S> {
     pub(crate) output: *mut R,
 }
 
-impl<F, R, S> Copy for RawProc<F, R, S> {}
-
-impl<F, R, S> Clone for RawProc<F, R, S> {
-    fn clone(&self) -> Self {
-        Self {
-            pdata: self.pdata,
-            schedule: self.schedule,
-            stack: self.stack,
-            future: self.future,
-            output: self.output,
-        }
-    }
-}
+/// A guard that closes the proc if polling its future panics.
+struct Guard<F, R, S>(RawProc<F, R, S>)
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+    S: Fn(LightProc) + Send + Sync + 'static;
 
 impl<F, R, S> RawProc<F, R, S>
 where
@@ -105,40 +96,40 @@ where
         unsafe {
             Self {
                 pdata: p as *const ProcData,
-                stack: p.add(proc_layout.offset_t) as *mut ProcStack,
-                schedule: p.add(proc_layout.offset_s) as *const S,
-                future: p.add(proc_layout.offset_f) as *mut F,
-                output: p.add(proc_layout.offset_r) as *mut R,
+                stack: p.add(proc_layout.offset_stack) as *mut ProcStack,
+                schedule: p.add(proc_layout.offset_schedule) as *const S,
+                future: p.add(proc_layout.offset_future) as *mut F,
+                output: p.add(proc_layout.offset_output) as *mut R,
             }
         }
     }
 
     /// Returns the memory layout for a proc.
     #[inline]
-    fn proc_layout() -> TaskLayout {
+    fn proc_layout() -> ProcLayout {
         let layout_pdata = Layout::new::<ProcData>();
-        let layout_t = Layout::new::<ProcStack>();
-        let layout_s = Layout::new::<S>();
-        let layout_f = Layout::new::<CatchUnwind<AssertUnwindSafe<F>>>();
-        let layout_r = Layout::new::<R>();
+        let layout_stack = Layout::new::<ProcStack>();
+        let layout_schedule = Layout::new::<S>();
+        let layout_future = Layout::new::<CatchUnwind<AssertUnwindSafe<F>>>();
+        let layout_output = Layout::new::<R>();
 
-        let size_union = layout_f.size().max(layout_r.size());
-        let align_union = layout_f.align().max(layout_r.align());
+        let size_union = layout_future.size().max(layout_output.size());
+        let align_union = layout_future.align().max(layout_output.align());
         let layout_union = unsafe { Layout::from_size_align_unchecked(size_union, align_union) };
 
         let layout = layout_pdata;
-        let (layout, offset_t) = extend(layout, layout_t);
-        let (layout, offset_s) = extend(layout, layout_s);
+        let (layout, offset_stack) = extend(layout, layout_stack);
+        let (layout, offset_schedule) = extend(layout, layout_schedule);
         let (layout, offset_union) = extend(layout, layout_union);
-        let offset_f = offset_union;
-        let offset_r = offset_union;
+        let offset_future = offset_union;
+        let offset_output = offset_union;
 
-        TaskLayout {
+        ProcLayout {
             layout,
-            offset_t,
-            offset_s,
-            offset_f,
-            offset_r,
+            offset_stack,
+            offset_schedule,
+            offset_future,
+            offset_output,
         }
     }
 
@@ -505,67 +496,74 @@ where
                 }
             }
         }
+    }
+}
 
-        /// A guard that closes the proc if polling its future panics.
-        struct Guard<F, R, S>(RawProc<F, R, S>)
-        where
-            F: Future<Output = R> + Send + 'static,
-            R: Send + 'static,
-            S: Fn(LightProc) + Send + Sync + 'static;
+impl<F, R, S> Copy for RawProc<F, R, S> {}
 
-        impl<F, R, S> Drop for Guard<F, R, S>
-        where
-            F: Future<Output = R> + Send + 'static,
-            R: Send + 'static,
-            S: Fn(LightProc) + Send + Sync + 'static,
-        {
-            fn drop(&mut self) {
-                let raw = self.0;
-                let ptr = raw.pdata as *const ();
+impl<F, R, S> Clone for RawProc<F, R, S> {
+    fn clone(&self) -> Self {
+        Self {
+            pdata: self.pdata,
+            schedule: self.schedule,
+            stack: self.stack,
+            future: self.future,
+            output: self.output,
+        }
+    }
+}
 
-                unsafe {
-                    let mut state = (*raw.pdata).state.load(Ordering::Acquire);
+impl<F, R, S> Drop for Guard<F, R, S>
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+    S: Fn(LightProc) + Send + Sync + 'static,
+{
+    fn drop(&mut self) {
+        let raw = self.0;
+        let ptr = raw.pdata as *const ();
 
-                    loop {
-                        // If the proc was closed while running, then unschedule it, drop its
-                        // future, and drop the proc reference.
-                        if state & CLOSED != 0 {
-                            // We still need to unschedule the proc because it is possible it was
-                            // woken while running.
-                            (*raw.pdata).state.fetch_and(!SCHEDULED, Ordering::AcqRel);
+        unsafe {
+            let mut state = (*raw.pdata).state.load(Ordering::Acquire);
 
-                            // The thread that closed the proc didn't drop the future because it
-                            // was running so now it's our responsibility to do so.
-                            RawProc::<F, R, S>::drop_future(ptr);
+            loop {
+                // If the proc was closed while running, then unschedule it, drop its
+                // future, and drop the proc reference.
+                if state & CLOSED != 0 {
+                    // We still need to unschedule the proc because it is possible it was
+                    // woken while running.
+                    (*raw.pdata).state.fetch_and(!SCHEDULED, Ordering::AcqRel);
 
-                            // Drop the proc reference.
-                            RawProc::<F, R, S>::decrement(ptr);
-                            break;
+                    // The thread that closed the proc didn't drop the future because it
+                    // was running so now it's our responsibility to do so.
+                    RawProc::<F, R, S>::drop_future(ptr);
+
+                    // Drop the proc reference.
+                    RawProc::<F, R, S>::decrement(ptr);
+                    break;
+                }
+
+                // Mark the proc as not running, not scheduled, and closed.
+                match (*raw.pdata).state.compare_exchange_weak(
+                    state,
+                    (state & !RUNNING & !SCHEDULED) | CLOSED,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(state) => {
+                        // Drop the future because the proc is now closed.
+                        RawProc::<F, R, S>::drop_future(ptr);
+
+                        // Notify the awaiter that the proc has been closed.
+                        if state & AWAITER != 0 {
+                            (*raw.pdata).notify();
                         }
 
-                        // Mark the proc as not running, not scheduled, and closed.
-                        match (*raw.pdata).state.compare_exchange_weak(
-                            state,
-                            (state & !RUNNING & !SCHEDULED) | CLOSED,
-                            Ordering::AcqRel,
-                            Ordering::Acquire,
-                        ) {
-                            Ok(state) => {
-                                // Drop the future because the proc is now closed.
-                                RawProc::<F, R, S>::drop_future(ptr);
-
-                                // Notify the awaiter that the proc has been closed.
-                                if state & AWAITER != 0 {
-                                    (*raw.pdata).notify();
-                                }
-
-                                // Drop the proc reference.
-                                RawProc::<F, R, S>::decrement(ptr);
-                                break;
-                            }
-                            Err(s) => state = s,
-                        }
+                        // Drop the proc reference.
+                        RawProc::<F, R, S>::decrement(ptr);
+                        break;
                     }
+                    Err(s) => state = s,
                 }
             }
         }

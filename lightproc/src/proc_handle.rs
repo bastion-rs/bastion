@@ -1,14 +1,13 @@
-use std::fmt;
+use crate::proc_data::ProcData;
+use crate::proc_stack::ProcStack;
+use crate::state::*;
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::marker::{PhantomData, Unpin};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
-
-use crate::proc_data::ProcData;
-use crate::proc_stack::*;
-use crate::state::*;
 
 /// A handle that awaits the result of a proc.
 ///
@@ -94,6 +93,85 @@ impl<R> ProcHandle<R> {
     }
 }
 
+impl<R> Future for ProcHandle<R> {
+    type Output = Option<R>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let ptr = self.raw_proc.as_ptr();
+        let pdata = ptr as *const ProcData;
+
+        unsafe {
+            let mut state = (*pdata).state.load(Ordering::Acquire);
+
+            loop {
+                // If the proc has been closed, notify the awaiter and return `None`.
+                if state & CLOSED != 0 {
+                    // Even though the awaiter is most likely the current proc, it could also be
+                    // another proc.
+                    (*pdata).notify_unless(cx.waker());
+                    return Poll::Ready(None);
+                }
+
+                // If the proc is not completed, register the current proc.
+                if state & COMPLETED == 0 {
+                    // Replace the waker with one associated with the current proc. We need a
+                    // safeguard against panics because dropping the previous waker can panic.
+                    (*pdata).swap_awaiter(Some(cx.waker().clone()));
+
+                    // Reload the state after registering. It is possible that the proc became
+                    // completed or closed just before registration so we need to check for that.
+                    state = (*pdata).state.load(Ordering::Acquire);
+
+                    // If the proc has been closed, notify the awaiter and return `None`.
+                    if state & CLOSED != 0 {
+                        // Even though the awaiter is most likely the current proc, it could also
+                        // be another proc.
+                        (*pdata).notify_unless(cx.waker());
+                        return Poll::Ready(None);
+                    }
+
+                    // If the proc is still not completed, we're blocked on it.
+                    if state & COMPLETED == 0 {
+                        return Poll::Pending;
+                    }
+                }
+
+                // Since the proc is now completed, mark it as closed in order to grab its output.
+                match (*pdata).state.compare_exchange(
+                    state,
+                    state | CLOSED,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => {
+                        // Notify the awaiter. Even though the awaiter is most likely the current
+                        // proc, it could also be another proc.
+                        if state & AWAITER != 0 {
+                            (*pdata).notify_unless(cx.waker());
+                        }
+
+                        // Take the output from the proc.
+                        let output = ((*pdata).vtable.get_output)(ptr) as *mut R;
+                        return Poll::Ready(Some(output.read()));
+                    }
+                    Err(s) => state = s,
+                }
+            }
+        }
+    }
+}
+
+impl<R> Debug for ProcHandle<R> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        let ptr = self.raw_proc.as_ptr();
+        let pdata = ptr as *const ProcData;
+
+        fmt.debug_struct("ProcHandle")
+            .field("pdata", unsafe { &(*pdata) })
+            .finish()
+    }
+}
+
 impl<R> Drop for ProcHandle<R> {
     fn drop(&mut self) {
         let ptr = self.raw_proc.as_ptr();
@@ -171,84 +249,5 @@ impl<R> Drop for ProcHandle<R> {
 
         // Drop the output if it was taken out of the proc.
         drop(output);
-    }
-}
-
-impl<R> Future for ProcHandle<R> {
-    type Output = Option<R>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let ptr = self.raw_proc.as_ptr();
-        let pdata = ptr as *const ProcData;
-
-        unsafe {
-            let mut state = (*pdata).state.load(Ordering::Acquire);
-
-            loop {
-                // If the proc has been closed, notify the awaiter and return `None`.
-                if state & CLOSED != 0 {
-                    // Even though the awaiter is most likely the current proc, it could also be
-                    // another proc.
-                    (*pdata).notify_unless(cx.waker());
-                    return Poll::Ready(None);
-                }
-
-                // If the proc is not completed, register the current proc.
-                if state & COMPLETED == 0 {
-                    // Replace the waker with one associated with the current proc. We need a
-                    // safeguard against panics because dropping the previous waker can panic.
-                    (*pdata).swap_awaiter(Some(cx.waker().clone()));
-
-                    // Reload the state after registering. It is possible that the proc became
-                    // completed or closed just before registration so we need to check for that.
-                    state = (*pdata).state.load(Ordering::Acquire);
-
-                    // If the proc has been closed, notify the awaiter and return `None`.
-                    if state & CLOSED != 0 {
-                        // Even though the awaiter is most likely the current proc, it could also
-                        // be another proc.
-                        (*pdata).notify_unless(cx.waker());
-                        return Poll::Ready(None);
-                    }
-
-                    // If the proc is still not completed, we're blocked on it.
-                    if state & COMPLETED == 0 {
-                        return Poll::Pending;
-                    }
-                }
-
-                // Since the proc is now completed, mark it as closed in order to grab its output.
-                match (*pdata).state.compare_exchange(
-                    state,
-                    state | CLOSED,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                ) {
-                    Ok(_) => {
-                        // Notify the awaiter. Even though the awaiter is most likely the current
-                        // proc, it could also be another proc.
-                        if state & AWAITER != 0 {
-                            (*pdata).notify_unless(cx.waker());
-                        }
-
-                        // Take the output from the proc.
-                        let output = ((*pdata).vtable.get_output)(ptr) as *mut R;
-                        return Poll::Ready(Some(output.read()));
-                    }
-                    Err(s) => state = s,
-                }
-            }
-        }
-    }
-}
-
-impl<R> fmt::Debug for ProcHandle<R> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ptr = self.raw_proc.as_ptr();
-        let pdata = ptr as *const ProcData;
-
-        f.debug_struct("ProcHandle")
-            .field("pdata", unsafe { &(*pdata) })
-            .finish()
     }
 }

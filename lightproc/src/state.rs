@@ -1,7 +1,7 @@
 /// Set if the proc is scheduled for running.
 ///
 /// A proc is considered to be scheduled whenever its `LightProc` reference exists. It is in scheduled
-/// state at the moment of creation and when it gets unapused either by its `ProcHandle` or woken
+/// state at the moment of creation and when it gets unpaused either by its `ProcHandle` or woken
 /// by a `Waker`.
 ///
 /// This flag can't be set when the proc is completed. However, it can be set while the proc is

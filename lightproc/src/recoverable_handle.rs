@@ -1,11 +1,28 @@
 use crate::proc_handle::ProcHandle;
+use crate::proc_stack::ProcStack;
 use std::future::Future;
 use std::panic::resume_unwind;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::thread;
 
-pub struct RecoverableHandle<R>(pub ProcHandle<thread::Result<R>>);
+pub struct RecoverableHandle<R>(pub(crate) ProcHandle<thread::Result<R>>);
+
+impl<R> RecoverableHandle<R> {
+    /// Cancels the proc.
+    ///
+    /// If the proc has already completed, calling this method will have no effect.
+    ///
+    /// When a proc is cancelled, its future cannot be polled again and will be dropped instead.
+    pub fn cancel(&self) {
+        self.0.cancel()
+    }
+
+    /// Returns a reference to the stack stored inside the proc.
+    pub fn stack(&self) -> &ProcStack {
+        self.0.stack()
+    }
+}
 
 impl<R> Future for RecoverableHandle<R> {
     type Output = Option<R>;

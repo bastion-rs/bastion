@@ -1,15 +1,13 @@
-use std::alloc::Layout;
-use std::cell::Cell;
-use std::fmt;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::Waker;
-
-use crossbeam_utils::Backoff;
-
 use crate::layout_helpers::extend;
-use crate::proc_stack::*;
+use crate::proc_stack::ProcStack;
 use crate::proc_vtable::ProcVTable;
 use crate::state::*;
+use crossbeam_utils::Backoff;
+use std::alloc::Layout;
+use std::cell::Cell;
+use std::fmt::{self, Debug, Formatter};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::task::Waker;
 
 /// The pdata of a proc.
 ///
@@ -131,23 +129,24 @@ impl ProcData {
     #[inline]
     pub(crate) fn offset_stack() -> usize {
         let layout_pdata = Layout::new::<ProcData>();
-        let layout_t = Layout::new::<ProcStack>();
-        let (_, offset_t) = extend(layout_pdata, layout_t);
-        offset_t
+        let layout_stack = Layout::new::<ProcStack>();
+        let (_, offset_stack) = extend(layout_pdata, layout_stack);
+        offset_stack
     }
 }
 
-impl fmt::Debug for ProcData {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for ProcData {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         let state = self.state.load(Ordering::SeqCst);
 
-        f.debug_struct("ProcData")
+        fmt.debug_struct("ProcData")
             .field("scheduled", &(state & SCHEDULED != 0))
             .field("running", &(state & RUNNING != 0))
             .field("completed", &(state & COMPLETED != 0))
             .field("closed", &(state & CLOSED != 0))
-            .field("awaiter", &(state & AWAITER != 0))
             .field("handle", &(state & HANDLE != 0))
+            .field("awaiter", &(state & AWAITER != 0))
+            .field("locked", &(state & LOCKED != 0))
             .field("ref_count", &(state / REFERENCE))
             .finish()
     }

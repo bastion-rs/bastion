@@ -6,30 +6,29 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct CatchUnwind<Fut>
+pub(crate) struct CatchUnwind<F>
 where
-    Fut: Future,
+    F: Future,
 {
-    future: Fut,
+    future: F,
 }
 
-impl<Fut> CatchUnwind<Fut>
+impl<F> CatchUnwind<F>
 where
-    Fut: Future + UnwindSafe,
+    F: Future + UnwindSafe,
 {
-    unsafe_pinned!(future: Fut);
+    unsafe_pinned!(future: F);
 
-    pub(super) fn new(future: Fut) -> CatchUnwind<Fut> {
+    pub(crate) fn new(future: F) -> CatchUnwind<F> {
         CatchUnwind { future }
     }
 }
 
-impl<Fut> Future for CatchUnwind<Fut>
+impl<F> Future for CatchUnwind<F>
 where
-    Fut: Future + UnwindSafe,
+    F: Future + UnwindSafe,
 {
-    type Output = Result<Fut::Output, Box<dyn Any + Send>>;
+    type Output = Result<F::Output, Box<dyn Any + Send>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         catch_unwind(AssertUnwindSafe(|| self.future().poll(cx)))?.map(Ok)

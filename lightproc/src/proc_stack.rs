@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::{Error, Formatter};
+use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -7,13 +6,14 @@ use std::sync::Arc;
 pub struct ProcStack {
     pub pid: AtomicUsize,
 
-    // Before action callbacks
-    pub before_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    // Before action callback
+    pub(crate) before_start: Option<Arc<dyn Fn() + Send + Sync>>,
 
-    // After action callbacks
-    pub after_complete: Option<Arc<dyn Fn() + Send + Sync>>,
+    // After action callback
+    pub(crate) after_complete: Option<Arc<dyn Fn() + Send + Sync>>,
 
-    pub after_panic: Option<Arc<dyn Fn() + Send + Sync>>,
+    // After panic callback
+    pub(crate) after_panic: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl ProcStack {
@@ -47,9 +47,9 @@ impl ProcStack {
     }
 }
 
-impl fmt::Debug for ProcStack {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("ProcStack")
+impl Debug for ProcStack {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("ProcStack")
             .field("pid", &self.pid.load(Ordering::SeqCst))
             .finish()
     }
