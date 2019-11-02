@@ -1,7 +1,8 @@
+use crate::proc_data::ProcData;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::ProcStack;
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::panic::resume_unwind;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::thread;
@@ -27,18 +28,30 @@ impl<R> RecoverableHandle<R> {
 impl<R> Future for RecoverableHandle<R> {
     type Output = Option<R>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match Pin::new(&mut self.0).poll(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(Ok(val))) => Poll::Ready(Some(val)),
-            Poll::Ready(Some(Err(err))) => {
+            Poll::Ready(Some(Err(_))) => {
                 if let Some(after_panic_cb) = self.0.stack().after_panic.clone() {
                     (*after_panic_cb.clone())();
                 }
 
-                resume_unwind(err)
+                Poll::Ready(None)
             }
         }
+    }
+}
+
+impl<R> Debug for RecoverableHandle<R> {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        let ptr = self.0.raw_proc.as_ptr();
+        let pdata = ptr as *const ProcData;
+
+        fmt.debug_struct("ProcHandle")
+            .field("pdata", unsafe { &(*pdata) })
+            .field("stack", self.stack())
+            .finish()
     }
 }

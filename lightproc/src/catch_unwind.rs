@@ -30,7 +30,7 @@ where
 {
     type Output = Result<F::Output, Box<dyn Any + Send>>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         catch_unwind(AssertUnwindSafe(|| self.future().poll(cx)))?.map(Ok)
     }
 }

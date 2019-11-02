@@ -48,7 +48,7 @@ impl ProcStack {
 }
 
 impl Debug for ProcStack {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         fmt.debug_struct("ProcStack")
             .field("pid", &self.pid.load(Ordering::SeqCst))
             .finish()

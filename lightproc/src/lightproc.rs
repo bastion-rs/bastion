@@ -91,7 +91,7 @@ impl LightProc {
 }
 
 impl Debug for LightProc {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
 

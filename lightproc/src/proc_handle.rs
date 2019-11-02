@@ -96,7 +96,7 @@ impl<R> ProcHandle<R> {
 impl<R> Future for ProcHandle<R> {
     type Output = Option<R>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
 
@@ -162,12 +162,13 @@ impl<R> Future for ProcHandle<R> {
 }
 
 impl<R> Debug for ProcHandle<R> {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
 
         fmt.debug_struct("ProcHandle")
             .field("pdata", unsafe { &(*pdata) })
+            .field("stack", self.stack())
             .finish()
     }
 }

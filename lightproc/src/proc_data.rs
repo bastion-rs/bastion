@@ -136,7 +136,7 @@ impl ProcData {
 }
 
 impl Debug for ProcData {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         let state = self.state.load(Ordering::SeqCst);
 
         fmt.debug_struct("ProcData")
