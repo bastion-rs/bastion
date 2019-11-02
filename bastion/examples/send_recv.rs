@@ -24,7 +24,6 @@ fn main() {
                 // Panicking will restart the children group.
                 panic!("Oh no!");
             }
-            .into()
         },
         1,
     )

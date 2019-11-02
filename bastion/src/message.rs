@@ -1,12 +1,12 @@
-use crate::children::{Children, Shell};
+use crate::children::Children;
 use crate::context::BastionId;
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-pub trait Message: Shell + Debug {}
-impl<T> Message for T where T: Shell + Debug {}
+pub trait Message: Any + Send + Sync + Debug {}
+impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
 #[derive(Debug)]
 pub struct Msg(MsgInner);
@@ -55,7 +55,7 @@ impl Msg {
         }
     }
 
-    pub fn downcast<M: Any>(self) -> Result<M, Self> {
+    pub fn downcast<M: Message>(self) -> Result<M, Self> {
         if let MsgInner::Owned(msg) = self.0 {
             if msg.is::<M>() {
                 let msg: Box<dyn Any + 'static> = msg;
@@ -69,10 +69,7 @@ impl Msg {
         }
     }
 
-    pub fn downcast_ref<M>(&self) -> Option<Arc<M>>
-    where
-        M: Any + Send + Sync + 'static,
-    {
+    pub fn downcast_ref<M: Message>(&self) -> Option<Arc<M>> {
         if let MsgInner::Shared(msg) = &self.0 {
             if msg.is::<M>() {
                 return Some(msg.clone().downcast::<M>().unwrap());
@@ -91,10 +88,7 @@ impl Msg {
         }
     }
 
-    pub(crate) fn try_unwrap<M>(self) -> Result<M, Self>
-    where
-        M: Any + Send + Sync + 'static,
-    {
+    pub(crate) fn try_unwrap<M: Message>(self) -> Result<M, Self> {
         if let MsgInner::Shared(msg) = self.0 {
             match msg.downcast() {
                 Ok(msg) => match Arc::try_unwrap(msg) {
@@ -185,10 +179,7 @@ impl BastionMessage {
         Some(clone)
     }
 
-    pub(crate) fn into_msg<M>(self) -> Option<M>
-    where
-        M: Any + Send + Sync + 'static,
-    {
+    pub(crate) fn into_msg<M: Message>(self) -> Option<M> {
         if let BastionMessage::Tell(msg) = self {
             msg.try_unwrap().ok()
         } else {
@@ -250,7 +241,7 @@ impl BastionMessage {
 ///         }
 ///
 ///         Ok(())
-///     }.into(),
+///     },
 ///     1,
 /// ).expect("Couldn't start the children group.");
 ///     #

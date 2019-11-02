@@ -1,12 +1,11 @@
-use crate::children::{Children, ChildrenRef};
+use crate::children::ChildrenRef;
 use crate::context::BastionId;
-use crate::message::{BastionMessage, Message, Msg};
-use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
-use crate::system::SYSTEM;
+use crate::message::BastionMessage;
+use crate::supervisor::SupervisorRef;
+use crate::system::SYSTEM_SENDER;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;
-use std::any::Any;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -22,7 +21,7 @@ pub(crate) struct Broadcast {
     children: FxHashMap<BastionId, Sender>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Parent {
     None,
     System,
@@ -58,6 +57,10 @@ impl Broadcast {
 
     pub(crate) fn sender(&self) -> &Sender {
         &self.sender
+    }
+
+    pub(crate) fn parent(&self) -> &Parent {
+        &self.parent
     }
 
     pub(crate) fn register(&mut self, child: &Self) {
@@ -161,11 +164,21 @@ impl Parent {
         Parent::Children(children)
     }
 
+    pub(crate) fn into_children(self) -> Option<ChildrenRef> {
+        if let Parent::Children(children) = self {
+            Some(children)
+        } else {
+            None
+        }
+    }
+
     fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
         match self {
             // FIXME
             Parent::None => unimplemented!(),
-            Parent::System => SYSTEM.unbounded_send(msg).map_err(|err| err.into_inner()),
+            Parent::System => SYSTEM_SENDER
+                .unbounded_send(msg)
+                .map_err(|err| err.into_inner()),
             Parent::Supervisor(supervisor) => supervisor.send(msg),
             Parent::Children(children) => children.send(msg),
         }
@@ -183,10 +196,10 @@ impl Stream for Broadcast {
 #[cfg(test)]
 mod tests {
     use super::{BastionMessage, Broadcast, Parent};
+    use futures::executor;
     use futures::poll;
     use futures::prelude::*;
     use std::task::Poll;
-    use tokio::runtime::Runtime;
 
     #[test]
     fn send_children() {
@@ -200,11 +213,10 @@ mod tests {
             children.push(child);
         }
 
-        let runtime = Runtime::new().unwrap();
         let msg = BastionMessage::start();
 
         parent.send_children(msg.try_clone().unwrap());
-        runtime.block_on(async {
+        executor::block_on(async {
             for child in &mut children {
                 match poll!(child.next()) {
                     Poll::Ready(Some(BastionMessage::Start)) => (),
@@ -215,7 +227,7 @@ mod tests {
 
         parent.unregister(children[0].id());
         parent.send_children(msg.try_clone().unwrap());
-        runtime.block_on(async {
+        executor::block_on(async {
             assert!(poll!(children[0].next()).is_pending());
 
             for child in &mut children[1..] {
@@ -228,7 +240,7 @@ mod tests {
 
         parent.clear_children();
         parent.send_children(msg);
-        runtime.block_on(async {
+        executor::block_on(async {
             for child in &mut children[1..] {
                 assert!(poll!(child.next()).is_pending());
             }

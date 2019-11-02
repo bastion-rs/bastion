@@ -1,8 +1,10 @@
 use crate::broadcast::{Broadcast, Parent};
-use crate::children::{ChildrenRef, Closure};
-use crate::message::{BastionMessage, Message, Msg};
+use crate::children::ChildrenRef;
+use crate::context::BastionContext;
+use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
-use crate::system::{ROOT_SPV, STARTED, SYSTEM};
+use crate::system::{ROOT_SPV, SYSTEM, SYSTEM_SENDER};
+use std::future::Future;
 use std::thread;
 
 pub struct Bastion {
@@ -33,8 +35,8 @@ impl Bastion {
     pub fn init() {
         std::panic::set_hook(Box::new(|_| ()));
 
-        // NOTE: this is just to make sure that SYSTEM has been initialized by lazy_static
-        SYSTEM.is_closed();
+        // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
+        SYSTEM_SENDER.is_closed();
     }
 
     /// Creates a new supervisor, passes it through the specified
@@ -83,13 +85,13 @@ impl Bastion {
         let supervisor_ref = supervisor.as_ref();
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        SYSTEM.unbounded_send(msg).map_err(|_| ())?;
+        SYSTEM_SENDER.unbounded_send(msg).map_err(|_| ())?;
 
         Ok(supervisor_ref)
     }
 
     /// Creates a new group of children that will run the future
-    /// returned by `child` and then makes the system's default
+    /// returned by `init` and then makes the system's default
     /// supervisor supervise it. The group will have as many
     /// elements as defined by `redundancy` and if one of them
     /// stops or dies, all of the other elements of the group
@@ -106,11 +108,9 @@ impl Bastion {
     ///
     /// # Arguments
     ///
-    /// * `child` - A closure taking a [`BastionContext`] as an
+    /// * `init` - A closure taking a [`BastionContext`] as an
     ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run (**NOTE**: you
-    ///     need to call `.into()` on the future before returning
-    ///     it).
+    ///     element of the children group will run.
     /// * `redundancy` - How many elements the children group
     ///     should contain. Each element of the group will be
     ///     independent, capable of sending and receiving its
@@ -134,7 +134,7 @@ impl Bastion {
     ///
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
-    ///     }.into(),
+    ///     },
     ///     1
     /// ).expect("Couldn't create the children group.");
     ///     #
@@ -147,9 +147,10 @@ impl Bastion {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<F>(init: F, redundancy: usize) -> Result<ChildrenRef, ()>
+    pub fn children<C, F>(init: C, redundancy: usize) -> Result<ChildrenRef, ()>
     where
-        F: Closure,
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         // FIXME: panics
         ROOT_SPV
@@ -197,7 +198,7 @@ impl Bastion {
     /// }
     ///             #
     ///             # Ok(())
-    ///         # }.into(),
+    ///         # },
     ///         # 1,
     ///     # ).unwrap();
     ///     #
@@ -209,7 +210,7 @@ impl Bastion {
     pub fn broadcast<M: Message>(msg: M) -> Result<(), M> {
         let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
-        SYSTEM
+        SYSTEM_SENDER
             .unbounded_send(msg)
             .map_err(|err| err.into_inner().into_msg().unwrap())
     }
@@ -239,7 +240,7 @@ impl Bastion {
     pub fn start() {
         let msg = BastionMessage::start();
         // FIXME: Err(Error)
-        SYSTEM.unbounded_send(msg).ok();
+        SYSTEM_SENDER.unbounded_send(msg).ok();
     }
 
     /// Sends a message to the system to tell it to stop
@@ -267,7 +268,7 @@ impl Bastion {
     pub fn stop() {
         let msg = BastionMessage::stop();
         // FIXME: Err(Error)
-        SYSTEM.unbounded_send(msg).ok();
+        SYSTEM_SENDER.unbounded_send(msg).ok();
     }
 
     /// Sends a message to the system to tell it to kill every
@@ -294,7 +295,13 @@ impl Bastion {
     pub fn kill() {
         let msg = BastionMessage::kill();
         // FIXME: Err(Error)
-        SYSTEM.unbounded_send(msg).ok();
+        SYSTEM_SENDER.unbounded_send(msg).ok();
+
+        // FIXME: panics
+        let mut system = SYSTEM.clone().lock().wait().unwrap();
+        if let Some(system) = system.take() {
+            system.cancel();
+        }
     }
 
     /// Blocks the current thread until the system is stopped
@@ -315,7 +322,7 @@ impl Bastion {
     ///     // Send messages to children and/or do some
     ///     // work...
     ///
-    ///     # Bastion::kill();
+    ///     # Bastion::stop();
     ///     Bastion::block_until_stopped();
     ///     // The system is now stopped. A child might have
     ///     // stopped or killed it...
@@ -327,8 +334,8 @@ impl Bastion {
     pub fn block_until_stopped() {
         loop {
             // FIXME: panics
-            let started = STARTED.clone().lock().wait().unwrap();
-            if *started {
+            let system = SYSTEM.clone().lock().wait().unwrap();
+            if system.is_none() {
                 return;
             }
 

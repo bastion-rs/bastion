@@ -68,7 +68,7 @@ impl BastionContext {
     ///             // only take effect after this future becomes "pending")...
     ///
     ///             Ok(())
-    ///         }.into(),
+    ///         },
     ///         1,
     ///     ).expect("Couldn't create the children group.");
     ///     #
@@ -101,7 +101,7 @@ impl BastionContext {
     ///             // or stop or kill the children group...
     ///
     ///             Ok(())
-    ///         }.into(),
+    ///         },
     ///         1,
     ///     ).expect("Couldn't create the children group.");
     ///     #
@@ -135,7 +135,7 @@ impl BastionContext {
     ///             // or stop or kill the supervisor...
     ///
     ///             Ok(())
-    ///         }.into(),
+    ///         },
     ///         1,
     ///     ).expect("Couldn't create the children group.");
     ///     #
@@ -174,7 +174,7 @@ impl BastionContext {
     ///             // be `Some(Msg)`, otherwise it will be `None`.
     ///
     ///             Ok(())
-    ///         }.into(),
+    ///         },
     ///         1,
     ///     ).expect("Couldn't create the children group.");
     ///     #
@@ -217,7 +217,7 @@ impl BastionContext {
     ///             let msg: Msg = ctx.recv().await?;
     ///
     ///             Ok(())
-    ///         }.into(),
+    ///         },
     ///         1,
     ///     ).expect("Couldn't create the children group.");
     ///     #

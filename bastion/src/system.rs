@@ -1,31 +1,37 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionId, NIL_ID};
 use crate::message::{BastionMessage, Deployment};
-use crate::proc::Proc;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
+use lightproc::prelude::*;
 use qutex::{QrwLock, Qutex};
 use std::task::Poll;
-use tokio::runtime::{Builder, Runtime};
+use threadpool::ThreadPool;
+
+pub(crate) fn schedule(proc: LightProc) {
+    // FIXME: panics?
+    let pool = POOL.clone().read().wait().unwrap();
+    pool.execute(|| proc.run())
+}
 
 lazy_static! {
-    pub(crate) static ref SYSTEM: Sender = System::init();
+    pub(crate) static ref SYSTEM: Qutex<Option<ProcHandle<()>>> = Qutex::new(None);
+    pub(crate) static ref SYSTEM_SENDER: Sender = System::init();
     pub(crate) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
-    pub(crate) static ref RUNTIME: Runtime = Builder::new().panic_handler(|_| ()).build().unwrap();
-    pub(crate) static ref STARTED: Qutex<bool> = Qutex::new(false);
+    pub(crate) static ref POOL: QrwLock<ThreadPool> = QrwLock::new(ThreadPool::default());
 }
 
 #[derive(Debug)]
 pub(crate) struct System {
     bcast: Broadcast,
-    launched: FxHashMap<BastionId, Proc<Supervisor>>,
+    launched: FxHashMap<BastionId, ProcHandle<Supervisor>>,
     // TODO: set limit
     restart: FxHashSet<BastionId>,
-    waiting: FuturesUnordered<Proc<Supervisor>>,
+    waiting: FuturesUnordered<ProcHandle<Supervisor>>,
     pre_start_msgs: Vec<BastionMessage>,
     started: bool,
 }
@@ -60,7 +66,14 @@ impl System {
         let msg = BastionMessage::deploy_supervisor(supervisor);
         system.bcast.send_self(msg);
 
-        Proc::spawn(system.run());
+        // FIXME: with_id
+        let stack = ProcStack::default();
+        let (proc, handle) = LightProc::build(system.run(), schedule, stack);
+
+        proc.schedule();
+        // FIXME: pancis?
+        let mut system = SYSTEM.clone().lock().wait().unwrap();
+        *system = Some(handle);
 
         // FIXME: panics?
         let mut root_spv = ROOT_SPV.clone().write().wait().unwrap();
@@ -83,7 +96,7 @@ impl System {
         supervisor.reset(bcast).await;
         self.bcast.register(supervisor.bcast());
 
-        let launched = Proc::spawn(supervisor.run());
+        let launched = supervisor.launch();
         self.launched.insert(id, launched);
     }
 
@@ -106,7 +119,13 @@ impl System {
     async fn kill(&mut self) {
         self.bcast.kill_children();
 
+        for launched in self.waiting.iter_mut() {
+            launched.cancel();
+        }
+
         for (_, launched) in self.launched.drain() {
+            launched.cancel();
+
             self.waiting.push(launched);
         }
 
@@ -145,7 +164,7 @@ impl System {
                     }
 
                     let id = supervisor.id().clone();
-                    let launched = Proc::spawn(supervisor.run());
+                    let launched = supervisor.launch();
                     self.launched.insert(id, launched);
                 }
                 // FIXME
@@ -183,20 +202,21 @@ impl System {
     }
 
     async fn run(mut self) {
-        // FIXME: panics
-        let mut started = STARTED.clone().lock_async().await.unwrap();
-        *started = true;
-
         loop {
-            if let Poll::Ready(Some(supervisor)) = poll!(&mut self.waiting.next()) {
-                let id = supervisor.id();
-                self.bcast.unregister(&id);
+            match poll!(&mut self.waiting.next()) {
+                Poll::Ready(Some(Some(supervisor))) => {
+                    let id = supervisor.id();
+                    self.bcast.unregister(&id);
 
-                if self.restart.remove(&id) {
-                    self.recover(supervisor).await;
+                    if self.restart.remove(&id) {
+                        self.recover(supervisor).await;
+                    }
+
+                    continue;
                 }
-
-                continue;
+                // FIXME
+                Poll::Ready(Some(None)) => unimplemented!(),
+                Poll::Ready(None) | Poll::Pending => (),
             }
 
             match poll!(&mut self.bcast.next()) {
@@ -213,6 +233,10 @@ impl System {
                     for msg in msgs {
                         // FIXME: Err(Error)?
                         if self.handle(msg).await.is_err() {
+                            // FIXME: panics?
+                            let mut system = SYSTEM.clone().lock_async().await.unwrap();
+                            *system = None;
+
                             return;
                         }
                     }
@@ -221,6 +245,10 @@ impl System {
                 Poll::Ready(Some(msg)) => {
                     // FIXME: Err(Error)?
                     if self.handle(msg).await.is_err() {
+                        // FIXME: panics?
+                        let mut system = SYSTEM.clone().lock_async().await.unwrap();
+                        *system = None;
+
                         return;
                     }
                 }

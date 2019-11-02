@@ -1,12 +1,14 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
-use crate::children::{Children, ChildrenRef, Closure};
-use crate::context::BastionId;
+use crate::children::{Children, ChildrenRef};
+use crate::context::{BastionContext, BastionId};
 use crate::message::{BastionMessage, Deployment, Message};
-use crate::proc::Proc;
+use crate::system::schedule;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
 use fxhash::FxHashMap;
+use lightproc::prelude::*;
+use std::future::Future;
 use std::iter::FromIterator;
 use std::ops::RangeFrom;
 use std::task::Poll;
@@ -18,7 +20,7 @@ pub struct Supervisor {
     // It is only updated when at least one of those is resat.
     order: Vec<BastionId>,
     // The currently launched supervised children and supervisors.
-    launched: FxHashMap<BastionId, (usize, Proc<Supervised>)>,
+    launched: FxHashMap<BastionId, (usize, ProcHandle<Supervised>)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
@@ -96,6 +98,11 @@ impl Supervisor {
         supervisor
     }
 
+    fn stack(&self) -> ProcStack {
+        // FIXME: with_pid
+        ProcStack::default()
+    }
+
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
         // TODO: stop or kill?
         let killed = self.kill(0..).await;
@@ -110,7 +117,10 @@ impl Supervisor {
             let bcast = Broadcast::new(parent);
             let supervisor = self.as_ref();
 
-            reset.push(supervised.reset(bcast, supervisor))
+            reset.push(async {
+                // FIXME: panics?
+                supervised.reset(bcast, supervisor).await.unwrap()
+            })
         }
 
         while let Some(supervised) = reset.next().await {
@@ -276,7 +286,7 @@ impl Supervisor {
     }
 
     /// Creates a new group of children that will run the future
-    /// returned by `child` and starts supervising it. The group
+    /// returned by `init` and starts supervising it. The group
     /// will have as many elements as defined by `redundancy` and
     /// if one of them stops or dies, all of the other elements of
     /// the group will be stopped or killed.
@@ -292,11 +302,9 @@ impl Supervisor {
     ///
     /// # Arguments
     ///
-    /// * `child` - A closure taking a [`BastionContext`] as an
+    /// * `init` - A closure taking a [`BastionContext`] as an
     ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run (**NOTE**: you
-    ///     need to call `.into()` on the future before returning
-    ///     it).
+    ///     element of the children group will run.
     /// * `redundancy` - How many elements the children group
     ///     should contain. Each element of the group will be
     ///     independent, capable of sending and receiving its
@@ -321,7 +329,7 @@ impl Supervisor {
     ///         Ok(())
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
-    ///     }.into(),
+    ///     },
     ///     1
     /// )
     ///     # }).unwrap();
@@ -336,13 +344,13 @@ impl Supervisor {
     /// [`children_ref`]: #method.children_ref
     /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<F>(self, child: F, redundancy: usize) -> Self
+    pub fn children<C, F>(self, init: C, redundancy: usize) -> Self
     where
-        F: Closure,
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
-        let init = Box::new(child);
 
         let children = Children::new(init, bcast, self.as_ref(), redundancy);
         let msg = BastionMessage::deploy_children(children);
@@ -352,7 +360,7 @@ impl Supervisor {
     }
 
     /// Creates a new group of children that will run the future
-    /// returned by `child` and starts supervising it. The group
+    /// returned by `init` and starts supervising it. The group
     /// will have as many elements as defined by `redundancy` and
     /// if one of them dies or returns an error, all of the other
     /// elements of the group will be stopped or killed.
@@ -368,11 +376,9 @@ impl Supervisor {
     ///
     /// # Arguments
     ///
-    /// * `child` - A closure taking a [`BastionContext`] as an
+    /// * `init` - A closure taking a [`BastionContext`] as an
     ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run (**NOTE**: you
-    ///     need to call `.into()` on the future before returning
-    ///     it).
+    ///     element of the children group will run.
     /// * `redundancy` - How many elements the children group
     ///     should contain. Each element of the group will be
     ///     independent, capable of sending and receiving its
@@ -397,7 +403,7 @@ impl Supervisor {
     ///         Ok(())
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
-    ///     }.into(),
+    ///     },
     ///     1
     /// );
     ///         # sp
@@ -413,13 +419,13 @@ impl Supervisor {
     /// [`children`]: #method.children
     /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children_ref<F>(&mut self, init: F, redundancy: usize) -> ChildrenRef
+    pub fn children_ref<C, F>(&mut self, init: C, redundancy: usize) -> ChildrenRef
     where
-        F: Closure,
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
-        let init = Box::new(init);
 
         let children = Children::new(init, bcast, self.as_ref(), redundancy);
         let children_ref = children.as_ref();
@@ -535,17 +541,17 @@ impl Supervisor {
                 continue;
             }
 
-            // TODO: Err if None?
-            if let Some(supervised) = supervised.last() {
-                // FIXME: Err(Error)
-                if supervised.id() != &id {
-                    continue;
+            match supervised.pop() {
+                Some(Some(supervised)) if supervised.id() == &id => {
+                    collected.push(supervised);
                 }
-            } else {
-                continue;
+                // FIXME
+                Some(Some(_)) => unimplemented!(),
+                // FIXME
+                Some(None) => unimplemented!(),
+                // FIXME
+                None => unimplemented!(),
             }
-
-            collected.push(supervised.pop().unwrap());
         }
 
         collected
@@ -556,14 +562,16 @@ impl Supervisor {
             SupervisionStrategy::OneForOne => {
                 let (order, launched) = self.launched.remove(&id).ok_or(())?;
                 // TODO: add a "waiting" list and poll from it instead of awaiting
-                let supervised = launched.await;
+                // FIXME: panics?
+                let supervised = launched.await.unwrap();
 
                 self.bcast.unregister(supervised.id());
 
                 let parent = Parent::supervisor(self.as_ref());
                 let bcast = Broadcast::new(parent);
                 let id = bcast.id().clone();
-                let supervised = supervised.reset(bcast, self.as_ref()).await;
+                // FIXME: panics?
+                let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
 
                 self.bcast.register(supervised.bcast());
                 if self.started {
@@ -582,7 +590,8 @@ impl Supervisor {
                     let parent = Parent::supervisor(self.as_ref());
                     let bcast = Broadcast::new(parent);
                     let id = bcast.id().clone();
-                    let supervised = supervised.reset(bcast, self.as_ref()).await;
+                    // FIXME: panics.
+                    let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
 
                     self.bcast.register(supervised.bcast());
 
@@ -608,7 +617,8 @@ impl Supervisor {
                     let parent = Parent::supervisor(self.as_ref());
                     let bcast = Broadcast::new(parent);
                     let id = bcast.id().clone();
-                    let supervised = supervised.reset(bcast, self.as_ref()).await;
+                    // FIXME: panics?
+                    let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
 
                     self.bcast.register(supervised.bcast());
                     if self.started {
@@ -686,7 +696,8 @@ impl Supervisor {
                 // FIXME: Err if None?
                 if let Some((_, launched)) = self.launched.remove(&id) {
                     // TODO: add a "waiting" list an poll from it instead of awaiting
-                    let supervised = launched.await;
+                    // FIXME: panics?
+                    let supervised = launched.await.unwrap();
 
                     self.bcast.unregister(&id);
                     self.stopped.insert(id, supervised);
@@ -705,7 +716,7 @@ impl Supervisor {
         Ok(())
     }
 
-    pub(crate) async fn run(mut self) -> Self {
+    async fn run(mut self) -> Self {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -742,6 +753,14 @@ impl Supervisor {
                 Poll::Pending => pending!(),
             }
         }
+    }
+
+    pub(crate) fn launch(self) -> ProcHandle<Self> {
+        let stack = self.stack();
+        let (proc, handle) = LightProc::build(self.run(), schedule, stack);
+
+        proc.schedule();
+        handle
     }
 }
 
@@ -801,7 +820,7 @@ impl SupervisorRef {
     }
 
     /// Creates a new group of children that will run the future
-    /// returned by `child` and sends it to the supervisor this
+    /// returned by `init` and sends it to the supervisor this
     /// `SupervisorRef` is referencing to supervise it. The
     /// group will have as many elements as defined by `redundancy`
     /// and if one of them stops or dies, all of the other elements
@@ -817,11 +836,9 @@ impl SupervisorRef {
     ///
     /// # Arguments
     ///
-    /// * `child` - A closure taking a [`BastionContext`] as an
+    /// * `init` - A closure taking a [`BastionContext`] as an
     ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run (**NOTE**: you
-    ///     need to call `.into()` on the future before returning
-    ///     it).
+    ///     element of the children group will run.
     /// * `redundancy` - How many elements the children group
     ///     should contain. Each element of the group will be
     ///     independent, capable of sending and receiving its
@@ -846,7 +863,7 @@ impl SupervisorRef {
     ///         Ok(())
     ///         // Note that if `Err(())` was returned, the supervisor would
     ///         // restart the children group.
-    ///     }.into(),
+    ///     },
     ///     1
     /// ).expect("Couldn't send the new children group.");
     ///     #
@@ -859,13 +876,13 @@ impl SupervisorRef {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`BastionContext`]: struct.BastionContext.html
     /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<F>(&self, init: F, redundancy: usize) -> Result<ChildrenRef, ()>
+    pub fn children<C, F>(&self, init: C, redundancy: usize) -> Result<ChildrenRef, ()>
     where
-        F: Closure,
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         let parent = Parent::supervisor(self.clone());
         let bcast = Broadcast::new(parent);
-        let init = Box::new(init);
 
         let children = Children::new(init, bcast, self.clone(), redundancy);
         let children_ref = children.as_ref();
@@ -967,7 +984,7 @@ impl SupervisorRef {
     /// }
     ///             #
     ///             # Ok(())
-    ///         # }.into(),
+    ///         # },
     ///         # 1,
     ///     # ).unwrap();
     ///     #
@@ -1068,29 +1085,71 @@ impl Supervised {
         }
     }
 
-    fn reset(self, bcast: Broadcast, supervisor: SupervisorRef) -> Proc<Self> {
+    fn reset(self, bcast: Broadcast, supervisor: SupervisorRef) -> ProcHandle<Self> {
         match self {
-            Supervised::Supervisor(mut supervisor) => Proc::spawn(async {
-                supervisor.reset(bcast).await;
-                Supervised::Supervisor(supervisor)
-            }),
-            Supervised::Children(mut children) => Proc::spawn(async {
-                children.reset(bcast, supervisor).await;
-                Supervised::Children(children)
-            }),
+            Supervised::Supervisor(mut supervisor) => {
+                let (proc, handle) = LightProc::build(
+                    async {
+                        supervisor.reset(bcast).await;
+                        Supervised::Supervisor(supervisor)
+                    },
+                    schedule,
+                    // FIXME: with_pid
+                    ProcStack::default(),
+                );
+
+                proc.schedule();
+                handle
+            }
+            Supervised::Children(mut children) => {
+                let (proc, handle) = LightProc::build(
+                    async {
+                        children.reset(bcast, supervisor).await;
+                        Supervised::Children(children)
+                    },
+                    schedule,
+                    // FIXME: with_pid
+                    ProcStack::default(),
+                );
+
+                proc.schedule();
+                handle
+            }
         }
     }
 
-    fn launch(self) -> Proc<Self> {
+    fn launch(self) -> ProcHandle<Self> {
         match self {
-            Supervised::Supervisor(supervisor) => Proc::spawn(async {
-                let supervisor = supervisor.run().await;
-                Supervised::Supervisor(supervisor)
-            }),
-            Supervised::Children(children) => Proc::spawn(async {
-                let children = children.run().await;
-                Supervised::Children(children)
-            }),
+            Supervised::Supervisor(supervisor) => {
+                let (proc, handle) = LightProc::build(
+                    async {
+                        // FIXME: panics?
+                        let supervisor = supervisor.launch().await.unwrap();
+                        Supervised::Supervisor(supervisor)
+                    },
+                    schedule,
+                    // FIXME: with_pid
+                    ProcStack::default(),
+                );
+
+                proc.schedule();
+                handle
+            }
+            Supervised::Children(children) => {
+                let (proc, handle) = LightProc::build(
+                    async {
+                        // FIXME: panics?
+                        let children = children.launch().await.unwrap();
+                        Supervised::Children(children)
+                    },
+                    schedule,
+                    // FIXME: with_pid
+                    ProcStack::default(),
+                );
+
+                proc.schedule();
+                handle
+            }
         }
     }
 }

@@ -1,53 +1,33 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{BastionMessage, Message};
-use crate::proc::Proc;
 use crate::supervisor::SupervisorRef;
-use futures::future::CatchUnwind;
+use crate::system::schedule;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
-use futures::stream::FuturesUnordered;
+use futures::stream::{FuturesOrdered, FuturesUnordered};
 use fxhash::FxHashMap;
+use lightproc::prelude::*;
 use qutex::Qutex;
-use std::any::Any;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
-use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
-pub trait Shell: Send + Sync + Any + 'static {}
-impl<T> Shell for T where T: Send + Sync + Any + 'static {}
+struct Init(Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
+struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
-pub trait Closure: Fn(BastionContext) -> Fut + Shell {}
-impl<T> Closure for T where T: Fn(BastionContext) -> Fut + Shell {}
-
-// TODO: Ok(T) & Err(E)
-type FutInner = Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>;
-type Exec = CatchUnwind<AssertUnwindSafe<FutInner>>;
-
-pub struct Fut(FutInner);
-
-impl<T> From<T> for Fut
-where
-    T: Future<Output = Result<(), ()>> + Send + 'static,
-{
-    fn from(fut: T) -> Fut {
-        Fut(Box::pin(fut))
-    }
-}
-
+#[derive(Debug)]
 pub(crate) struct Children {
     bcast: Broadcast,
     supervisor: SupervisorRef,
     // The currently launched elements of the group.
-    launched: FxHashMap<BastionId, (Sender, Proc<()>)>,
+    launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     // The closure returning the future that will be executed
     // by every element of the group.
-    init: Box<dyn Closure>,
+    init: Init,
     redundancy: usize,
     // Messages that were received before the group was
     // started. Those will be "replayed" once a start message
@@ -65,6 +45,7 @@ pub struct ChildrenRef {
     children: Vec<ChildRef>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Child {
     bcast: Broadcast,
     // The future that this child is executing.
@@ -89,14 +70,36 @@ pub struct ChildRef {
     sender: Sender,
 }
 
+impl Init {
+    fn new<C, F>(init: C) -> Self
+    where
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
+    {
+        let init = Box::new(move |ctx: BastionContext| {
+            let fut = init(ctx);
+            let exec = Box::pin(fut);
+
+            Exec(exec)
+        });
+
+        Init(init)
+    }
+}
+
 impl Children {
-    pub(crate) fn new(
-        init: Box<dyn Closure>,
+    pub(crate) fn new<C, F>(
+        init: C,
         bcast: Broadcast,
         supervisor: SupervisorRef,
         redundancy: usize,
-    ) -> Self {
+    ) -> Self
+    where
+        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
+    {
         let launched = FxHashMap::default();
+        let init = Init::new(init);
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -113,6 +116,11 @@ impl Children {
         children.new_elems();
 
         children
+    }
+
+    fn stack(&self) -> ProcStack {
+        // FIXME: with_pid
+        ProcStack::default()
     }
 
     fn new_elems(&mut self) {
@@ -132,14 +140,14 @@ impl Children {
 
             let ctx =
                 BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
-            let exec = AssertUnwindSafe((self.init)(ctx).0).catch_unwind();
+            let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);
 
             let child = Child::new(exec, bcast, state);
-            let launched = Proc::spawn(child.run());
+            let launched = child.launch();
 
-            self.launched.insert(id, (sender, launched));
+            self.launched.insert(id.clone(), (sender, launched));
         }
     }
 
@@ -181,17 +189,21 @@ impl Children {
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .collect::<Vec<_>>()
+            .for_each_concurrent(None, |_| async {})
             .await;
     }
 
     async fn kill(&mut self) {
         self.bcast.kill_children();
 
-        let launched = self.launched.drain().map(|(_, (_, launched))| launched);
-        FuturesUnordered::from_iter(launched)
-            .collect::<Vec<_>>()
-            .await;
+        let mut children = FuturesOrdered::new();
+        for (_, (_, launched)) in self.launched.drain() {
+            launched.cancel();
+
+            children.push(launched);
+        }
+
+        children.for_each_concurrent(None, |_| async {}).await;
     }
 
     fn stopped(&mut self) {
@@ -229,8 +241,7 @@ impl Children {
             BastionMessage::Stopped { id } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
-                    // TODO: stop or kill?
-                    self.kill().await;
+                    self.stop().await;
                     self.stopped();
 
                     return Err(());
@@ -239,7 +250,6 @@ impl Children {
             BastionMessage::Faulted { id } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
-                    // TODO: stop or kill?
                     self.kill().await;
                     self.faulted();
 
@@ -251,7 +261,7 @@ impl Children {
         Ok(())
     }
 
-    pub(crate) async fn run(mut self) -> Self {
+    async fn run(mut self) -> Self {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -285,9 +295,21 @@ impl Children {
 
                     return self;
                 }
-                Poll::Pending => pending!(),
+                Poll::Pending => (),
+            }
+
+            for (_, launched) in self.launched.values_mut() {
+                let _ = poll!(launched);
             }
         }
+    }
+
+    pub(crate) fn launch(self) -> ProcHandle<Self> {
+        let stack = self.stack();
+        let (proc, handle) = LightProc::build(self.run(), schedule, stack);
+
+        proc.schedule();
+        handle
     }
 }
 
@@ -311,7 +333,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     /// let elems: &[ChildRef] = children_ref.elems();
     ///     #
     ///     # Bastion::start();
@@ -348,7 +370,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     /// let msg = "A message containing data.";
     /// children_ref.broadcast(msg).expect("Couldn't send the message.");
     ///
@@ -365,7 +387,7 @@ impl ChildrenRef {
     /// }
     ///             #
     ///             # Ok(())
-    ///         # }.into(),
+    ///         # },
     ///         # 1,
     ///     # ).unwrap();
     ///     #
@@ -397,7 +419,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     /// children_ref.stop().expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
@@ -425,7 +447,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     /// children_ref.kill().expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
@@ -450,15 +472,29 @@ impl Child {
         let pre_start_msgs = Vec::new();
         let started = false;
 
-        let child = Child {
+        Child {
             bcast,
             exec,
             state,
             pre_start_msgs,
             started,
-        };
+        }
+    }
 
-        child
+    fn stack(&self) -> ProcStack {
+        let id = self.bcast.id().clone();
+        // FIXME: panics?
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+
+        // FIXME: with_pid
+        ProcStack::default().with_after_panic(move || {
+            // FIXME: clones
+            let id = id.clone();
+
+            let msg = BastionMessage::faulted(id);
+            // TODO: handle errors
+            parent.send(msg).ok();
+        })
     }
 
     fn stopped(&mut self) {
@@ -540,15 +576,22 @@ impl Child {
                 continue;
             }
 
-            if let Poll::Ready(res) = poll!(&mut self.exec) {
-                match res {
-                    Ok(Ok(())) => return self.stopped(),
-                    Ok(Err(())) | Err(_) => return self.faulted(),
-                }
+            match poll!(&mut self.exec) {
+                Poll::Ready(Ok(())) => return self.stopped(),
+                Poll::Ready(Err(())) => return self.faulted(),
+                Poll::Pending => (),
             }
 
             pending!();
         }
+    }
+
+    fn launch(self) -> RecoverableHandle<()> {
+        let stack = self.stack();
+        let (proc, handle) = LightProc::recoverable(self.run(), schedule, stack);
+
+        proc.schedule();
+        handle
     }
 }
 
@@ -574,7 +617,7 @@ impl ChildRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// let msg = "A message containing data.";
     /// child_ref.send_msg(msg).expect("Couldn't send the message.");
@@ -604,7 +647,7 @@ impl ChildRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// child_ref.stop().expect("Couldn't send the message.");
     ///     #
@@ -632,7 +675,7 @@ impl ChildRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }.into(), 1).unwrap();
+    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// child_ref.kill().expect("Couldn't send the message.");
     ///     #
@@ -653,28 +696,22 @@ impl ChildRef {
     }
 }
 
-impl Debug for Children {
-    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        fmt.debug_struct("Children")
-            .field("bcast", &self.bcast)
-            .field("supervisor", &self.supervisor)
-            .field("launched", &self.launched)
-            .field("init", &"Closure")
-            .field("redundancy", &self.redundancy)
-            .field("pre_start_msgs", &self.pre_start_msgs)
-            .field("started", &self.started)
-            .finish()
+impl Future for Exec {
+    type Output = Result<(), ()>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
+        Pin::new(&mut self.get_mut().0).poll(ctx)
     }
 }
 
-impl Debug for Child {
+impl Debug for Init {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        fmt.debug_struct("Child")
-            .field("bcast", &self.bcast)
-            .field("exec", &"Exec")
-            .field("state", &self.state)
-            .field("pre_start_msgs", &self.pre_start_msgs)
-            .field("started", &self.started)
-            .finish()
+        fmt.debug_struct("Init").finish()
+    }
+}
+
+impl Debug for Exec {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("Exec").finish()
     }
 }
