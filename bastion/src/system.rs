@@ -181,7 +181,7 @@ impl System {
             }
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Tell(_) => self.bcast.send_children(msg),
+            BastionMessage::Message { .. } => self.bcast.send_children(msg),
             BastionMessage::Stopped { id } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {

@@ -1,6 +1,6 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
-use crate::message::{BastionMessage, Message};
+use crate::message::{Answer, BastionMessage, Message};
 use crate::supervisor::SupervisorRef;
 use crate::system::schedule;
 use futures::pending;
@@ -235,7 +235,7 @@ impl Children {
             BastionMessage::Prune { .. } => unimplemented!(),
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Tell(_) => {
+            BastionMessage::Message { .. } => {
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
@@ -519,7 +519,7 @@ impl Child {
             BastionMessage::Prune { .. } => unimplemented!(),
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Tell(msg) => {
+            BastionMessage::Message(msg) => {
                 let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
                 state.push_msg(msg);
             }
@@ -616,21 +616,130 @@ impl ChildRef {
     /// #
     /// # fn main() {
     ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    /// // The message that will be "told"...
+    /// const TELL_MSG: &'static str = "A message containing data (tell).";
+    ///
+    ///     # let children_ref =
+    /// // Create a new child...
+    /// Bastion::children(
+    ///     |ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message "told"...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str => {
+    ///                     assert_eq!(msg, TELL_MSG);
+    ///                     // Handle the message...
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "tells" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     },
+    ///     1,
+    /// ).expect("Couldn't create the children group.");
+    ///
     ///     # let child_ref = &children_ref.elems()[0];
-    /// let msg = "A message containing data.";
-    /// child_ref.send_msg(msg).expect("Couldn't send the message.");
+    /// // Later, the message is "told" to the child...
+    /// child_ref.tell(TELL_MSG).expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    pub fn send_msg<M: Message>(&self, msg: M) -> Result<(), M> {
+    pub fn tell<M: Message>(&self, msg: M) -> Result<(), M> {
         let msg = BastionMessage::tell(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
+    }
+
+    /// Sends a message to the child this `ChildRef` is referencing,
+    /// allowing it to answer.
+    ///
+    /// This method returns [`Answer`] if it succeeded, or `Err(msg)`
+    /// otherwise.
+    ///
+    /// # Argument
+    ///
+    /// * `msg` - The message to send.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    /// // The message that will be "asked"...
+    /// const ASK_MSG: &'static str = "A message containing data (ask).";
+    /// // The message the will be "answered"...
+    /// const ANSWER_MSG: &'static str = "A message containing data (answer).";
+    ///
+    ///     # let children_ref =
+    /// // Create a new child...
+    /// Bastion::children(
+    ///     |ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message asked...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str =!> {
+    ///                     assert_eq!(msg, ASK_MSG);
+    ///                     // Handle the message...
+    ///
+    ///                     // ...and eventually answer to it...
+    ///                     answer!(ANSWER_MSG);
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "asks" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     },
+    ///     1,
+    /// ).expect("Couldn't create the children group.");
+    ///
+    ///     # Bastion::children(
+    ///         # move |ctx: BastionContext| {
+    ///             # let child_ref = children_ref.elems()[0].clone();
+    ///             # async move {
+    /// // Later, the message is "asked" to the child...
+    /// let answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
+    ///
+    /// // ...and the child's answer is received...
+    /// msg! { answer.await.expect("Couldn't receive the answer."),
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, ANSWER_MSG);
+    ///         // Handle the answer...
+    ///     };
+    ///     // This won't happen because this example
+    ///     // only answers a `&'static str`...
+    ///     _: _ => ();
+    /// }
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # },
+    ///         # 1,
+    ///     # ).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Answer`]: message/struct.Answer.html
+    pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
+        let (msg, answer) = BastionMessage::ask(msg);
+        // FIXME: panics?
+        self.send(msg).map_err(|msg| msg.into_msg().unwrap())?;
+
+        Ok(answer)
     }
 
     /// Sends a message to the child this `ChildRef` is referencing

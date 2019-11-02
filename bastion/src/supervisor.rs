@@ -689,7 +689,7 @@ impl Supervisor {
             BastionMessage::SuperviseWith(strategy) => {
                 self.strategy = strategy;
             }
-            BastionMessage::Tell(_) => {
+            BastionMessage::Message(_) => {
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
