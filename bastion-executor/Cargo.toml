@@ -22,8 +22,7 @@ rustc-hash = "1.0.1"
 pin-utils = "0.1.0-alpha.4"
 numanji = "^0.1"
 allocator-suite = "^0.1"
+lightproc = { "path" = "../lightproc" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 jemallocator = "^0.3"
-
-lightproc = { "path" = "../lightproc" }
