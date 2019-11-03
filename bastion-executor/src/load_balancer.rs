@@ -27,14 +27,6 @@ impl LoadBalancer {
                     if let Ok(mut stats) = load_balancer::stats().try_write() {
                         stats.mean_level = m;
                     }
-
-                    // General suspending is equal to cache line size in ERTS
-                    // https://github.com/erlang/otp/blob/master/erts/emulator/beam/erl_process.c#L10887
-                    // https://github.com/erlang/otp/blob/ea7d6c39f2179b2240d55df4a1ddd515b6d32832/erts/emulator/beam/erl_thr_progress.c#L237
-                    // thread::sleep(SIXTY_MILLIS);
-                    (0..64).for_each(|_| unsafe {
-                        asm!("NOP");
-                    })
                 }
             })
             .expect("load-balancer couldn't start");

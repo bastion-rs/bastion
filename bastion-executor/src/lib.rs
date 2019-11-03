@@ -4,8 +4,6 @@
 //! NUMA-aware SMP based Fault-tolerant Executor
 //!
 
-// Executing asm in some places
-#![feature(asm)]
 // Allocator features
 #![feature(allocator_api)]
 #![feature(extern_types)]
