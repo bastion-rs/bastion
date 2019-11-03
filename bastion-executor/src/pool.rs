@@ -26,6 +26,7 @@ pub struct Pool {
 impl Pool {
     /// Error recovery for the fallen threads
     pub fn recover_async_thread() {
+        // FIXME: Do recovery for fallen worker threads
         unimplemented!()
     }
 
