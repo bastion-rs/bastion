@@ -4,13 +4,6 @@
 //! NUMA-aware SMP based Fault-tolerant Executor
 //!
 
-// Allocator features
-#![feature(allocator_api)]
-#![feature(extern_types)]
-#![feature(core_intrinsics)]
-#![feature(libstd_sys_internals)]
-#![feature(thread_local)]
-#![feature(const_fn)]
 // Force missing implementations
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
@@ -30,4 +23,5 @@ pub mod worker;
 pub mod prelude {
     pub use crate::pool::*;
     pub use crate::run::*;
+    pub use crate::allocator::*;
 }
