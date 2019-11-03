@@ -1,7 +1,6 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{Answer, BastionMessage, Message};
-use crate::supervisor::SupervisorRef;
 use crate::system::schedule;
 use futures::pending;
 use futures::poll;
@@ -20,9 +19,8 @@ struct Init(Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
 #[derive(Debug)]
-pub(crate) struct Children {
+pub struct Children {
     bcast: Broadcast,
-    supervisor: SupervisorRef,
     // The currently launched elements of the group.
     launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     // The closure returning the future that will be executed
@@ -88,34 +86,21 @@ impl Init {
 }
 
 impl Children {
-    pub(crate) fn new<C, F>(
-        init: C,
-        bcast: Broadcast,
-        supervisor: SupervisorRef,
-        redundancy: usize,
-    ) -> Self
-    where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
-        F: Future<Output = Result<(), ()>> + Send + 'static,
-    {
+    pub(crate) fn new(bcast: Broadcast) -> Self {
         let launched = FxHashMap::default();
-        let init = Init::new(init);
+        let init = Init::default();
+        let redundancy = 1;
         let pre_start_msgs = Vec::new();
         let started = false;
 
-        let mut children = Children {
+        Children {
             bcast,
-            supervisor,
             launched,
             init,
             redundancy,
             pre_start_msgs,
             started,
-        };
-
-        children.new_elems();
-
-        children
+        }
     }
 
     fn stack(&self) -> ProcStack {
@@ -123,42 +108,13 @@ impl Children {
         ProcStack::default()
     }
 
-    fn new_elems(&mut self) {
-        for _ in 0..self.redundancy {
-            let parent = Parent::children(self.as_ref());
-            let bcast = Broadcast::new(parent);
-            // TODO: clone or ref?
-            let id = bcast.id().clone();
-            let sender = bcast.sender().clone();
-
-            let child_ref = ChildRef::new(id.clone(), sender.clone());
-            let children = self.as_ref();
-            let supervisor = self.supervisor.clone();
-
-            let state = ContextState::new();
-            let state = Qutex::new(state);
-
-            let ctx =
-                BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
-            let exec = (self.init.0)(ctx);
-
-            self.bcast.register(&bcast);
-
-            let child = Child::new(exec, bcast, state);
-            let launched = child.launch();
-
-            self.launched.insert(id.clone(), (sender, launched));
-        }
-    }
-
-    pub(crate) async fn reset(&mut self, bcast: Broadcast, supervisor: SupervisorRef) {
+    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
         // TODO: stop or kill?
         self.kill().await;
 
         self.bcast = bcast;
-        self.supervisor = supervisor;
 
-        self.new_elems();
+        self.launch_elems();
     }
 
     pub(crate) fn id(&self) -> &BastionId {
@@ -182,6 +138,20 @@ impl Children {
         }
 
         ChildrenRef::new(id, sender, children)
+    }
+
+    pub fn with_exec<I, F>(mut self, init: I) -> Self
+    where
+        I: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
+    {
+        self.init = Init::new(init);
+        self
+    }
+
+    pub fn with_redundancy(mut self, redundancy: usize) -> Self {
+        self.redundancy = redundancy;
+        self
     }
 
     async fn stop(&mut self) {
@@ -304,6 +274,35 @@ impl Children {
         }
     }
 
+    pub(crate) fn launch_elems(&mut self) {
+        for _ in 0..self.redundancy {
+            let parent = Parent::children(self.as_ref());
+            let bcast = Broadcast::new(parent);
+            // TODO: clone or ref?
+            let id = bcast.id().clone();
+            let sender = bcast.sender().clone();
+
+            let child_ref = ChildRef::new(id.clone(), sender.clone());
+            let children = self.as_ref();
+            // FIXME
+            let supervisor = self.bcast.parent().clone().into_supervisor().unwrap();
+
+            let state = ContextState::new();
+            let state = Qutex::new(state);
+
+            let ctx =
+                BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
+            let exec = (self.init.0)(ctx);
+
+            self.bcast.register(&bcast);
+
+            let child = Child::new(exec, bcast, state);
+            let launched = child.launch();
+
+            self.launched.insert(id.clone(), (sender, launched));
+        }
+    }
+
     pub(crate) fn launch(self) -> ProcHandle<Self> {
         let stack = self.stack();
         let (proc, handle) = LightProc::build(self.run(), schedule, stack);
@@ -333,7 +332,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     /// let elems: &[ChildRef] = children_ref.elems();
     ///     #
     ///     # Bastion::start();
@@ -370,12 +369,13 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     /// let msg = "A message containing data.";
     /// children_ref.broadcast(msg).expect("Couldn't send the message.");
     ///
-    ///     # Bastion::children(|ctx: BastionContext|
-    ///         # async move {
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(|ctx: BastionContext| {
+    ///             # async move {
     /// // And then in every of the children group's elements' futures...
     /// msg! { ctx.recv().await?,
     ///     ref msg: &'static str => {
@@ -385,11 +385,11 @@ impl ChildrenRef {
     ///     // example, so we know that this won't happen...
     ///     _: _ => ();
     /// }
-    ///             #
-    ///             # Ok(())
-    ///         # },
-    ///         # 1,
-    ///     # ).unwrap();
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # })
+    ///     # }).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -419,7 +419,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     /// children_ref.stop().expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
@@ -447,7 +447,7 @@ impl ChildrenRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     /// children_ref.kill().expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
@@ -621,8 +621,8 @@ impl ChildRef {
     ///
     ///     # let children_ref =
     /// // Create a new child...
-    /// Bastion::children(
-    ///     |ctx: BastionContext| {
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // ...which will receive the message "told"...
     ///             msg! { ctx.recv().await?,
@@ -637,9 +637,8 @@ impl ChildRef {
     ///
     ///             Ok(())
     ///         }
-    ///     },
-    ///     1,
-    /// ).expect("Couldn't create the children group.");
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///
     ///     # let child_ref = &children_ref.elems()[0];
     /// // Later, the message is "told" to the child...
@@ -680,8 +679,8 @@ impl ChildRef {
     ///
     ///     # let children_ref =
     /// // Create a new child...
-    /// Bastion::children(
-    ///     |ctx: BastionContext| {
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // ...which will receive the message asked...
     ///             msg! { ctx.recv().await?,
@@ -699,12 +698,11 @@ impl ChildRef {
     ///
     ///             Ok(())
     ///         }
-    ///     },
-    ///     1,
-    /// ).expect("Couldn't create the children group.");
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///
-    ///     # Bastion::children(
-    ///         # move |ctx: BastionContext| {
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(move |ctx: BastionContext| {
     ///             # let child_ref = children_ref.elems()[0].clone();
     ///             # async move {
     /// // Later, the message is "asked" to the child...
@@ -723,9 +721,8 @@ impl ChildRef {
     ///                 #
     ///                 # Ok(())
     ///             # }
-    ///         # },
-    ///         # 1,
-    ///     # ).unwrap();
+    ///         # })
+    ///     # }).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -756,7 +753,7 @@ impl ChildRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// child_ref.stop().expect("Couldn't send the message.");
     ///     #
@@ -784,7 +781,7 @@ impl ChildRef {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     # let children_ref = Bastion::children(|_| async { Ok(()) }, 1).unwrap();
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
     ///     # let child_ref = &children_ref.elems()[0];
     /// child_ref.kill().expect("Couldn't send the message.");
     ///     #
@@ -810,6 +807,12 @@ impl Future for Exec {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         Pin::new(&mut self.get_mut().0).poll(ctx)
+    }
+}
+
+impl Default for Init {
+    fn default() -> Self {
+        Init::new(|_| async { Ok(()) })
     }
 }
 

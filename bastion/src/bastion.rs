@@ -1,10 +1,8 @@
 use crate::broadcast::{Broadcast, Parent};
-use crate::children::ChildrenRef;
-use crate::context::BastionContext;
+use crate::children::{Children, ChildrenRef};
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{ROOT_SPV, SYSTEM, SYSTEM_SENDER};
-use std::future::Future;
 use std::thread;
 
 pub struct Bastion {
@@ -33,23 +31,23 @@ impl Bastion {
     /// }
     /// ```
     pub fn init() {
-        std::panic::set_hook(Box::new(|_| ()));
+        //std::panic::set_hook(Box::new(|_| ()));
 
         // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
         SYSTEM_SENDER.is_closed();
     }
 
-    /// Creates a new supervisor, passes it through the specified
+    /// Creates a new [`Supervisor`], passes it through the specified
     /// `init` closure and then sends it to the system for it to
     /// start supervising children.
     ///
-    /// This method returns a [`SupervisorRef`] for the newly
+    /// This method returns a [`SupervisorRef`] referencing the newly
     /// created supervisor if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Arguments
     ///
-    /// * `init` - The closure taking the new supervisor as an
+    /// * `init` - The closure taking the new [`Supervisor`] as an
     ///     argument and returning it once configured.
     ///
     /// # Example
@@ -62,7 +60,7 @@ impl Bastion {
     ///     #
     /// let sp_ref: SupervisorRef = Bastion::supervisor(|sp| {
     ///     // Configure the supervisor...
-    ///     sp.strategy(SupervisionStrategy::OneForOne)
+    ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// }).expect("Couldn't create the supervisor.");
     ///     #
@@ -72,6 +70,7 @@ impl Bastion {
     /// # }
     /// ```
     ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
     /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     pub fn supervisor<S>(init: S) -> Result<SupervisorRef, ()>
     where
@@ -90,32 +89,18 @@ impl Bastion {
         Ok(supervisor_ref)
     }
 
-    /// Creates a new group of children that will run the future
-    /// returned by `init` and then makes the system's default
-    /// supervisor supervise it. The group will have as many
-    /// elements as defined by `redundancy` and if one of them
-    /// stops or dies, all of the other elements of the group
-    /// will be stopped or killed.
+    /// Creates a new [`Children`], passes it through the specified
+    /// `init` closure and then sends it to the system's default
+    /// supervisor for it to start supervising it.
     ///
-    /// The future of each element will need to return a `Result<(), ()>`,
-    /// where `Ok(())` indicates that the element has stopped and
-    /// `Err(())` that it died, in which case it will be restarted by the
-    /// default supervisor.
-    ///
-    /// This method returns a [`ChildrenRef`] for the newly
-    /// created children group if it succeeded, or `Err(())`
+    /// This methods returns a [`ChildrenRef`] referencing the newly
+    /// created children group it it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Arguments
     ///
-    /// * `init` - A closure taking a [`BastionContext`] as an
-    ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run.
-    /// * `redundancy` - How many elements the children group
-    ///     should contain. Each element of the group will be
-    ///     independent, capable of sending and receiving its
-    ///     own messages but will be stopped or killed if
-    ///     another element stopped or died.
+    /// * `init` - The closure taking the new [`Children`] as an
+    ///     argument and returning it once configured.
     ///
     /// # Example
     ///
@@ -125,18 +110,21 @@ impl Bastion {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    /// let children_ref: ChildrenRef = Bastion::children(|ctx: BastionContext|
-    ///     async move {
-    ///         // Send and receive messages...
-    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
-    ///         // ...and return `Ok(())` or `Err(())` when you are done...
-    ///         Ok(())
+    /// let children_ref: ChildrenRef = Bastion::children(|children| {
+    ///     // Configure the children group...
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // Send and receive messages...
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             // ...and return `Ok(())` or `Err(())` when you are done...
+    ///             Ok(())
     ///
-    ///         // Note that if `Err(())` was returned, the supervisor would
-    ///         // restart the children group.
-    ///     },
-    ///     1
-    /// ).expect("Couldn't create the children group.");
+    ///             // Note that if `Err(())` was returned, the supervisor would
+    ///             // restart the children group.
+    ///         }
+    ///     })
+    ///     // ...and return it.
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -144,13 +132,11 @@ impl Bastion {
     /// # }
     /// ```
     ///
+    /// [`Children`]: children/struct.Children.html
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`BastionContext`]: struct.BastionContext.html
-    /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<C, F>(init: C, redundancy: usize) -> Result<ChildrenRef, ()>
+    pub fn children<C>(init: C) -> Result<ChildrenRef, ()>
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
-        F: Future<Output = Result<(), ()>> + Send + 'static,
+        C: FnOnce(Children) -> Children,
     {
         // FIXME: panics
         ROOT_SPV
@@ -160,7 +146,7 @@ impl Bastion {
             .unwrap()
             .as_ref()
             .unwrap()
-            .children(init, redundancy)
+            .children(init)
     }
 
     /// Sends a message to the system which will then send it to all
@@ -185,8 +171,9 @@ impl Bastion {
     /// let msg = "A message containing data.";
     /// Bastion::broadcast(msg).expect("Couldn't send the message.");
     ///
-    ///     # Bastion::children(|ctx: BastionContext|
-    ///         # async move {
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(|ctx: BastionContext| {
+    ///             # async move {
     /// // And then in every children groups's elements' future...
     /// msg! { ctx.recv().await?,
     ///     ref msg: &'static str => {
@@ -196,11 +183,11 @@ impl Bastion {
     ///     // example, so we know that this won't happen...
     ///     _: _ => ();
     /// }
-    ///             #
-    ///             # Ok(())
-    ///         # },
-    ///         # 1,
-    ///     # ).unwrap();
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # })
+    ///     # }).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();

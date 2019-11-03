@@ -61,16 +61,17 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     Bastion::children(|ctx: BastionContext|
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             let current: &ChildRef = ctx.current();
     ///             // Stop or kill the current element (note that this will
     ///             // only take effect after this future becomes "pending")...
     ///
     ///             Ok(())
-    ///         },
-    ///         1,
-    ///     ).expect("Couldn't create the children group.");
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -94,16 +95,17 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     Bastion::children(|ctx: BastionContext|
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             let parent: &ChildrenRef = ctx.parent();
     ///             // Get the other elements of the group, broadcast message,
     ///             // or stop or kill the children group...
     ///
     ///             Ok(())
-    ///         },
-    ///         1,
-    ///     ).expect("Couldn't create the children group.");
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -128,16 +130,17 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     Bastion::children(|ctx: BastionContext|
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             let supervisor: &SupervisorRef = ctx.supervisor();
     ///             // Add new children or nested supervisors, broadcast messages,
     ///             // or stop or kill the supervisor...
     ///
     ///             Ok(())
-    ///         },
-    ///         1,
-    ///     ).expect("Couldn't create the children group.");
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -167,16 +170,17 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     Bastion::children(|ctx: BastionContext|
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
     ///             // If a message was received by the element, `opt_msg` will
     ///             // be `Some(Msg)`, otherwise it will be `None`.
     ///
     ///             Ok(())
-    ///         },
-    ///         1,
-    ///     ).expect("Couldn't create the children group.");
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -211,15 +215,16 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
-    ///     Bastion::children(|ctx: BastionContext|
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // This will block until a message has been received...
     ///             let msg: Msg = ctx.recv().await?;
     ///
     ///             Ok(())
-    ///         },
-    ///         1,
-    ///     ).expect("Couldn't create the children group.");
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();

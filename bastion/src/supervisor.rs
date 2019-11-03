@@ -1,6 +1,6 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::children::{Children, ChildrenRef};
-use crate::context::{BastionContext, BastionId};
+use crate::context::BastionId;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::system::schedule;
 use futures::prelude::*;
@@ -8,7 +8,6 @@ use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use std::future::Future;
 use std::iter::FromIterator;
 use std::ops::RangeFrom;
 use std::task::Poll;
@@ -85,7 +84,7 @@ impl Supervisor {
         let pre_start_msgs = Vec::new();
         let started = false;
 
-        let supervisor = Supervisor {
+        Supervisor {
             bcast,
             order,
             launched,
@@ -93,9 +92,7 @@ impl Supervisor {
             strategy,
             pre_start_msgs,
             started,
-        };
-
-        supervisor
+        }
     }
 
     fn stack(&self) -> ProcStack {
@@ -115,11 +112,10 @@ impl Supervisor {
         for supervised in killed {
             let parent = Parent::supervisor(self.as_ref());
             let bcast = Broadcast::new(parent);
-            let supervisor = self.as_ref();
 
             reset.push(async {
                 // FIXME: panics?
-                supervised.reset(bcast, supervisor).await.unwrap()
+                supervised.reset(bcast).await.unwrap()
             })
         }
 
@@ -140,6 +136,10 @@ impl Supervisor {
 
     pub(crate) fn id(&self) -> &BastionId {
         &self.bcast.id()
+    }
+
+    pub(crate) fn bcast(&self) -> &Broadcast {
+        &self.bcast
     }
 
     /// Creates and returns a new [`SupervisorRef`] referencing
@@ -173,16 +173,12 @@ impl Supervisor {
         SupervisorRef::new(id, sender)
     }
 
-    pub(crate) fn bcast(&self) -> &Broadcast {
-        &self.bcast
-    }
-
     /// Creates a new supervisor, passes it through the specified
     /// `init` closure and then starts supervising it.
     ///
-    /// If you don't need to chain calls to the `Supervisor`'s methods
-    /// and need to get a [`SupervisorRef`] for the newly created
-    /// supervisor, use the [`supervisor_ref`] method instead.
+    /// If you don't need to chain calls to this `Supervisor`'s methods
+    /// and need to get a [`SupervisorRef`] referencing the newly
+    /// created supervisor, use the [`supervisor_ref`] method instead.
     ///
     /// # Arguments
     ///
@@ -200,7 +196,7 @@ impl Supervisor {
     ///     # Bastion::supervisor(|parent| {
     /// parent.supervisor(|sp| {
     ///     // Configure the supervisor...
-    ///     sp.strategy(SupervisionStrategy::OneForOne)
+    ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// })
     ///     # }).unwrap();
@@ -213,7 +209,7 @@ impl Supervisor {
     ///
     /// [`SupervisorRef`]: ../struct.SupervisorRef.html
     /// [`supervisor_ref`]: #method.supervisor_ref
-    pub fn supervisor<S>(mut self, init: S) -> Self
+    pub fn supervisor<S>(self, init: S) -> Self
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
@@ -222,7 +218,6 @@ impl Supervisor {
 
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
-        self.bcast.register(&supervisor.bcast);
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
@@ -230,16 +225,16 @@ impl Supervisor {
         self
     }
 
-    /// Creates a new supervisor, passes it through the specified
+    /// Creates a new `Supervisor`, passes it through the specified
     /// `init` closure and then starts supervising it.
     ///
-    /// If you need to chain calls to the `Supervisor`'s methods and
-    /// don't need to get a [`SupervisorRef`] to the newly created
-    /// supervisor, use the [`supervisor`] method instead.
+    /// If you need to chain calls to this `Supervisor`'s methods and
+    /// don't need to get a [`SupervisorRef`] referencing the newly
+    /// created supervisor, use the [`supervisor`] method instead.
     ///
     /// # Arguments
     ///
-    /// * `init` - The closure taking the new supervisor as an
+    /// * `init` - The closure taking the new `Supervisor` as an
     ///     argument and returning it once configured.
     ///
     /// # Example
@@ -253,7 +248,7 @@ impl Supervisor {
     ///     # Bastion::supervisor(|mut parent| {
     /// let sp_ref: SupervisorRef = parent.supervisor_ref(|sp| {
     ///     // Configure the supervisor...
-    ///     sp.strategy(SupervisionStrategy::OneForOne)
+    ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// });
     ///         # parent
@@ -277,7 +272,6 @@ impl Supervisor {
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
         let supervisor_ref = supervisor.as_ref();
-        self.bcast.register(&supervisor.bcast);
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
@@ -285,31 +279,17 @@ impl Supervisor {
         supervisor_ref
     }
 
-    /// Creates a new group of children that will run the future
-    /// returned by `init` and starts supervising it. The group
-    /// will have as many elements as defined by `redundancy` and
-    /// if one of them stops or dies, all of the other elements of
-    /// the group will be stopped or killed.
+    /// Creates a new [`Children`], passes it through the specified
+    /// `init` closure and then starts supervising it.
     ///
-    /// The future of each element will need to return a `Result<(), ()>`,
-    /// where `Ok(())` indicates that the element has stopped and
-    /// `Err(())` that it died, in which case it will be restarted by the
-    /// supervisor.
-    ///
-    /// If you don't need to chain calls to the `Supervisor`'s methods
-    /// and need to get a [`ChildrenRef`] for the newly created children
-    /// group, use the [`children_ref`] method instead.
+    /// If you don't need to chain calls to this `Supervisor`'s methods
+    /// and need to get a [`ChildrenRef`] referencing the newly
+    /// created supervisor, use the [`children`] method instead.
     ///
     /// # Arguments
     ///
-    /// * `init` - A closure taking a [`BastionContext`] as an
-    ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run.
-    /// * `redundancy` - How many elements the children group
-    ///     should contain. Each element of the group will be
-    ///     independent, capable of sending and receiving its
-    ///     own messages but will be stopped or killed if
-    ///     another element stopped or died.
+    /// * `init` - The closure taking the new `Children` as an
+    ///     argument and returning it once configured.
     ///
     /// # Example
     ///
@@ -320,18 +300,19 @@ impl Supervisor {
     ///     # Bastion::init();
     ///     #
     ///     # Bastion::supervisor(|sp| {
-    /// sp.children(|ctx: BastionContext|
-    ///     async move {
-    ///         // Send and receive messages...
-    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    /// sp.children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // Send and receive messages...
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
     ///
-    ///         // ...and return `Ok(())` or `Err(())` when you are done...
-    ///         Ok(())
-    ///         // Note that if `Err(())` was returned, the supervisor would
-    ///         // restart the children group.
-    ///     },
-    ///     1
-    /// )
+    ///             // ...and return `Ok(())` or `Err(())` when you are done...
+    ///             Ok(())
+    ///             // Note that if `Err(())` was returned, the supervisor would
+    ///             // restart the children group.
+    ///         }
+    ///     })
+    /// })
     ///     # }).unwrap();
     ///     #
     ///     # Bastion::start();
@@ -340,50 +321,37 @@ impl Supervisor {
     /// # }
     /// ```
     ///
+    /// [`Children`]: children/struct.Children.html
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children_ref`]: #method.children_ref
-    /// [`BastionContext`]: struct.BastionContext.html
-    /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<C, F>(self, init: C, redundancy: usize) -> Self
+    pub fn children<C>(self, init: C) -> Self
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
-        F: Future<Output = Result<(), ()>> + Send + 'static,
+        C: FnOnce(Children) -> Children,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
-        let children = Children::new(init, bcast, self.as_ref(), redundancy);
+        let children = Children::new(bcast);
+        let mut children = init(children);
+        children.launch_elems();
+
         let msg = BastionMessage::deploy_children(children);
         self.bcast.send_self(msg);
 
         self
     }
 
-    /// Creates a new group of children that will run the future
-    /// returned by `init` and starts supervising it. The group
-    /// will have as many elements as defined by `redundancy` and
-    /// if one of them dies or returns an error, all of the other
-    /// elements of the group will be stopped or killed.
+    /// Creates a new [`Children`], passes it through the specified
+    /// `init` closure and then starts supervising it.
     ///
-    /// The future of each element will need to return a `Result<(), ()>`,
-    /// where `Ok(())` indicates that the element has stopped and
-    /// `Err(())` that it died, in which case it will be restarted by the
-    /// supervisor.
-    ///
-    /// If you need to chain calls to the `Supervisor`'s methods and
-    /// don't need to get a [`ChildrenRef`] to the newly created
-    /// children group, use the [`children`] method instead.
+    /// If you need to chain calls to this `Supervisor`'s methods and
+    /// don't need to get a [`ChildrenRef`] referencing the newly
+    /// created supervisor, use the [`children`] method instead.
     ///
     /// # Arguments
     ///
-    /// * `init` - A closure taking a [`BastionContext`] as an
-    ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run.
-    /// * `redundancy` - How many elements the children group
-    ///     should contain. Each element of the group will be
-    ///     independent, capable of sending and receiving its
-    ///     own messages but will be stopped or killed if
-    ///     another element stopped or died.
+    /// * `init` - The closure taking the new `Children` as an
+    ///     argument and returning it once configured.
     ///
     /// # Example
     ///
@@ -394,18 +362,19 @@ impl Supervisor {
     ///     # Bastion::init();
     ///     #
     ///     # Bastion::supervisor(|mut sp| {
-    /// let children_ref: ChildrenRef = sp.children_ref(|ctx: BastionContext|
-    ///     async move {
-    ///         // Send and receive messages...
-    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    /// let children_ref: ChildrenRef = sp.children_ref(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // Send and receive messages...
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
     ///
-    ///         // ...and return `Ok(())` or `Err(())` when you are done...
-    ///         Ok(())
-    ///         // Note that if `Err(())` was returned, the supervisor would
-    ///         // restart the children group.
-    ///     },
-    ///     1
-    /// );
+    ///             // ...and return `Ok(())` or `Err(())` when you are done...
+    ///             Ok(())
+    ///             // Note that if `Err(())` was returned, the supervisor would
+    ///             // restart the children group.
+    ///         }
+    ///     })
+    /// });
     ///         # sp
     ///     # }).unwrap();
     ///     #
@@ -415,19 +384,20 @@ impl Supervisor {
     /// # }
     /// ```
     ///
+    /// [`Children`]: children/struct.Children.html
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children`]: #method.children
-    /// [`BastionContext`]: struct.BastionContext.html
-    /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children_ref<C, F>(&mut self, init: C, redundancy: usize) -> ChildrenRef
+    pub fn children_ref<C>(&self, init: C) -> ChildrenRef
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
-        F: Future<Output = Result<(), ()>> + Send + 'static,
+        C: FnOnce(Children) -> Children,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
-        let children = Children::new(init, bcast, self.as_ref(), redundancy);
+        let children = Children::new(bcast);
+        let mut children = init(children);
+
+        children.launch_elems();
         let children_ref = children.as_ref();
 
         let msg = BastionMessage::deploy_children(children);
@@ -468,7 +438,7 @@ impl Supervisor {
     ///     #
     /// Bastion::supervisor(|sp| {
     ///     // Note that "one-for-one" is already the default strategy.
-    ///     sp.strategy(SupervisionStrategy::OneForOne)
+    ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     /// }).expect("Couldn't create a new supervisor");
     ///     #
     ///     # Bastion::start();
@@ -480,7 +450,7 @@ impl Supervisor {
     /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
     /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
     /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
-    pub fn strategy(mut self, strategy: SupervisionStrategy) -> Self {
+    pub fn with_strategy(mut self, strategy: SupervisionStrategy) -> Self {
         self.strategy = strategy;
         self
     }
@@ -571,7 +541,7 @@ impl Supervisor {
                 let bcast = Broadcast::new(parent);
                 let id = bcast.id().clone();
                 // FIXME: panics?
-                let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
+                let supervised = supervised.reset(bcast).await.unwrap();
 
                 self.bcast.register(supervised.bcast());
                 if self.started {
@@ -591,7 +561,7 @@ impl Supervisor {
                     let bcast = Broadcast::new(parent);
                     let id = bcast.id().clone();
                     // FIXME: panics.
-                    let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
+                    let supervised = supervised.reset(bcast).await.unwrap();
 
                     self.bcast.register(supervised.bcast());
 
@@ -618,7 +588,7 @@ impl Supervisor {
                     let bcast = Broadcast::new(parent);
                     let id = bcast.id().clone();
                     // FIXME: panics?
-                    let supervised = supervised.reset(bcast, self.as_ref()).await.unwrap();
+                    let supervised = supervised.reset(bcast).await.unwrap();
 
                     self.bcast.register(supervised.bcast());
                     if self.started {
@@ -769,17 +739,17 @@ impl SupervisorRef {
         SupervisorRef { id, sender }
     }
 
-    /// Creates a new supervisor, passes it through the specified
+    /// Creates a new [`Supervisor`], passes it through the specified
     /// `init` closure and then sends it to the supervisor this
     /// `SupervisorRef` is referencing to supervise it.
     ///
-    /// This method returns a [`SupervisorRef`] for the newly
+    /// This method returns a [`SupervisorRef`] referencing the newly
     /// created supervisor if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Arguments
     ///
-    /// * `init` - The closure taking the new supervisor as an
+    /// * `init` - The closure taking the new [`Supervisor`] as an
     ///     argument and returning it once configured.
     ///
     /// # Example
@@ -793,7 +763,7 @@ impl SupervisorRef {
     ///     # let mut parent_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// let sp_ref: SupervisorRef = parent_ref.supervisor(|sp| {
     ///     // Configure the supervisor...
-    ///     sp.strategy(SupervisionStrategy::OneForOne)
+    ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// }).expect("Couldn't send the new supervisor.");
     ///     #
@@ -802,6 +772,8 @@ impl SupervisorRef {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
+    ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
     pub fn supervisor<S>(&self, init: S) -> Result<Self, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -819,31 +791,18 @@ impl SupervisorRef {
         Ok(supervisor_ref)
     }
 
-    /// Creates a new group of children that will run the future
-    /// returned by `init` and sends it to the supervisor this
-    /// `SupervisorRef` is referencing to supervise it. The
-    /// group will have as many elements as defined by `redundancy`
-    /// and if one of them stops or dies, all of the other elements
-    /// of the group will be stopped or killed.
+    /// Creates a new [`Children`], passes it through the specified
+    /// `init` closure and then sends it to the supervisor this
+    /// `SupervisorRef` is referencing to supervise it.
     ///
-    /// The future of each element will need to return a `Result<(), ()>`,
-    /// where `Ok(())` indicates that the element has stopped and
-    /// `Err(())` that it died, in which case it will be restarted by the
-    /// supervisor.
-    ///
-    /// This method returns a [`ChildrenRef`] for the newly created
-    /// children group if it succeeded, or `Err(())` otherwise.
+    /// This methods returns a [`ChildrenRef`] referencing the newly
+    /// created children group it it succeeded, or `Err(())`
+    /// otherwise.
     ///
     /// # Arguments
     ///
-    /// * `init` - A closure taking a [`BastionContext`] as an
-    ///     argument and returning the [`Future`] that every
-    ///     element of the children group will run.
-    /// * `redundancy` - How many elements the children group
-    ///     should contain. Each element of the group will be
-    ///     independent, capable of sending and receiving its
-    ///     own messages but will be stopped or killed if
-    ///     another element stopped or died.
+    /// * `init` - The closure taking the new [`Children`] as an
+    ///     argument and returning it once configured.
     ///
     /// # Example
     ///
@@ -854,18 +813,19 @@ impl SupervisorRef {
     ///     # Bastion::init();
     ///     #
     ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
-    /// let children_ref: ChildrenRef = sp_ref.children(|ctx: BastionContext|
-    ///     async move {
-    ///         // Send and receive messages...
-    ///         let opt_msg: Option<Msg> = ctx.try_recv().await;
+    /// let children_ref: ChildrenRef = sp_ref.children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // Send and receive messages...
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
     ///
-    ///         // ...and return `Ok(())` or `Err(())` when you are done...
-    ///         Ok(())
-    ///         // Note that if `Err(())` was returned, the supervisor would
-    ///         // restart the children group.
-    ///     },
-    ///     1
-    /// ).expect("Couldn't send the new children group.");
+    ///             // ...and return `Ok(())` or `Err(())` when you are done...
+    ///             Ok(())
+    ///             // Note that if `Err(())` was returned, the supervisor would
+    ///             // restart the children group.
+    ///         }
+    ///     })
+    /// }).expect("Couldn't send the new children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -873,18 +833,19 @@ impl SupervisorRef {
     /// # }
     /// ```
     ///
+    /// [`Children`]: children/struct.Children.html
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`BastionContext`]: struct.BastionContext.html
-    /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-    pub fn children<C, F>(&self, init: C, redundancy: usize) -> Result<ChildrenRef, ()>
+    pub fn children<C>(&self, init: C) -> Result<ChildrenRef, ()>
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
-        F: Future<Output = Result<(), ()>> + Send + 'static,
+        C: FnOnce(Children) -> Children,
     {
         let parent = Parent::supervisor(self.clone());
         let bcast = Broadcast::new(parent);
 
-        let children = Children::new(init, bcast, self.clone(), redundancy);
+        let children = Children::new(bcast);
+        let mut children = init(children);
+
+        children.launch_elems();
         let children_ref = children.as_ref();
 
         let msg = BastionMessage::deploy_children(children);
@@ -969,8 +930,9 @@ impl SupervisorRef {
     /// let msg = "A message containing data.";
     /// sp_ref.broadcast(msg).expect("Couldn't send the message.");
     ///
-    ///     # Bastion::children(|ctx: BastionContext|
-    ///         # async move {
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(|ctx: BastionContext| {
+    ///             # async move {
     /// // And then in every future of the elements of the children
     /// // groups that are supervised by this supervisor or one of
     /// // its supervised supervisors (etc.)...
@@ -982,11 +944,11 @@ impl SupervisorRef {
     ///     // example, so we know that this won't happen...
     ///     _: _ => ();
     /// }
-    ///             #
-    ///             # Ok(())
-    ///         # },
-    ///         # 1,
-    ///     # ).unwrap();
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # })
+    ///     # }).unwrap();
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -1085,7 +1047,7 @@ impl Supervised {
         }
     }
 
-    fn reset(self, bcast: Broadcast, supervisor: SupervisorRef) -> ProcHandle<Self> {
+    fn reset(self, bcast: Broadcast) -> ProcHandle<Self> {
         match self {
             Supervised::Supervisor(mut supervisor) => {
                 let (proc, handle) = LightProc::build(
@@ -1104,7 +1066,7 @@ impl Supervised {
             Supervised::Children(mut children) => {
                 let (proc, handle) = LightProc::build(
                     async {
-                        children.reset(bcast, supervisor).await;
+                        children.reset(bcast).await;
                         Supervised::Children(children)
                     },
                     schedule,

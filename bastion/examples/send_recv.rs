@@ -8,8 +8,8 @@ fn main() {
     let started = AtomicBool::new(false);
     let started = Arc::new(started);
 
-    Bastion::children(
-        move |ctx: BastionContext| {
+    Bastion::children(|children| {
+        children.with_exec(move |ctx: BastionContext| {
             let started = started.clone();
             async move {
                 println!("Started!");
@@ -56,9 +56,8 @@ fn main() {
                 // Panicking will restart the children group.
                 panic!("Oh no!");
             }
-        },
-        1,
-    )
+        })
+    })
     .expect("Couldn't start a new children group.");
 
     Bastion::start();

@@ -308,41 +308,42 @@ impl Future for Answer {
 /// // The message that will be "asked" to the child...
 /// const ASK_MSG: &'static str = "A message containing data (ask).";
 ///
-/// Bastion::children(|ctx: BastionContext|
-///     async move {
-///         # ctx.current().tell(TELL_MSG).unwrap();
-///         # ctx.current().ask(ASK_MSG).unwrap();
-///         #
-///         loop {
-///             msg! { ctx.recv().await?,
-///                 // We match broadcasted `&'static str`s...
-///                 ref msg: &'static str => {
-///                     // Note that `msg` will actually be a `&&'static str`.
-///                     assert_eq!(msg, &BCAST_MSG);
-///                     // Handle the message...
-///                 };
-///                 // We match `&'static str`s "told" to this child...
-///                 msg: &'static str => {
-///                     assert_eq!(msg, TELL_MSG);
-///                     // Handle the message...
-///                 };
-///                 // We match `&'static str`'s "asked" to this child...
-///                 msg: &'static str =!> {
-///                     assert_eq!(msg, ASK_MSG);
-///                     // Handle the message...
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             # ctx.current().tell(TELL_MSG).unwrap();
+///             # ctx.current().ask(ASK_MSG).unwrap();
+///             #
+///             loop {
+///                 msg! { ctx.recv().await?,
+///                     // We match broadcasted `&'static str`s...
+///                     ref msg: &'static str => {
+///                         // Note that `msg` will actually be a `&&'static str`.
+///                         assert_eq!(msg, &BCAST_MSG);
+///                         // Handle the message...
+///                     };
+///                     // We match `&'static str`s "told" to this child...
+///                     msg: &'static str => {
+///                         assert_eq!(msg, TELL_MSG);
+///                         // Handle the message...
+///                     };
+///                     // We match `&'static str`'s "asked" to this child...
+///                     msg: &'static str =!> {
+///                         assert_eq!(msg, ASK_MSG);
+///                         // Handle the message...
 ///
-///                     // ...and eventually answer to it...
-///                     answer!("An answer to the message.");
-///                 };
-///                 // We are only broadcasting, "telling" and "asking" a
-///                 // `&'static str` in this example, so we know that this won't
-///                 // happen...
-///                 _: _ => ();
+///                         // ...and eventually answer to it...
+///                         answer!("An answer to the message.");
+///                     };
+///                     // We are only broadcasting, "telling" and "asking" a
+///                     // `&'static str` in this example, so we know that this won't
+///                     // happen...
+///                     _: _ => ();
+///                 }
 ///             }
 ///         }
-///     },
-///     1,
-/// ).expect("Couldn't start the children group.");
+///     })
+/// }).expect("Couldn't start the children group.");
 ///     #
 ///     # Bastion::start();
 ///     # Bastion::broadcast(BCAST_MSG).unwrap();

@@ -164,6 +164,14 @@ impl Parent {
         Parent::Children(children)
     }
 
+    pub(crate) fn into_supervisor(self) -> Option<SupervisorRef> {
+        if let Parent::Supervisor(supervisor) = self {
+            Some(supervisor)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn into_children(self) -> Option<ChildrenRef> {
         if let Parent::Children(children) = self {
             Some(children)

@@ -11,7 +11,7 @@ pub mod supervisor;
 
 pub mod prelude {
     pub use crate::bastion::Bastion;
-    pub use crate::children::{ChildRef, ChildrenRef};
+    pub use crate::children::{ChildRef, Children, ChildrenRef};
     pub use crate::context::BastionContext;
     pub use crate::message::{Answer, Message, Msg, Sender};
     pub use crate::msg;
