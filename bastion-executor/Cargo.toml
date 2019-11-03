@@ -22,4 +22,4 @@ allocator-suite = "^0.1"
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 jemallocator = "^0.3"
 
-lightproc = "^0.3"
+lightproc = { "path" = "../lightproc" }
