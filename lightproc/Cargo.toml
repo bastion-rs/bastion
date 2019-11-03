@@ -5,6 +5,11 @@ description = "Lightweight process abstraction for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system", "lightweight-process"]
 categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+readme = "README.md"
+license = "Apache-2.0/MIT"
 edition = "2018"
 
 [dependencies]

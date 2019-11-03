@@ -1,12 +1,16 @@
 [package]
 name = "bastion-executor"
 version = "0.2.1-alpha.0"
-description = "Fault-tolerant Runtime for Rust applications"
+description = "SMP enabled NUMA-aware executor for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
-categories = []
+categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+readme = "README.md"
+license = "Apache-2.0/MIT"
 edition = "2018"
-
 
 [dependencies]
 crossbeam-utils = "0.6"
