@@ -48,7 +48,7 @@ impl Pool {
                     .iter()
                     .max_by_key(|&(_core, stat)| stat)
                     .unwrap()
-                    .1;
+                    .0;
                 let stealer = self.stealers.get(affine_core).unwrap();
                 if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
                     if let Some(proc) = stealer
