@@ -3,6 +3,7 @@ use crate::children::{Children, ChildrenRef};
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{ROOT_SPV, SYSTEM, SYSTEM_SENDER};
+use std::fmt::{self, Debug, Formatter};
 use std::thread;
 
 /// A `struct` allowing to access the system's API to initialize it,
@@ -454,5 +455,12 @@ impl Bastion {
 
             thread::yield_now();
         }
+    }
+}
+
+impl Debug for Bastion {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("Bastion")
+            .finish()
     }
 }
