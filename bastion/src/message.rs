@@ -9,6 +9,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+/// A trait that any message sent needs to implement (it is
+/// already automatically implemented but forces message to
+/// implement the following traits: [`Any`], [`Send`],
+/// [`Sync`] and [`Debug`]).
+///
+/// [`Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
+/// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
 pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
@@ -17,9 +26,138 @@ impl<T> Message for T where T: Any + Send + Sync + Debug {}
 pub struct Sender(oneshot::Sender<Msg>);
 
 #[derive(Debug)]
+/// A [`Future`] returned when successfully "asking" a
+/// message using [`ChildRef::ask`] and which resolves to
+/// a `Result<Msg, ()>` where the [`Msg`] is the message
+/// answered by the child (see the [`msg!`] macro for more
+/// information).
+///
+/// # Example
+///
+/// ```
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+/// // The message that will be "asked"...
+/// const ASK_MSG: &'static str = "A message containing data (ask).";
+/// // The message the will be "answered"...
+/// const ANSWER_MSG: &'static str = "A message containing data (answer).";
+///
+///     # let children_ref =
+/// // Create a new child...
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             // ...which will receive the message asked...
+///             msg! { ctx.recv().await?,
+///                 msg: &'static str =!> {
+///                     assert_eq!(msg, ASK_MSG);
+///                     // Handle the message...
+///
+///                     // ...and eventually answer to it...
+///                     answer!(ANSWER_MSG);
+///                 };
+///                 // This won't happen because this example
+///                 // only "asks" a `&'static str`...
+///                 _: _ => ();
+///             }
+///
+///             Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///
+///     # Bastion::children(|children| {
+///         # children.with_exec(move |ctx: BastionContext| {
+///             # let child_ref = children_ref.elems()[0].clone();
+///             # async move {
+/// // Later, the message is "asked" to the child...
+/// let answer: Answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
+///
+/// // ...and the child's answer is received...
+/// msg! { answer.await.expect("Couldn't receive the answer."),
+///     msg: &'static str => {
+///         assert_eq!(msg, ANSWER_MSG);
+///         // Handle the answer...
+///     };
+///     // This won't happen because this example
+///     // only answers a `&'static str`...
+///     _: _ => ();
+/// }
+///                 #
+///                 # Ok(())
+///             # }
+///         # })
+///     # }).unwrap();
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
+/// [`ChildRef::ask`]: children/struct.ChildRef.hmtl#method.ask
+/// [`Msg`]: message/struct.Msg.html
+/// [`msg!`]: macro.msg.html
 pub struct Answer(Receiver<Msg>);
 
 #[derive(Debug)]
+/// A message returned by [`BastionContext::recv`] or
+/// [`BastionContext::try_recv`] that should be passed to the
+/// [`msg!`] macro to try to match what its real type is.
+///
+/// # Example
+///
+/// ```
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             loop {
+///                 let msg: Msg = ctx.recv().await?;
+///                 msg! { msg,
+///                     // We match a broadcasted `&'static str`s...
+///                     ref msg: &'static str => {
+///                         // Note that `msg` will actually be a `&&'static str`.
+///                         assert_eq!(msg, &"A message containing data.");
+///
+///                         // Handle the message...
+///                     };
+///                     // We match a `&'static str`s "told" to this child...
+///                     msg: &'static str => {
+///                         assert_eq!(msg, "A message containing data.");
+///                         // Handle the message...
+///                     };
+///                     // We match a `&'static str`s "asked" to this child...
+///                     msg: &'static str =!> {
+///                         assert_eq!(msg, "A message containing data.");
+///                         // Handle the message...
+///
+///                         // ...and eventually answer to it...
+///                         answer!("An answer message containing data.");
+///                     };
+///                     // We match a message that wasn't previously matched...
+///                     _: _ => ();
+///                 }
+///             }
+///         }
+///     })
+/// }).expect("Couldn't start the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`BastionContext::recv`]: struct.BastionContext.html#method.recv
+/// [`BastionContext::try_recv`]: struct.BastionContext.html#method.try_recv
+/// [`msg!`]: macro.msg.html
 pub struct Msg(MsgInner);
 
 #[derive(Debug)]

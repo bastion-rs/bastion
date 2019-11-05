@@ -823,7 +823,7 @@ impl ChildRef {
     ///             # let child_ref = children_ref.elems()[0].clone();
     ///             # async move {
     /// // Later, the message is "asked" to the child...
-    /// let answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
+    /// let answer: Answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
     ///
     /// // ...and the child's answer is received...
     /// msg! { answer.await.expect("Couldn't receive the answer."),
