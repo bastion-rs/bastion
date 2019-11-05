@@ -123,19 +123,6 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>) -> Option<LightProc> {
                                 })
                         })
                 })
-
-            /////
-//            let stealer = pool.stealers.get(affine_core).unwrap();
-//
-//            if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
-//                if let Some(possible) = amount.checked_sub(1) {
-//                    stealer.steal_batch_and_pop_with_amount(local, possible).success()
-//                } else {
-//                    pool.injector.steal_batch_and_pop(local).success()
-//                }
-//            } else {
-//                pool.injector.steal_batch_and_pop(local).success()
-//            }
         },
         Err(_) => {
             pool.injector.steal_batch_and_pop(local).success()
