@@ -1,5 +1,7 @@
-// Allocation selector import
-use numanji::*;
+unstable_api! {
+    // Allocation selector import
+    use numanji::*;
 
-// Drive selection of allocator here
-autoselect!();
+    // Drive selection of allocator here
+    autoselect!();
+}
