@@ -30,41 +30,6 @@ impl Pool {
         unimplemented!()
     }
 
-    pub fn fetch_proc(&self, affinity: usize, local: &Worker<LightProc>) -> Option<LightProc> {
-        if let Ok(mut stats) = load_balancer::stats().try_write() {
-            stats
-                .smp_queues
-                .insert(affinity, local.worker_run_queue_size());
-        }
-
-        if let Ok(stats) = load_balancer::stats().try_read() {
-            if local.worker_run_queue_size() == 0 {
-                while let Some(proc) = self.injector.steal_batch_and_pop(local).success() {
-                    return Some(proc);
-                }
-            } else {
-                let affine_core = *stats
-                    .smp_queues
-                    .iter()
-                    .max_by_key(|&(_core, stat)| stat)
-                    .unwrap()
-                    .0;
-                let stealer = self.stealers.get(affine_core).unwrap();
-                if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
-                    if let Some(proc) = stealer
-                        .steal_batch_and_pop_with_amount(local, amount.wrapping_add(1))
-                        .success()
-                    {
-                        return Some(proc);
-                    }
-                }
-            }
-        }
-
-        // Pop only from the local queue with full trust
-        local.pop()
-    }
-
     pub fn spawn<F, T>(&self, future: F, stack: ProcStack) -> RecoverableHandle<T>
     where
         F: Future<Output = T> + Send + 'static,

@@ -27,10 +27,6 @@ where
             }
         };
 
-        // Log this `block_on` operation.
-        let _child_id = stack.get_pid();
-        let _parent_id = worker::get_proc_stack(|t| t.get_pid()).unwrap_or(0);
-
         // Pin the future onto the stack.
         pin_utils::pin_mut!(future);
 

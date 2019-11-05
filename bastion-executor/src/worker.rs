@@ -1,9 +1,15 @@
-use std::cell::Cell;
+use std::cell::{UnsafeCell, Cell};
 use std::ptr;
 
 use super::pool;
 use super::run_queue::Worker;
 use lightproc::prelude::*;
+use core::iter;
+use crate::load_balancer;
+use std::iter::repeat_with;
+use crate::pool::Pool;
+use std::sync::atomic::Ordering;
+use std::sync::atomic;
 
 pub fn current() -> ProcStack {
     get_proc_stack(|proc| proc.clone())
@@ -47,40 +53,117 @@ where
 }
 
 thread_local! {
-    static IS_WORKER: Cell<bool> = Cell::new(false);
-    static QUEUE: Cell<Option<Worker<LightProc>>> = Cell::new(None);
-}
-
-pub(crate) fn is_worker() -> bool {
-    IS_WORKER.with(|is_worker| is_worker.get())
-}
-
-fn get_queue<F: FnOnce(&Worker<LightProc>) -> T, T>(f: F) -> T {
-    QUEUE.with(|queue| {
-        let q = queue.take().unwrap();
-        let ret = f(&q);
-        queue.set(Some(q));
-        ret
-    })
+    static QUEUE: UnsafeCell<Option<Worker<LightProc>>> = UnsafeCell::new(None);
 }
 
 pub(crate) fn schedule(proc: LightProc) {
-    if is_worker() {
-        get_queue(|q| q.push(proc));
-    } else {
-        pool::get().injector.push(proc);
-    }
+    QUEUE.with(|queue| {
+        let local = unsafe { (*queue.get()).as_ref() };
+
+        match local {
+            None => pool::get().injector.push(proc),
+            Some(q) => q.push(proc),
+        }
+    });
+
     pool::get().sleepers.notify_one();
 }
 
-pub(crate) fn main_loop(affinity: usize, worker: Worker<LightProc>) {
-    IS_WORKER.with(|is_worker| is_worker.set(true));
-    QUEUE.with(|queue| queue.set(Some(worker)));
+pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
+    let pool = pool::get();
+
+    QUEUE.with(|queue| {
+        let local = unsafe { (*queue.get()).as_ref().unwrap() };
+
+        stats_generator(affinity, local);
+
+        // Pop only from the local queue with full trust
+        local.pop().or_else(|| {
+            match local.worker_run_queue_size() {
+                x if x == 0 => {
+                    if pool.injector.is_empty() {
+                        affine_steal(pool, local)
+                    } else {
+                        pool.injector.steal_batch_and_pop(local).success()
+                    }
+                },
+                _ => {
+                    affine_steal(pool, local)
+                }
+            }
+        })
+    })
+}
+
+fn affine_steal(pool: &Pool, local: &Worker<LightProc>) -> Option<LightProc> {
+    match load_balancer::stats().try_read() {
+        Ok(stats) => {
+            let affine_core = *stats
+                .smp_queues
+                .iter()
+                .max_by_key(|&(_core, stat)| stat)
+                .unwrap()
+                .0;
+
+            let default = || {
+                pool.injector.steal_batch_and_pop(local).success()
+            };
+
+            pool.stealers.get(affine_core)
+                .map_or_else(default, |stealer| {
+                    stealer.run_queue_size().checked_sub(stats.mean_level)
+                        .map_or_else(default, |amount| {
+                            amount.checked_sub(1)
+                                .map_or_else(default, |possible| {
+                                    if possible != 0 {
+                                        stealer.steal_batch_and_pop_with_amount(local, possible).success()
+                                    } else {
+                                        default()
+                                    }
+                                })
+                        })
+                })
+
+            /////
+//            let stealer = pool.stealers.get(affine_core).unwrap();
+//
+//            if let Some(amount) = stealer.run_queue_size().checked_sub(stats.mean_level) {
+//                if let Some(possible) = amount.checked_sub(1) {
+//                    stealer.steal_batch_and_pop_with_amount(local, possible).success()
+//                } else {
+//                    pool.injector.steal_batch_and_pop(local).success()
+//                }
+//            } else {
+//                pool.injector.steal_batch_and_pop(local).success()
+//            }
+        },
+        Err(_) => {
+            pool.injector.steal_batch_and_pop(local).success()
+        }
+    }
+}
+
+fn stats_generator(affinity: usize, local: &Worker<LightProc>) {
+    if let Ok(mut stats) = load_balancer::stats().try_write() {
+        stats
+            .smp_queues
+            .insert(affinity, local.worker_run_queue_size());
+    }
+}
+
+pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {
+    QUEUE.with(|queue| unsafe { *queue.get() = Some(local) });
 
     loop {
-        match get_queue(|q| pool::get().fetch_proc(affinity, q)) {
+        match fetch_proc(affinity) {
             Some(proc) => set_stack(proc.stack(), || proc.run()),
-            None => pool::get().sleepers.wait(),
+            None => {
+                QUEUE.with(|queue| {
+                    let local = unsafe { (*queue.get()).as_ref().unwrap() };
+                    stats_generator(affinity, local);
+                });
+                pool::get().sleepers.wait()
+            },
         }
     }
 }

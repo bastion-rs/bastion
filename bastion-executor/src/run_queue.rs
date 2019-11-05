@@ -323,11 +323,11 @@ impl<T> Worker<T> {
             let cap = self.buffer.get().cap;
 
             // Is there enough capacity to push `reserve_cap` tasks?
-            if cap - len < reserve_cap {
+            if cap.saturating_sub(len) < reserve_cap {
                 // Keep doubling the capacity as much as is needed.
                 let mut new_cap = cap * 2;
-                while new_cap - len < reserve_cap {
-                    new_cap *= 2;
+                while new_cap.saturating_sub(len) < reserve_cap {
+                    new_cap = new_cap.wrapping_mul(2);
                 }
 
                 // Resize the buffer.
@@ -908,6 +908,9 @@ impl<T> Stealer<T> {
 
         let guard = &epoch::pin();
 
+        // Shadow the requested amount;
+        let mut amount = amount;
+
         // Load the back index.
         let b = self.inner.back.load(Ordering::Acquire);
 
@@ -915,6 +918,11 @@ impl<T> Stealer<T> {
         let len = b.wrapping_sub(f);
         if len <= 0 {
             return Steal::Empty;
+        }
+
+        let default_time_ahead = ((len as usize - 1) / 2);
+        if amount > default_time_ahead as usize {
+            amount = default_time_ahead;
         }
 
         // Reserve capacity for the stolen batch.
@@ -1748,8 +1756,8 @@ impl<T> Steal<T> {
     /// * If both steals were unsuccessful but any resulted in `Retry`, then `Retry` is returned.
     /// * If both resulted in `None`, then `None` is returned.
     pub fn or_else<F>(self, f: F) -> Steal<T>
-    where
-        F: FnOnce() -> Steal<T>,
+        where
+            F: FnOnce() -> Steal<T>,
     {
         match self {
             Steal::Empty => f(),
@@ -1781,8 +1789,8 @@ impl<T> FromIterator<Steal<T>> for Steal<T> {
     /// If no `Success` was found, but there was at least one `Retry`, then returns `Retry`.
     /// Otherwise, `Empty` is returned.
     fn from_iter<I>(iter: I) -> Steal<T>
-    where
-        I: IntoIterator<Item = Steal<T>>,
+        where
+            I: IntoIterator<Item = Steal<T>>,
     {
         let mut retry = false;
         for s in iter {
@@ -1800,3 +1808,4 @@ impl<T> FromIterator<Steal<T>> for Steal<T> {
         }
     }
 }
+
