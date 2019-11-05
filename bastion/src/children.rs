@@ -19,12 +19,57 @@ struct Init(Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
 #[derive(Debug)]
+/// A children group that will contain a defined number of
+/// elements (set with [`with_redundancy`] or `1` by default)
+/// all running a future (returned by the closure that is set
+/// with [`with_exec`]).
+///
+/// When an element of the group stops or panics, all the
+/// elements will be stopped as well and the group's supervisor
+/// will receive a notice that a stop or panic occurred (note
+/// that if a panic occurred, the supervisor will restart the
+/// children group and eventually some of its other children,
+/// depending on its [`SupervisionStrategy`]).
+///
+/// # Example
+///
+/// ```
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// let children_ref: ChildrenRef = Bastion::children(|children| {
+///     // Configure the children group...
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             // Send and receive messages...
+///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+///             // ...and return `Ok(())` or `Err(())` when you are done...
+///             Ok(())
+///
+///             // Note that if `Err(())` was returned, the supervisor would
+///             // restart the children group.
+///         }
+///     })
+///     // ...and return it.
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`with_redundancy`]: #method.with_redundancy
+/// [`with_exec`]: #method.with_exec
+/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
 pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
     launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
-    // The closure returning the future that will be executed
-    // by every element of the group.
+    // The closure returning the future that will be used by
+    // every element of the group.
     init: Init,
     redundancy: usize,
     // Messages that were received before the group was
@@ -140,6 +185,49 @@ impl Children {
         ChildrenRef::new(id, sender, children)
     }
 
+    /// Sets the closure taking a [`BastionContext`] and returning a
+    /// [`Future`] that will be used by every element of this children
+    /// group.
+    ///
+    /// When a new element is started, it will be assigned a new context,
+    /// pass it to the `init` closure and poll the returned future until
+    /// it stops, panics or another element of the group stops or panics.
+    ///
+    /// The returned future's output should be `Result<(), ()>`.
+    ///
+    /// # Arguments
+    ///
+    /// * `init` - The closure taking a [`BastionContext`] and returning
+    ///     a [`Future`] that will be used by every element of this
+    ///     children group.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx| {
+    ///         async move {
+    ///             // Send and receive messages...
+    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             // ...and return `Ok(())` or `Err(())` when you are done...
+    ///             Ok(())
+    ///
+    ///             // Note that if `Err(())` was returned, the supervisor would
+    ///             // restart the children group.
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
         I: Fn(BastionContext) -> F + Send + Sync + 'static,
@@ -149,6 +237,35 @@ impl Children {
         self
     }
 
+    /// Sets the number of number of elements this children group will
+    /// contain. Each element will call the closure passed in
+    /// [`with_exec`] and run the returned future until it stops,
+    /// panics or another element in the group stops or panics.
+    ///
+    /// The default number of elements a children group contains is `1`.
+    ///
+    /// # Arguments
+    ///
+    /// * `redundancy` - The number of elements this group will contain.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     // Note that "1" is the default number of elements.
+    ///     children.with_redundancy(1)
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         self.redundancy = redundancy;
         self

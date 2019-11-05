@@ -13,6 +13,38 @@ use std::ops::RangeFrom;
 use std::task::Poll;
 
 #[derive(Debug)]
+/// A supervisor that can supervise both [`Children`] and other
+/// supervisors using a defined [`SupervisionStrategy`] (set
+/// with [`with_strategy`] or [`SupervisionStrategy::OneForOne`]
+/// by default).
+///
+/// When a supervised children group or supervisor faults, the
+/// supervisor will restart it and eventually some of its other
+/// supervised entities, depending on its supervision strategy.
+///
+/// # Example
+///
+/// ```
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// let sp_ref: SupervisorRef = Bastion::supervisor(|sp| {
+///     // Configure the supervisor...
+///     sp.with_strategy(SupervisionStrategy::OneForOne)
+///     // ...and return it.
+/// }).expect("Couldn't create the supervisor.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`Children`]: children/struct.Children.html
+/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
+/// [`with_strategy`]: #method.with_strategy
 pub struct Supervisor {
     bcast: Broadcast,
     // The order in which children and supervisors were added.
@@ -142,30 +174,7 @@ impl Supervisor {
         &self.bcast
     }
 
-    /// Creates and returns a new [`SupervisorRef`] referencing
-    /// this `Supervisor`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use bastion::prelude::*;
-    /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|sp| {
-    /// let sp_ref: SupervisorRef = sp.as_ref();
-    ///         # sp
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
-    /// ```
-    ///
-    /// [`SupervisorRef`]: supervisor/struct.Supervisor.html
-    pub fn as_ref(&self) -> SupervisorRef {
+    pub(crate) fn as_ref(&self) -> SupervisorRef {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
@@ -411,6 +420,9 @@ impl Supervisor {
     /// (in the case of a children group, it could be because one
     /// of its elements panicked or returned an error).
     ///
+    /// The default strategy is
+    /// [`SupervisorStrategy::OneForOne`].
+    ///
     /// # Arguments
     ///
     /// * `strategy` - The strategy to use:
@@ -437,9 +449,9 @@ impl Supervisor {
     ///     # Bastion::init();
     ///     #
     /// Bastion::supervisor(|sp| {
-    ///     // Note that "one-for-one" is already the default strategy.
+    ///     // Note that "one-for-one" is the default strategy.
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
-    /// }).expect("Couldn't create a new supervisor");
+    /// }).expect("Couldn't create the supervisor");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -765,7 +777,7 @@ impl SupervisorRef {
     ///     // Configure the supervisor...
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
-    /// }).expect("Couldn't send the new supervisor.");
+    /// }).expect("Couldn't create the supervisor.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -825,7 +837,7 @@ impl SupervisorRef {
     ///             // restart the children group.
     ///         }
     ///     })
-    /// }).expect("Couldn't send the new children group.");
+    /// }).expect("Couldn't create the children group.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
@@ -861,6 +873,9 @@ impl SupervisorRef {
     /// it could be because one of its elements panicked or
     /// returned an error).
     ///
+    /// The default strategy `Supervisor` is
+    /// [`SupervisorStrategy::OneForOne`].
+    ///
     /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
     ///
@@ -890,7 +905,7 @@ impl SupervisorRef {
     ///     # Bastion::init();
     ///     #
     ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
-    /// // Note that "one-for-one" is already the default strategy.
+    /// // Note that "one-for-one" is the default strategy.
     /// sp_ref.strategy(SupervisionStrategy::OneForOne);
     ///     #
     ///     # Bastion::start();

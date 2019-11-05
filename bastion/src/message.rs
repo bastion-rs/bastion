@@ -13,6 +13,7 @@ pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
 #[derive(Debug)]
+#[doc(hidden)]
 pub struct Sender(oneshot::Sender<Msg>);
 
 #[derive(Debug)]
@@ -51,6 +52,7 @@ pub(crate) enum Deployment {
 }
 
 impl Sender {
+    #[doc(hidden)]
     pub fn send<M: Message>(self, msg: M) -> Result<(), M> {
         let msg = Msg::tell(msg);
         self.0.send(msg).map_err(|msg| msg.try_unwrap().unwrap())
@@ -80,6 +82,7 @@ impl Msg {
         (Msg(inner), answer)
     }
 
+    #[doc(hidden)]
     pub fn is_broadcast(&self) -> bool {
         if let MsgInner::Broadcast(_) = self.0 {
             true
@@ -88,6 +91,7 @@ impl Msg {
         }
     }
 
+    #[doc(hidden)]
     pub fn is_tell(&self) -> bool {
         if let MsgInner::Tell(_) = self.0 {
             true
@@ -96,6 +100,7 @@ impl Msg {
         }
     }
 
+    #[doc(hidden)]
     pub fn is_ask(&self) -> bool {
         if let MsgInner::Ask { .. } = self.0 {
             true
@@ -104,6 +109,7 @@ impl Msg {
         }
     }
 
+    #[doc(hidden)]
     pub fn take_sender(&mut self) -> Option<Sender> {
         if let MsgInner::Ask { sender, .. } = &mut self.0 {
             sender.take()
@@ -112,6 +118,7 @@ impl Msg {
         }
     }
 
+    #[doc(hidden)]
     pub fn downcast<M: Message>(self) -> Result<M, Self> {
         match self.0 {
             MsgInner::Tell(msg) => {
@@ -136,6 +143,7 @@ impl Msg {
         }
     }
 
+    #[doc(hidden)]
     pub fn downcast_ref<M: Message>(&self) -> Option<Arc<M>> {
         if let MsgInner::Broadcast(msg) = &self.0 {
             if msg.is::<M>() {
