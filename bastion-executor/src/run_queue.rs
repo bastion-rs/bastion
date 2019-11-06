@@ -1756,8 +1756,8 @@ impl<T> Steal<T> {
     /// * If both steals were unsuccessful but any resulted in `Retry`, then `Retry` is returned.
     /// * If both resulted in `None`, then `None` is returned.
     pub fn or_else<F>(self, f: F) -> Steal<T>
-        where
-            F: FnOnce() -> Steal<T>,
+    where
+        F: FnOnce() -> Steal<T>,
     {
         match self {
             Steal::Empty => f(),
@@ -1789,8 +1789,8 @@ impl<T> FromIterator<Steal<T>> for Steal<T> {
     /// If no `Success` was found, but there was at least one `Retry`, then returns `Retry`.
     /// Otherwise, `Empty` is returned.
     fn from_iter<I>(iter: I) -> Steal<T>
-        where
-            I: IntoIterator<Item = Steal<T>>,
+    where
+        I: IntoIterator<Item = Steal<T>>,
     {
         let mut retry = false;
         for s in iter {
@@ -1808,4 +1808,3 @@ impl<T> FromIterator<Steal<T>> for Steal<T> {
         }
     }
 }
-

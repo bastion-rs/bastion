@@ -62,9 +62,7 @@ impl Debug for ProcStack {
 impl Clone for ProcStack {
     fn clone(&self) -> Self {
         ProcStack {
-            pid: AtomicUsize::new(
-                self.pid.load(Ordering::Acquire)
-            ),
+            pid: AtomicUsize::new(self.pid.load(Ordering::Acquire)),
             before_start: self.before_start.clone(),
             after_complete: self.after_complete.clone(),
             after_panic: self.after_panic.clone(),

@@ -283,7 +283,10 @@ where
         let raw = Self::from_ptr(ptr);
 
         // Decrement the reference count.
-        let new = (*raw.pdata).state.fetch_sub(REFERENCE, Ordering::AcqRel).saturating_sub(REFERENCE);
+        let new = (*raw.pdata)
+            .state
+            .fetch_sub(REFERENCE, Ordering::AcqRel)
+            .saturating_sub(REFERENCE);
 
         // If this was the last reference to the proc and the `ProcHandle` has been dropped as
         // well, then destroy the proc.

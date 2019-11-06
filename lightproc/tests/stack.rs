@@ -2,11 +2,9 @@ use lightproc::proc_stack::ProcStack;
 
 #[test]
 fn stack_copy() {
-    let stack = ProcStack::default()
-        .with_pid(12)
-        .with_after_panic(|| {
-            println!("After panic!");
-        });
+    let stack = ProcStack::default().with_pid(12).with_after_panic(|| {
+        println!("After panic!");
+    });
 
     let stack2 = stack.clone();
 
