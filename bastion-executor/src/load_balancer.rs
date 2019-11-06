@@ -13,20 +13,18 @@ impl LoadBalancer {
     pub fn sample() {
         thread::Builder::new()
             .name("load-balancer-thread".to_string())
-            .spawn(move || {
-                loop {
-                    let mut m = 0_usize;
-                    if let Ok(stats) = load_balancer::stats().try_read() {
-                        m = stats
-                            .smp_queues
-                            .values()
-                            .sum::<usize>()
-                            .wrapping_div(placement::get_core_ids().unwrap().len());
-                    }
+            .spawn(move || loop {
+                let mut m = 0_usize;
+                if let Ok(stats) = load_balancer::stats().try_read() {
+                    m = stats
+                        .smp_queues
+                        .values()
+                        .sum::<usize>()
+                        .wrapping_div(placement::get_core_ids().unwrap().len());
+                }
 
-                    if let Ok(mut stats) = load_balancer::stats().try_write() {
-                        stats.mean_level = m;
-                    }
+                if let Ok(mut stats) = load_balancer::stats().try_write() {
+                    stats.mean_level = m;
                 }
             })
             .expect("load-balancer couldn't start");

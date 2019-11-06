@@ -1,15 +1,15 @@
-use std::cell::{UnsafeCell, Cell};
+use std::cell::{Cell, UnsafeCell};
 use std::ptr;
 
 use super::pool;
 use super::run_queue::Worker;
-use lightproc::prelude::*;
-use core::iter;
 use crate::load_balancer;
-use std::iter::repeat_with;
 use crate::pool::Pool;
-use std::sync::atomic::Ordering;
+use core::iter;
+use lightproc::prelude::*;
+use std::iter::repeat_with;
 use std::sync::atomic;
+use std::sync::atomic::Ordering;
 
 pub fn current() -> ProcStack {
     get_proc_stack(|proc| proc.clone())
@@ -78,19 +78,15 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
         stats_generator(affinity, local);
 
         // Pop only from the local queue with full trust
-        local.pop().or_else(|| {
-            match local.worker_run_queue_size() {
-                x if x == 0 => {
-                    if pool.injector.is_empty() {
-                        affine_steal(pool, local)
-                    } else {
-                        pool.injector.steal_batch_and_pop(local).success()
-                    }
-                },
-                _ => {
+        local.pop().or_else(|| match local.worker_run_queue_size() {
+            x if x == 0 => {
+                if pool.injector.is_empty() {
                     affine_steal(pool, local)
+                } else {
+                    pool.injector.steal_batch_and_pop(local).success()
                 }
             }
+            _ => affine_steal(pool, local),
         })
     })
 }
@@ -105,28 +101,28 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>) -> Option<LightProc> {
                 .unwrap()
                 .0;
 
-            let default = || {
-                pool.injector.steal_batch_and_pop(local).success()
-            };
+            let default = || pool.injector.steal_batch_and_pop(local).success();
 
-            pool.stealers.get(affine_core)
+            pool.stealers
+                .get(affine_core)
                 .map_or_else(default, |stealer| {
-                    stealer.run_queue_size().checked_sub(stats.mean_level)
+                    stealer
+                        .run_queue_size()
+                        .checked_sub(stats.mean_level)
                         .map_or_else(default, |amount| {
-                            amount.checked_sub(1)
-                                .map_or_else(default, |possible| {
-                                    if possible != 0 {
-                                        stealer.steal_batch_and_pop_with_amount(local, possible).success()
-                                    } else {
-                                        default()
-                                    }
-                                })
+                            amount.checked_sub(1).map_or_else(default, |possible| {
+                                if possible != 0 {
+                                    stealer
+                                        .steal_batch_and_pop_with_amount(local, possible)
+                                        .success()
+                                } else {
+                                    default()
+                                }
+                            })
                         })
                 })
-        },
-        Err(_) => {
-            pool.injector.steal_batch_and_pop(local).success()
         }
+        Err(_) => pool.injector.steal_batch_and_pop(local).success(),
     }
 }
 
@@ -150,7 +146,7 @@ pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {
                     stats_generator(affinity, local);
                 });
                 pool::get().sleepers.wait()
-            },
+            }
         }
     }
 }

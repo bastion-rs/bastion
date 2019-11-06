@@ -4,12 +4,32 @@ on: [push, pull_request]
 
 jobs:
   build_and_test:
-    name: ${{ matrix.version }} - Build and test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        version: [stable, nightly]
+        toolchain:
+          - x86_64-pc-windows-msvc
+          - x86_64-pc-windows-gnu
+          - i686-pc-windows-msvc
+          - x86_64-unknown-linux-gnu
+          - x86_64-apple-darwin
+        version:
+          - stable
+          - nightly
+        include:
+        - toolchain: x86_64-pc-windows-msvc
+          os: windows-latest
+        - toolchain: x86_64-pc-windows-gnu
+          os: windows-latest
+        - toolchain: i686-pc-windows-msvc
+          os: windows-latest
+        - toolchain: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+        - toolchain: x86_64-apple-darwin
+          os: macOS-latest
+
+    name: ${{ matrix.version }} - ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@master
@@ -17,8 +37,8 @@ jobs:
       - name: Install ${{ matrix.version }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.version }}
-          override: true
+          toolchain: ${{ matrix.version }}-${{ matrix.toolchain }}
+          default: true
 
       - name: check nightly
         if: matrix.version == 'nightly'

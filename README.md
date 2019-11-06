@@ -35,18 +35,10 @@
 </td>
 </tr>
 <tr>
-  <td>Build Status (Linux / MacOS)</td>
+  <td>Build Status</td>
   <td>
     <a href="https://actions-badge.atrox.dev/bastion-rs/bastion/goto">
     <img alt="Build Status" src="https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fbastion-rs%2Fbastion%2Fbadge&style=flat" />
-    </a>
-  </td>
-</tr>
-<tr>
-  <td>Build Status (Windows)</td>
-  <td>
-    <a href="https://ci.appveyor.com/project/vertexclique/bastion-4i0dk">
-    <img src="https://ci.appveyor.com/api/projects/status/pbug23islg80de33/branch/master?svg=true" alt="appveyor build status" />
     </a>
   </td>
 </tr>

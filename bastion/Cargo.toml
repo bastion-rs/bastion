@@ -35,7 +35,7 @@ maintenance = { status = "actively-developed" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
-lightproc = { path = "../lightproc" }
+lightproc = { version = "=0.3.3-alpha.0", path = "../lightproc" }
 qutex = { version = "0.2", features = ["async_await"] }
 threadpool = "1.7"
 uuid = { version = "0.8", features = ["v4"] }

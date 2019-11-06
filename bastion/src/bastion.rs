@@ -460,7 +460,6 @@ impl Bastion {
 
 impl Debug for Bastion {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        fmt.debug_struct("Bastion")
-            .finish()
+        fmt.debug_struct("Bastion").finish()
     }
 }
