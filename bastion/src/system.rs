@@ -2,6 +2,7 @@ use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionId, NIL_ID};
 use crate::message::{BastionMessage, Deployment};
 use crate::supervisor::{Supervisor, SupervisorRef};
+use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
@@ -10,28 +11,20 @@ use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::{QrwLock, Qutex};
 use std::task::Poll;
-use threadpool::ThreadPool;
-
-pub(crate) fn schedule(proc: LightProc) {
-    // FIXME: panics?
-    let pool = POOL.clone().read().wait().unwrap();
-    pool.execute(|| proc.run())
-}
 
 lazy_static! {
-    pub(crate) static ref SYSTEM: Qutex<Option<ProcHandle<()>>> = Qutex::new(None);
+    pub(crate) static ref SYSTEM: Qutex<Option<RecoverableHandle<()>>> = Qutex::new(None);
     pub(crate) static ref SYSTEM_SENDER: Sender = System::init();
     pub(crate) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
-    pub(crate) static ref POOL: QrwLock<ThreadPool> = QrwLock::new(ThreadPool::default());
 }
 
 #[derive(Debug)]
 pub(crate) struct System {
     bcast: Broadcast,
-    launched: FxHashMap<BastionId, ProcHandle<Supervisor>>,
+    launched: FxHashMap<BastionId, RecoverableHandle<Supervisor>>,
     // TODO: set limit
     restart: FxHashSet<BastionId>,
-    waiting: FuturesUnordered<ProcHandle<Supervisor>>,
+    waiting: FuturesUnordered<RecoverableHandle<Supervisor>>,
     pre_start_msgs: Vec<BastionMessage>,
     started: bool,
 }
@@ -68,9 +61,8 @@ impl System {
 
         // FIXME: with_id
         let stack = ProcStack::default();
-        let (proc, handle) = LightProc::build(system.run(), schedule, stack);
+        let handle = pool::spawn(system.run(), stack);
 
-        proc.schedule();
         // FIXME: pancis?
         let mut system = SYSTEM.clone().lock().wait().unwrap();
         *system = Some(handle);

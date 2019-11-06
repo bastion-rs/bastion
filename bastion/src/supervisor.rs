@@ -2,7 +2,7 @@ use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::children::{Children, ChildrenRef};
 use crate::context::BastionId;
 use crate::message::{BastionMessage, Deployment, Message};
-use crate::system::schedule;
+use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
@@ -51,7 +51,7 @@ pub struct Supervisor {
     // It is only updated when at least one of those is resat.
     order: Vec<BastionId>,
     // The currently launched supervised children and supervisors.
-    launched: FxHashMap<BastionId, (usize, ProcHandle<Supervised>)>,
+    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
@@ -737,12 +737,9 @@ impl Supervisor {
         }
     }
 
-    pub(crate) fn launch(self) -> ProcHandle<Self> {
+    pub(crate) fn launch(self) -> RecoverableHandle<Self> {
         let stack = self.stack();
-        let (proc, handle) = LightProc::build(self.run(), schedule, stack);
-
-        proc.schedule();
-        handle
+        pool::spawn(self.run(), stack)
     }
 }
 
@@ -1062,70 +1059,58 @@ impl Supervised {
         }
     }
 
-    fn reset(self, bcast: Broadcast) -> ProcHandle<Self> {
+    fn reset(self, bcast: Broadcast) -> RecoverableHandle<Self> {
         match self {
             Supervised::Supervisor(mut supervisor) => {
-                let (proc, handle) = LightProc::build(
+                // FIXME: with_pid
+                let stack = ProcStack::default();
+                pool::spawn(
                     async {
                         supervisor.reset(bcast).await;
                         Supervised::Supervisor(supervisor)
                     },
-                    schedule,
-                    // FIXME: with_pid
-                    ProcStack::default(),
-                );
-
-                proc.schedule();
-                handle
+                    stack,
+                )
             }
             Supervised::Children(mut children) => {
-                let (proc, handle) = LightProc::build(
+                // FIXME: with_pid
+                let stack = ProcStack::default();
+                pool::spawn(
                     async {
                         children.reset(bcast).await;
                         Supervised::Children(children)
                     },
-                    schedule,
-                    // FIXME: with_pid
-                    ProcStack::default(),
-                );
-
-                proc.schedule();
-                handle
+                    stack,
+                )
             }
         }
     }
 
-    fn launch(self) -> ProcHandle<Self> {
+    fn launch(self) -> RecoverableHandle<Self> {
         match self {
             Supervised::Supervisor(supervisor) => {
-                let (proc, handle) = LightProc::build(
+                // FIXME: with_pid
+                let stack = ProcStack::default();
+                pool::spawn(
                     async {
                         // FIXME: panics?
                         let supervisor = supervisor.launch().await.unwrap();
                         Supervised::Supervisor(supervisor)
                     },
-                    schedule,
-                    // FIXME: with_pid
-                    ProcStack::default(),
-                );
-
-                proc.schedule();
-                handle
+                    stack,
+                )
             }
             Supervised::Children(children) => {
-                let (proc, handle) = LightProc::build(
+                // FIXME: with_pid
+                let stack = ProcStack::default();
+                pool::spawn(
                     async {
                         // FIXME: panics?
                         let children = children.launch().await.unwrap();
                         Supervised::Children(children)
                     },
-                    schedule,
-                    // FIXME: with_pid
-                    ProcStack::default(),
-                );
-
-                proc.schedule();
-                handle
+                    stack,
+                )
             }
         }
     }
