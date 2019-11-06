@@ -12,8 +12,12 @@ readme = "README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
 
+[badges]
+travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
+maintenance = { status = "actively-developed" }
+
 [features]
-unstable = ["numanji", "allocator-suite"]
+unstable = ["numanji", "allocator-suite", "jemallocator"]
 
 [dependencies]
 crossbeam-utils = "0.6"
@@ -23,11 +27,14 @@ libc = "0.2"
 num_cpus = "1.10"
 rustc-hash = "1.0.1"
 pin-utils = "0.1.0-alpha.4"
-lightproc = { "path" = "../lightproc" }
+lightproc = { version = "=0.3.3-alpha.0", "path" = "../lightproc" }
 
 # Allocator
-numanji = { version = "^0.1", optional = true, default-features = false}
-allocator-suite = { version = "^0.1", optional = true, default-features = false}
+numanji = { version = "^0.1", optional = true, default-features = false }
+allocator-suite = { version = "^0.1", optional = true, default-features = false }
+
+[dev-dependencies]
+proptest = "^0.9"
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
-jemallocator = "^0.3"
+jemallocator = { version = "^0.3", optional = true, default-features = false }
