@@ -45,6 +45,10 @@ impl ProcStack {
         self.after_panic = Some(Arc::new(callback));
         self
     }
+
+    pub fn get_pid(&self) -> usize {
+        self.pid.load(Ordering::Acquire)
+    }
 }
 
 impl Debug for ProcStack {
@@ -52,5 +56,18 @@ impl Debug for ProcStack {
         fmt.debug_struct("ProcStack")
             .field("pid", &self.pid.load(Ordering::SeqCst))
             .finish()
+    }
+}
+
+impl Clone for ProcStack {
+    fn clone(&self) -> Self {
+        ProcStack {
+            pid: AtomicUsize::new(
+                self.pid.load(Ordering::Acquire)
+            ),
+            before_start: self.before_start.clone(),
+            after_complete: self.after_complete.clone(),
+            after_panic: self.after_panic.clone(),
+        }
     }
 }

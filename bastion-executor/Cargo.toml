@@ -1,7 +1,33 @@
 [package]
 name = "bastion-executor"
 version = "0.2.1-alpha.0"
-description = "Fault-tolerant Runtime for Rust applications"
+description = "Cache affine NUMA-aware executor for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
-categories = []
+categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+readme = "README.md"
+license = "Apache-2.0/MIT"
+edition = "2018"
+
+[features]
+unstable = ["numanji", "allocator-suite"]
+
+[dependencies]
+crossbeam-utils = "0.6"
+crossbeam-epoch = "0.7"
+lazy_static = "1.4"
+libc = "0.2"
+num_cpus = "1.10"
+rustc-hash = "1.0.1"
+pin-utils = "0.1.0-alpha.4"
+lightproc = { "path" = "../lightproc" }
+
+# Allocator
+numanji = { version = "^0.1", optional = true, default-features = false}
+allocator-suite = { version = "^0.1", optional = true, default-features = false}
+
+[target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
+jemallocator = "^0.3"
