@@ -12,6 +12,10 @@ readme = "README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
 
+[badges]
+travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
+maintenance = { status = "actively-developed" }
+
 [dependencies]
 crossbeam-utils = "0.6"
 pin-utils = "0.1.0-alpha.4"
