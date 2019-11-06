@@ -179,12 +179,3 @@ More interaction and more ideas are better!
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 
 A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](.github/CONTRIBUTING.md) on GitHub.
-
-### Thanks
-
-Thanks to my dear mom (Günnur Bulut) who is an artist with many things to do but
-spending her efforts without any hesitation on small things that I requested
-(Like this logo). My shining star.
-
-Also, thanks to my friend [Berkan Yavri](http://github.com/yavrib) who helped to the idea of making this.
-Debated over the approaches that I took, spent time on thinking about this project with me.
