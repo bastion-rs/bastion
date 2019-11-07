@@ -12,17 +12,20 @@ use qutex::{QrwLock, Qutex};
 use std::task::Poll;
 use threadpool::ThreadPool;
 
+// FIXME: unsafe?
+static mut POOL: Option<ThreadPool> = None;
+
 pub(crate) fn schedule(proc: LightProc) {
     // FIXME: panics?
-    let pool = POOL.clone().read().wait().unwrap();
-    pool.execute(|| proc.run())
+    // FIXME unsafe?
+    let pool = unsafe { POOL.clone().unwrap() };
+    pool.execute(|| proc.run());
 }
 
 lazy_static! {
     pub(crate) static ref SYSTEM: Qutex<Option<ProcHandle<()>>> = Qutex::new(None);
     pub(crate) static ref SYSTEM_SENDER: Sender = System::init();
     pub(crate) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
-    pub(crate) static ref POOL: QrwLock<ThreadPool> = QrwLock::new(ThreadPool::default());
 }
 
 #[derive(Debug)]
@@ -38,6 +41,9 @@ pub(crate) struct System {
 
 impl System {
     pub(crate) fn init() -> Sender {
+        // FIXME unsafe?
+        unsafe { POOL = Some(ThreadPool::default()) };
+
         let parent = Parent::none();
         let bcast = Broadcast::with_id(parent, NIL_ID);
         let launched = FxHashMap::default();
