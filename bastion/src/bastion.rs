@@ -158,7 +158,7 @@ impl Bastion {
     /// ```
     pub fn init() {
         // NOTE: this hides all panic messages
-        std::panic::set_hook(Box::new(|_| ()));
+        //std::panic::set_hook(Box::new(|_| ()));
 
         // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
         SYSTEM_SENDER.is_closed();
@@ -460,7 +460,6 @@ impl Bastion {
 
 impl Debug for Bastion {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        fmt.debug_struct("Bastion")
-            .finish()
+        fmt.debug_struct("Bastion").finish()
     }
 }
