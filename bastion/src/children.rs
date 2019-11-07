@@ -350,6 +350,10 @@ impl Children {
 
     async fn run(mut self) -> Self {
         loop {
+            for (_, launched) in self.launched.values_mut() {
+                let _ = poll!(launched);
+            }
+
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
@@ -382,11 +386,7 @@ impl Children {
 
                     return self;
                 }
-                Poll::Pending => (),
-            }
-
-            for (_, launched) in self.launched.values_mut() {
-                let _ = poll!(launched);
+                Poll::Pending => pending!(),
             }
         }
     }

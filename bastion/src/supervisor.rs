@@ -562,7 +562,8 @@ impl Supervisor {
                 }
 
                 let launched = supervised.launch();
-                self.launched.insert(id, (order, launched));
+                self.launched.insert(id.clone(), (order, launched));
+                self.order[order] = id;
             }
             SupervisionStrategy::OneForAll => {
                 // TODO: stop or kill?
