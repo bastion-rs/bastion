@@ -37,9 +37,9 @@
 //! [lightproc]: https://docs.rs/lightproc/
 //!
 
-#![doc(html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png")]
-
-
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png"
+)]
 // Force missing implementations
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
