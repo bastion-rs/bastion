@@ -1,3 +1,6 @@
+// Discarded lints
+#![allow(clippy::cast_ptr_alignment)]
+
 mod catch_unwind;
 mod layout_helpers;
 mod proc_data;
