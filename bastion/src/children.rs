@@ -266,6 +266,8 @@ impl Children {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
+    ///
+    /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         self.redundancy = redundancy;
         self

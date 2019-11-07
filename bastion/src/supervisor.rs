@@ -421,7 +421,7 @@ impl Supervisor {
     /// of its elements panicked or returned an error).
     ///
     /// The default strategy is
-    /// [`SupervisorStrategy::OneForOne`].
+    /// [`SupervisionStrategy::OneForOne`].
     ///
     /// # Arguments
     ///
@@ -874,7 +874,7 @@ impl SupervisorRef {
     /// returned an error).
     ///
     /// The default strategy `Supervisor` is
-    /// [`SupervisorStrategy::OneForOne`].
+    /// [`SupervisionStrategy::OneForOne`].
     ///
     /// This method returns `()` if it succeeded, or `Err(())`
     /// otherwise.
