@@ -31,9 +31,6 @@ pub(crate) struct System {
 
 impl System {
     pub(crate) fn init() -> Sender {
-        // FIXME unsafe?
-        unsafe { POOL = Some(ThreadPool::default()) };
-
         let parent = Parent::none();
         let bcast = Broadcast::with_id(parent, NIL_ID);
         let launched = FxHashMap::default();
