@@ -3,8 +3,9 @@ use std::ptr;
 
 use super::pool;
 use super::run_queue::Worker;
-use crate::load_balancer;
 use crate::pool::Pool;
+use crate::run_queue::Steal;
+use crate::{load_balancer, placement};
 use core::iter;
 use lightproc::prelude::*;
 use std::iter::repeat_with;
@@ -74,63 +75,66 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 
     QUEUE.with(|queue| {
         let local = unsafe { (*queue.get()).as_ref().unwrap() };
-
-        stats_generator(affinity, local);
-
-        // Pop only from the local queue with full trust
-        local.pop().or_else(|| match local.worker_run_queue_size() {
-            x if x == 0 => {
-                if pool.injector.is_empty() {
-                    affine_steal(pool, local)
-                } else {
-                    pool.injector.steal_batch_and_pop(local).success()
-                }
-            }
-            _ => affine_steal(pool, local),
-        })
+        local.pop().or_else(|| affine_steal(pool, local))
     })
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>) -> Option<LightProc> {
-    match load_balancer::stats().try_read() {
-        Ok(stats) => {
-            let affine_core = *stats
-                .smp_queues
-                .iter()
-                .max_by_key(|&(_core, stat)| stat)
-                .unwrap()
-                .0;
+    // Pop a task from the local queue, if not empty.
+    local.pop().or_else(|| {
+        // Otherwise, we need to look for a task elsewhere.
+        iter::repeat_with(|| match load_balancer::stats().try_read() {
+            Ok(stats) => {
+                // Collect run queue statistics
+                let mut core_vec: Vec<_> = stats
+                    .smp_queues
+                    .iter()
+                    .map(|(&x, &y)| (x, y))
+                    .collect::<Vec<(usize, usize)>>();
 
-            let default = || pool.injector.steal_batch_and_pop(local).success();
+                // Sort cores and their run queue sizes.
+                //
+                // This sort will be ordered by descending order
+                // so we can pick up from the most overloaded queue.
+                core_vec.sort_by(|x, y| y.1.cmp(&x.1));
 
-            pool.stealers
-                .get(affine_core)
-                .map_or_else(default, |stealer| {
-                    stealer
-                        .run_queue_size()
-                        .checked_sub(stats.mean_level)
-                        .map_or_else(default, |amount| {
-                            amount.checked_sub(1).map_or_else(default, |possible| {
-                                if possible != 0 {
-                                    stealer
-                                        .steal_batch_and_pop_with_amount(local, possible)
-                                        .success()
-                                } else {
-                                    default()
-                                }
-                            })
+                // First try to get procs from global queue
+                pool.injector.steal_batch_and_pop(&local).or_else(|| {
+                    // Try iterating through biggest to smallest
+                    core_vec
+                        .iter()
+                        .map(|s| {
+                            // Steal the mean amount to balance all queues considering incoming workloads
+                            // Otherwise do an ignorant steal (which is going to be useless)
+                            if stats.mean_level > 0 {
+                                pool.stealers
+                                    .get(s.0)
+                                    .unwrap()
+                                    .steal_batch_and_pop_with_amount(&local, stats.mean_level)
+                            } else {
+                                pool.stealers.get(s.0).unwrap().steal_batch_and_pop(&local)
+                            }
                         })
+                        .collect()
                 })
-        }
-        Err(_) => pool.injector.steal_batch_and_pop(local).success(),
-    }
+            }
+            Err(_) => Steal::Retry,
+        })
+        // Loop while no task was stolen and any steal operation needs to be retried.
+        .find(|s| !s.is_retry())
+        // Extract the stolen task, if there is one.
+        .and_then(|s| s.success())
+    })
 }
 
-fn stats_generator(affinity: usize, local: &Worker<LightProc>) {
-    if let Ok(mut stats) = load_balancer::stats().try_write() {
-        stats
-            .smp_queues
-            .insert(affinity, local.worker_run_queue_size());
+pub(crate) fn stats_generator(affinity: usize, local: &Worker<LightProc>) {
+    loop {
+        if let Ok(mut stats) = load_balancer::stats().try_write() {
+            stats
+                .smp_queues
+                .insert(affinity, local.worker_run_queue_size());
+            break;
+        }
     }
 }
 
@@ -138,15 +142,14 @@ pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {
     QUEUE.with(|queue| unsafe { *queue.get() = Some(local) });
 
     loop {
+        QUEUE.with(|queue| {
+            let local = unsafe { (*queue.get()).as_ref().unwrap() };
+            stats_generator(affinity, local);
+        });
+
         match fetch_proc(affinity) {
             Some(proc) => set_stack(proc.stack(), || proc.run()),
-            None => {
-                QUEUE.with(|queue| {
-                    let local = unsafe { (*queue.get()).as_ref().unwrap() };
-                    stats_generator(affinity, local);
-                });
-                pool::get().sleepers.wait()
-            }
+            None => pool::get().sleepers.wait(),
         }
     }
 }

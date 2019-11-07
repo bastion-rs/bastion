@@ -1,7 +1,7 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{Answer, BastionMessage, Message};
-use crate::system::schedule;
+use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
@@ -422,12 +422,9 @@ impl Children {
         }
     }
 
-    pub(crate) fn launch(self) -> ProcHandle<Self> {
+    pub(crate) fn launch(self) -> RecoverableHandle<Self> {
         let stack = self.stack();
-        let (proc, handle) = LightProc::build(self.run(), schedule, stack);
-
-        proc.schedule();
-        handle
+        pool::spawn(self.run(), stack)
     }
 }
 
@@ -707,10 +704,7 @@ impl Child {
 
     fn launch(self) -> RecoverableHandle<()> {
         let stack = self.stack();
-        let (proc, handle) = LightProc::recoverable(self.run(), schedule, stack);
-
-        proc.schedule();
-        handle
+        pool::spawn(self.run(), stack)
     }
 }
 

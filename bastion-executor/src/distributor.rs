@@ -8,16 +8,12 @@ use crate::worker;
 use std::thread;
 
 pub(crate) struct Distributor {
-    pub round: usize,
-    pub last_dead: usize,
     pub cores: Vec<CoreId>,
 }
 
 impl Distributor {
     pub fn new() -> Self {
         Distributor {
-            round: 0_usize,
-            last_dead: usize::max_value(),
             cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
         }
     }
@@ -26,8 +22,6 @@ impl Distributor {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
 
         for core in self.cores {
-            self.round = core.id;
-
             let wrk = Worker::new_fifo();
             stealers.push(wrk.stealer());
 
@@ -37,6 +31,8 @@ impl Distributor {
                     // affinity assignment
                     placement::set_for_current(core);
 
+                    // run initial stats generation for cores
+                    worker::stats_generator(core.id.clone(), &wrk);
                     // actual execution
                     worker::main_loop(core.id.clone(), wrk);
                 })

@@ -32,10 +32,10 @@ travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
+bastion-executor = { path = "../bastion-executor" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
 lightproc = { version = "=0.3.3-alpha.0", path = "../lightproc" }
 qutex = { version = "0.2", features = ["async_await"] }
-threadpool = "1.7"
 uuid = { version = "0.8", features = ["v4"] }
