@@ -1,4 +1,5 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
+use crate::callbacks::Callbacks;
 use crate::children::{Children, ChildrenRef};
 use crate::context::BastionId;
 use crate::message::{BastionMessage, Deployment, Message};
@@ -6,7 +7,7 @@ use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use lightproc::prelude::*;
 use std::iter::FromIterator;
 use std::ops::RangeFrom;
@@ -56,6 +57,8 @@ pub struct Supervisor {
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
     stopped: FxHashMap<BastionId, Supervised>,
+    // TODO: doc
+    killed: FxHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
@@ -112,6 +115,7 @@ impl Supervisor {
         let order = Vec::new();
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
+        let killed = FxHashMap::default();
         let strategy = SupervisionStrategy::default();
         let pre_start_msgs = Vec::new();
         let started = false;
@@ -121,6 +125,7 @@ impl Supervisor {
             order,
             launched,
             stopped,
+            killed,
             strategy,
             pre_start_msgs,
             started,
@@ -133,15 +138,20 @@ impl Supervisor {
     }
 
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
+        let stopped = self.stopped.keys().cloned().collect::<FxHashSet<_>>();
         // TODO: stop or kill?
-        let killed = self.kill(0..).await;
+        let supervised = self.kill(0..).await;
 
         self.bcast = bcast;
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
         let mut reset = FuturesOrdered::new();
-        for supervised in killed {
+        for supervised in supervised {
+            if !stopped.contains(supervised.id()) {
+                supervised.callbacks().call_before_restart();
+            }
+
             let parent = Parent::supervisor(self.as_ref());
             let bcast = Broadcast::new(parent);
 
@@ -153,6 +163,17 @@ impl Supervisor {
 
         while let Some(supervised) = reset.next().await {
             let id = supervised.id().clone();
+            if stopped.contains(supervised.id()) {
+                supervised.callbacks().call_before_start();
+            } else {
+                supervised.callbacks().call_after_restart();
+            }
+
+            self.bcast.register(supervised.bcast());
+            if self.started {
+                let msg = BastionMessage::start();
+                self.bcast.send_child(&id, msg);
+            }
 
             let launched = supervised.launch();
             self.launched
@@ -504,7 +525,7 @@ impl Supervisor {
     async fn collect(&mut self, range: RangeFrom<usize>) -> Vec<Supervised> {
         let mut supervised = Vec::new();
         // FIXME: panics?
-        for id in self.order.get(range).unwrap() {
+        for id in self.order.get(range.clone()).unwrap() {
             // TODO: Err if None?
             if let Some((_, launched)) = self.launched.remove(&id) {
                 // TODO: add a "stopped" list and poll from it instead of awaiting
@@ -516,8 +537,14 @@ impl Supervisor {
         let mut supervised = supervised.collect::<Vec<_>>().await;
 
         let mut collected = Vec::with_capacity(supervised.len());
-        for id in self.order.drain(..) {
+        for id in self.order.drain(range) {
             if let Some(supervised) = self.stopped.remove(&id) {
+                collected.push(supervised);
+
+                continue;
+            }
+
+            if let Some(supervised) = self.killed.remove(&id) {
                 collected.push(supervised);
 
                 continue;
@@ -546,6 +573,7 @@ impl Supervisor {
                 // TODO: add a "waiting" list and poll from it instead of awaiting
                 // FIXME: panics?
                 let supervised = launched.await.unwrap();
+                supervised.callbacks().call_before_restart();
 
                 self.bcast.unregister(supervised.id());
 
@@ -554,6 +582,7 @@ impl Supervisor {
                 let id = bcast.id().clone();
                 // FIXME: panics?
                 let supervised = supervised.reset(bcast).await.unwrap();
+                supervised.callbacks().call_after_restart();
 
                 self.bcast.register(supervised.bcast());
                 if self.started {
@@ -562,11 +591,18 @@ impl Supervisor {
                 }
 
                 let launched = supervised.launch();
-                self.launched.insert(id, (order, launched));
+                self.launched.insert(id.clone(), (order, launched));
+                self.order[order] = id;
             }
             SupervisionStrategy::OneForAll => {
+                let stopped = self.stopped.keys().cloned().collect::<FxHashSet<_>>();
+
                 // TODO: stop or kill?
                 for supervised in self.kill(0..).await {
+                    if !stopped.contains(supervised.id()) {
+                        supervised.callbacks().call_before_restart();
+                    }
+
                     self.bcast.unregister(supervised.id());
 
                     let parent = Parent::supervisor(self.as_ref());
@@ -574,6 +610,11 @@ impl Supervisor {
                     let id = bcast.id().clone();
                     // FIXME: panics.
                     let supervised = supervised.reset(bcast).await.unwrap();
+                    if stopped.contains(supervised.id()) {
+                        supervised.callbacks().call_before_start();
+                    } else {
+                        supervised.callbacks().call_after_restart();
+                    }
 
                     self.bcast.register(supervised.bcast());
 
@@ -589,11 +630,16 @@ impl Supervisor {
                 }
             }
             SupervisionStrategy::RestForOne => {
+                let stopped = self.stopped.keys().cloned().collect::<FxHashSet<_>>();
                 let (order, _) = self.launched.get(&id).ok_or(())?;
                 let order = *order;
 
                 // TODO: stop or kill?
                 for supervised in self.kill(order..).await {
+                    if !stopped.contains(supervised.id()) {
+                        supervised.callbacks().call_before_restart();
+                    }
+
                     self.bcast.unregister(supervised.id());
 
                     let parent = Parent::supervisor(self.as_ref());
@@ -601,6 +647,11 @@ impl Supervisor {
                     let id = bcast.id().clone();
                     // FIXME: panics?
                     let supervised = supervised.reset(bcast).await.unwrap();
+                    if stopped.contains(supervised.id()) {
+                        supervised.callbacks().call_before_start();
+                    } else {
+                        supervised.callbacks().call_after_restart();
+                    }
 
                     self.bcast.register(supervised.bcast());
                     if self.started {
@@ -623,13 +674,21 @@ impl Supervisor {
         match msg {
             BastionMessage::Start => unreachable!(),
             BastionMessage::Stop => {
-                self.stop(0..).await;
+                for supervised in self.stop(0..).await.into_iter() {
+                    supervised.callbacks().call_after_stop();
+
+                    self.stopped.insert(supervised.id().clone(), supervised);
+                }
+
                 self.stopped();
 
                 return Err(());
             }
             BastionMessage::Kill => {
-                self.kill(0..).await;
+                for supervised in self.kill(0..).await.into_iter() {
+                    self.killed.insert(supervised.id().clone(), supervised);
+                }
+
                 self.stopped();
 
                 return Err(());
@@ -644,6 +703,7 @@ impl Supervisor {
 
                     let id = supervisor.id().clone();
                     let supervised = Supervised::supervisor(supervisor);
+                    //supervised.callbacks().call_before_start();
 
                     let launched = supervised.launch();
                     self.launched
@@ -651,6 +711,8 @@ impl Supervisor {
                     self.order.push(id);
                 }
                 Deployment::Children(children) => {
+                    children.callbacks().call_before_start();
+
                     self.bcast.register(children.bcast());
                     if self.started {
                         let msg = BastionMessage::start();
@@ -680,6 +742,7 @@ impl Supervisor {
                     // TODO: add a "waiting" list an poll from it instead of awaiting
                     // FIXME: panics?
                     let supervised = launched.await.unwrap();
+                    supervised.callbacks().call_after_stop();
 
                     self.bcast.unregister(&id);
                     self.stopped.insert(id, supervised);
@@ -687,7 +750,10 @@ impl Supervisor {
             }
             BastionMessage::Faulted { id } => {
                 if self.recover(id).await.is_err() {
-                    self.kill(0..).await;
+                    for supervised in self.kill(0..).await.into_iter() {
+                        self.killed.insert(supervised.id().clone(), supervised);
+                    }
+
                     self.faulted();
 
                     return Err(());
@@ -727,7 +793,10 @@ impl Supervisor {
                 }
                 Poll::Ready(None) => {
                     // TODO: stop or kill?
-                    self.kill(0..).await;
+                    for supervised in self.kill(0..).await.into_iter() {
+                        self.killed.insert(supervised.id().clone(), supervised);
+                    }
+
                     self.faulted();
 
                     return self;
@@ -1056,6 +1125,13 @@ impl Supervised {
         match self {
             Supervised::Supervisor(supervisor) => supervisor.bcast(),
             Supervised::Children(children) => children.bcast(),
+        }
+    }
+
+    fn callbacks(&self) -> &Callbacks {
+        match self {
+            Supervised::Supervisor(supervisor) => unimplemented!(),
+            Supervised::Children(children) => children.callbacks(),
         }
     }
 

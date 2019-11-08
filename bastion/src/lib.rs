@@ -51,12 +51,14 @@ mod broadcast;
 mod context;
 mod system;
 
+pub mod callbacks;
 pub mod children;
 pub mod message;
 pub mod supervisor;
 
 pub mod prelude {
     pub use crate::bastion::Bastion;
+    pub use crate::callbacks::{AfterRestart, AfterStop, BeforeRestart, BeforeStart, Callbacks};
     pub use crate::children::{ChildRef, Children, ChildrenRef};
     pub use crate::context::BastionContext;
     pub use crate::message::{Answer, Message, Msg, Sender};

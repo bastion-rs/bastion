@@ -1,4 +1,5 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
+use crate::callbacks::Callbacks;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{Answer, BastionMessage, Message};
 use bastion_executor::pool;
@@ -72,6 +73,8 @@ pub struct Children {
     // every element of the group.
     init: Init,
     redundancy: usize,
+    // TODO: doc
+    callbacks: Callbacks,
     // Messages that were received before the group was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -135,6 +138,7 @@ impl Children {
         let launched = FxHashMap::default();
         let init = Init::default();
         let redundancy = 1;
+        let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -143,6 +147,7 @@ impl Children {
             launched,
             init,
             redundancy,
+            callbacks,
             pre_start_msgs,
             started,
         }
@@ -168,6 +173,10 @@ impl Children {
 
     pub(crate) fn bcast(&self) -> &Broadcast {
         &self.bcast
+    }
+
+    pub(crate) fn callbacks(&self) -> &Callbacks {
+        &self.callbacks
     }
 
     pub(crate) fn as_ref(&self) -> ChildrenRef {
@@ -270,6 +279,12 @@ impl Children {
     /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         self.redundancy = redundancy;
+        self
+    }
+
+    // TODO: doc
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = callbacks;
         self
     }
 
@@ -403,7 +418,7 @@ impl Children {
 
             let child_ref = ChildRef::new(id.clone(), sender.clone());
             let children = self.as_ref();
-            // FIXME
+            // FIXME: panics?
             let supervisor = self.bcast.parent().clone().into_supervisor().unwrap();
 
             let state = ContextState::new();
