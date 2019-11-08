@@ -57,6 +57,8 @@ pub struct Supervisor {
     // supervision strategy is not "one-for-one".
     stopped: FxHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
+    // TODO: doc
+    is_system_supervisor: bool,
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -72,6 +74,8 @@ pub struct Supervisor {
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
+    // TODO: doc
+    is_system_supervisor: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +117,7 @@ impl Supervisor {
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
         let strategy = SupervisionStrategy::default();
+        let is_system_supervisor = false;
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -122,9 +127,17 @@ impl Supervisor {
             launched,
             stopped,
             strategy,
+            is_system_supervisor,
             pre_start_msgs,
             started,
         }
+    }
+
+    pub(crate) fn system(bcast: Broadcast) -> Self {
+        let mut supervisor = Supervisor::new(bcast);
+        supervisor.is_system_supervisor = true;
+
+        supervisor
     }
 
     fn stack(&self) -> ProcStack {
@@ -178,8 +191,9 @@ impl Supervisor {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
+        let is_system_supervisor = self.is_system_supervisor;
 
-        SupervisorRef::new(id, sender)
+        SupervisorRef::new(id, sender, is_system_supervisor)
     }
 
     /// Creates a new supervisor, passes it through the specified
@@ -342,6 +356,7 @@ impl Supervisor {
 
         let children = Children::new(bcast);
         let mut children = init(children);
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
 
         let msg = BastionMessage::deploy_children(children);
@@ -406,6 +421,7 @@ impl Supervisor {
         let children = Children::new(bcast);
         let mut children = init(children);
 
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
         let children_ref = children.as_ref();
 
@@ -744,8 +760,12 @@ impl Supervisor {
 }
 
 impl SupervisorRef {
-    pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
-        SupervisorRef { id, sender }
+    pub(crate) fn new(id: BastionId, sender: Sender, is_system_supervisor: bool) -> Self {
+        SupervisorRef {
+            id,
+            sender,
+            is_system_supervisor,
+        }
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified
@@ -854,6 +874,7 @@ impl SupervisorRef {
         let children = Children::new(bcast);
         let mut children = init(children);
 
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
         let children_ref = children.as_ref();
 
@@ -1027,6 +1048,10 @@ impl SupervisorRef {
     pub fn kill(&self) -> Result<(), ()> {
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
+    }
+
+    pub(crate) fn is_system_supervisor(&self) -> bool {
+        self.is_system_supervisor
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
