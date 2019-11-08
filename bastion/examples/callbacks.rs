@@ -111,7 +111,7 @@ fn main() {
                     .with_callbacks(callbacks)
             })
     })
-        .expect("Couldn't create the supervisor.");
+    .expect("Couldn't create the supervisor.");
 
     Bastion::start();
     Bastion::block_until_stopped();
