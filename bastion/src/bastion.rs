@@ -265,15 +265,13 @@ impl Bastion {
     where
         C: FnOnce(Children) -> Children,
     {
-        // FIXME: panics
-        ROOT_SPV
-            .clone()
-            .read()
-            .wait()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .children(init)
+        // FIXME: unsafe?
+        if let Some(supervisor) = unsafe { &ROOT_SPV } {
+            supervisor.children(init)
+        } else {
+            // TODO: Err(Error)
+            Err(())
+        }
     }
 
     /// Sends a message to the system which will then send it to all
