@@ -2,19 +2,15 @@ use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
 pub trait BeforeStart: Fn() + Send + Sync + 'static {}
-
 impl<T> BeforeStart for T where T: Fn() + Send + Sync + 'static {}
 
 pub trait BeforeRestart: Fn() + Send + Sync + 'static {}
-
 impl<T> BeforeRestart for T where T: Fn() + Send + Sync + 'static {}
 
 pub trait AfterRestart: Fn() + Send + Sync + 'static {}
-
 impl<T> AfterRestart for T where T: Fn() + Send + Sync + 'static {}
 
 pub trait AfterStop: Fn() + Send + Sync + 'static {}
-
 impl<T> AfterStop for T where T: Fn() + Send + Sync + 'static {}
 
 #[derive(Default)]
@@ -54,61 +50,45 @@ impl Callbacks {
         self
     }
 
-    pub fn before_start(&self) -> Option<&dyn BeforeStart> {
-        if let Some(before_start) = &self.before_start {
-            Some(&**before_start)
-        } else {
-            None
-        }
+    pub fn contains_before_start(&self) -> bool {
+        self.before_start.is_some()
     }
 
-    pub fn before_restart(&self) -> Option<&dyn BeforeRestart> {
-        if let Some(before_restart) = &self.before_restart {
-            Some(&**before_restart)
-        } else {
-            None
-        }
+    pub fn contains_before_restart(&self) -> bool {
+        self.before_restart.is_some()
     }
 
-    pub fn after_restart(&self) -> Option<&dyn AfterRestart> {
-        if let Some(after_restart) = &self.after_restart {
-            Some(&**after_restart)
-        } else {
-            None
-        }
+    pub fn contains_after_restart(&self) -> bool {
+        self.after_restart.is_some()
     }
 
-    pub fn after_stop(&self) -> Option<&dyn AfterStop> {
-        if let Some(after_stop) = &self.after_stop {
-            Some(&**after_stop)
-        } else {
-            None
-        }
+    pub fn contains_after_stop(&self) -> bool {
+        self.after_stop.is_some()
     }
 
-    pub(crate) fn call_before_start(&self) {
+    pub(crate) fn before_start(&self) {
         if let Some(before_start) = &self.before_start {
             before_start()
         }
     }
 
-    pub(crate) fn call_before_restart(&self) {
+    pub(crate) fn before_restart(&self) {
         if let Some(before_restart) = &self.before_restart {
             before_restart()
         } else {
-            self.call_after_stop()
+            self.after_stop()
         }
     }
 
-    pub(crate) fn call_after_restart(&self) {
+    pub(crate) fn after_restart(&self) {
         if let Some(after_restart) = &self.after_restart {
             after_restart()
         } else {
-            self.call_before_start()
+            self.before_start()
         }
     }
 
-    pub(crate) fn call_after_stop(&self) {
+    pub(crate) fn after_stop(&self) {
         if let Some(after_stop) = &self.after_stop {
             after_stop()
         }

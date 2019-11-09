@@ -76,7 +76,7 @@ impl System {
 
     // TODO: set a limit?
     async fn recover(&mut self, mut supervisor: Supervisor) {
-        supervisor.callbacks().call_before_restart();
+        supervisor.callbacks().before_restart();
 
         let parent = Parent::system();
         let bcast = if supervisor.id() == &NIL_ID {
@@ -87,7 +87,7 @@ impl System {
 
         let id = bcast.id().clone();
         supervisor.reset(bcast).await;
-        supervisor.callbacks().call_after_restart();
+        supervisor.callbacks().after_restart();
 
         self.bcast.register(supervisor.bcast());
 
@@ -144,7 +144,7 @@ impl System {
                 self.started = false;
 
                 for supervisor in self.stop().await {
-                    supervisor.callbacks().call_after_stop();
+                    supervisor.callbacks().after_stop();
                 }
 
                 return Err(());
@@ -158,7 +158,7 @@ impl System {
             }
             BastionMessage::Deploy(deployment) => match deployment {
                 Deployment::Supervisor(supervisor) => {
-                    supervisor.callbacks().call_before_start();
+                    supervisor.callbacks().before_start();
 
                     self.bcast.register(supervisor.bcast());
                     if self.started {
@@ -214,7 +214,7 @@ impl System {
                     if self.restart.remove(&id) {
                         self.recover(supervisor).await;
                     } else {
-                        supervisor.callbacks().call_after_stop();
+                        supervisor.callbacks().after_stop();
                     }
 
                     continue;

@@ -164,7 +164,7 @@ impl Supervisor {
 
             let killed = killed.contains(supervised.id());
             if killed {
-                supervised.callbacks().call_before_restart();
+                supervised.callbacks().before_restart();
             }
 
             let bcast = Broadcast::new(parent.clone());
@@ -173,9 +173,9 @@ impl Supervisor {
                 let supervised = supervised.reset(bcast).await.unwrap();
                 // FIXME: might not keep order
                 if killed {
-                    supervised.callbacks().call_after_restart();
+                    supervised.callbacks().after_restart();
                 } else {
-                    supervised.callbacks().call_before_start();
+                    supervised.callbacks().before_start();
                 }
 
                 supervised
@@ -259,8 +259,8 @@ impl Supervisor {
     /// [`SupervisorRef`]: ../struct.SupervisorRef.html
     /// [`supervisor_ref`]: #method.supervisor_ref
     pub fn supervisor<S>(self, init: S) -> Self
-        where
-            S: FnOnce(Supervisor) -> Supervisor,
+    where
+        S: FnOnce(Supervisor) -> Supervisor,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
@@ -312,8 +312,8 @@ impl Supervisor {
     /// [`SupervisorRef`]: ../struct.SupervisorRef.html
     /// [`supervisor`]: #method.supervisor
     pub fn supervisor_ref<S>(&mut self, init: S) -> SupervisorRef
-        where
-            S: FnOnce(Supervisor) -> Supervisor,
+    where
+        S: FnOnce(Supervisor) -> Supervisor,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
@@ -374,8 +374,8 @@ impl Supervisor {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children_ref`]: #method.children_ref
     pub fn children<C>(self, init: C) -> Self
-        where
-            C: FnOnce(Children) -> Children,
+    where
+        C: FnOnce(Children) -> Children,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
@@ -437,8 +437,8 @@ impl Supervisor {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     /// [`children`]: #method.children
     pub fn children_ref<C>(&self, init: C) -> ChildrenRef
-        where
-            C: FnOnce(Children) -> Children,
+    where
+        C: FnOnce(Children) -> Children,
     {
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
@@ -531,7 +531,7 @@ impl Supervisor {
 
             let killed = killed.contains(supervised.id());
             if killed {
-                supervised.callbacks().call_before_restart();
+                supervised.callbacks().before_restart();
             }
 
             let bcast = Broadcast::new(parent.clone());
@@ -540,9 +540,9 @@ impl Supervisor {
                 let supervised = supervised.reset(bcast).await.unwrap();
                 // FIXME: might not keep order
                 if killed {
-                    supervised.callbacks().call_after_restart();
+                    supervised.callbacks().after_restart();
                 } else {
-                    supervised.callbacks().call_before_start();
+                    supervised.callbacks().before_start();
                 }
 
                 supervised
@@ -589,7 +589,7 @@ impl Supervisor {
                 Some(supervised) => {
                     let id = supervised.id().clone();
 
-                    supervised.callbacks().call_after_stop();
+                    supervised.callbacks().after_stop();
                     self.stopped.insert(id, supervised);
                 }
                 // FIXME
@@ -650,7 +650,7 @@ impl Supervisor {
                 // FIXME: panics?
                 let supervised = launched.await.unwrap();
                 dbg!();
-                supervised.callbacks().call_before_restart();
+                supervised.callbacks().before_restart();
 
                 self.bcast.unregister(supervised.id());
 
@@ -659,7 +659,7 @@ impl Supervisor {
                 let id = bcast.id().clone();
                 // FIXME: panics?
                 let supervised = supervised.reset(bcast).await.unwrap();
-                supervised.callbacks().call_after_restart();
+                supervised.callbacks().after_restart();
 
                 self.bcast.register(supervised.bcast());
                 if self.started {
@@ -707,11 +707,11 @@ impl Supervisor {
             BastionMessage::Deploy(deployment) => {
                 let supervised = match deployment {
                     Deployment::Supervisor(supervisor) => {
-                        supervisor.callbacks().call_before_start();
+                        supervisor.callbacks().before_start();
                         Supervised::supervisor(supervisor)
                     }
                     Deployment::Children(children) => {
-                        children.callbacks().call_before_start();
+                        children.callbacks().before_start();
                         Supervised::children(children)
                     }
                 };
@@ -727,7 +727,7 @@ impl Supervisor {
                 self.launched
                     .insert(id.clone(), (self.order.len(), launched));
                 self.order.push(id);
-            },
+            }
             // FIXME
             BastionMessage::Prune { .. } => unimplemented!(),
             BastionMessage::SuperviseWith(strategy) => {
@@ -742,7 +742,7 @@ impl Supervisor {
                     // TODO: add a "waiting" list an poll from it instead of awaiting
                     // FIXME: panics?
                     let supervised = launched.await.unwrap();
-                    supervised.callbacks().call_after_stop();
+                    supervised.callbacks().after_stop();
 
                     self.bcast.unregister(&id);
                     self.stopped.insert(id, supervised);

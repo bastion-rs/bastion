@@ -24,7 +24,6 @@ fn sp(supervisor: Supervisor) -> Supervisor {
             println!("(sp      ) after_stop");
         });
 
-
     let children_ref = supervisor.children_ref(sp_ch);
 
     supervisor
