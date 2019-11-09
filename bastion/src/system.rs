@@ -83,16 +83,15 @@ impl System {
     async fn recover(&mut self, mut supervisor: Supervisor) {
         let parent = Parent::system();
         let bcast = if supervisor.id() == &NIL_ID {
-            Broadcast::with_id(parent, NIL_ID)
+            None
         } else {
-            Broadcast::new(parent)
+            Some(Broadcast::new(parent))
         };
-
-        let id = bcast.id().clone();
 
         supervisor.reset(bcast).await;
         self.bcast.register(supervisor.bcast());
 
+        let id = supervisor.id().clone();
         let launched = supervisor.launch();
         self.launched.insert(id, launched);
     }

@@ -132,11 +132,16 @@ impl Supervisor {
         ProcStack::default()
     }
 
-    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
+    pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
         // TODO: stop or kill?
         let killed = self.kill(0..).await;
 
-        self.bcast = bcast;
+        if let Some(bcast) = bcast {
+            self.bcast = bcast;
+        } else {
+            self.bcast.clear_children();
+        }
+
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
@@ -1067,7 +1072,7 @@ impl Supervised {
                 let stack = ProcStack::default();
                 pool::spawn(
                     async {
-                        supervisor.reset(bcast).await;
+                        supervisor.reset(Some(bcast)).await;
                         Supervised::Supervisor(supervisor)
                     },
                     stack,
