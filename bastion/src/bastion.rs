@@ -2,7 +2,7 @@ use crate::broadcast::{Broadcast, Parent};
 use crate::children::{Children, ChildrenRef};
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
-use crate::system::{ROOT_SPV, SYSTEM, SYSTEM_SENDER};
+use crate::system::{System, SYSTEM, SYSTEM_SENDER};
 use std::fmt::{self, Debug, Formatter};
 use std::thread;
 
@@ -265,15 +265,13 @@ impl Bastion {
     where
         C: FnOnce(Children) -> Children,
     {
-        // FIXME: panics
-        ROOT_SPV
-            .clone()
-            .read()
-            .wait()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .children(init)
+        // FIXME: unsafe?
+        if let Some(supervisor) = System::root_supervisor() {
+            supervisor.children(init)
+        } else {
+            // TODO: Err(Error)
+            Err(())
+        }
     }
 
     /// Sends a message to the system which will then send it to all
