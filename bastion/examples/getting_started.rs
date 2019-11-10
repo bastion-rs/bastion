@@ -109,7 +109,7 @@ fn main() {
     let answer: Answer = child
         .ask("A message containing data.")
         .expect("Couldn't send the message.");
-    async {
+    let _ = async {
         // ...until the child eventually answers back...
         let _answer: Result<Msg, ()> = answer.await;
     };

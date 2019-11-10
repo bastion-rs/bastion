@@ -9,14 +9,7 @@
 //! called [lightproc] and utilize all the system resources
 //! efficiently with at-most-once message delivery guarantee.
 //!
-//! ## Why Bastion?
-//! If one of the questions below answered with yes, then Bastion is just for you:
-//! * Do I need fault-tolerance in my project?
-//! * Do I hate to implement weird Actor traits?
-//! * I shouldn't need a webserver to run an actor system, right?
-//! * Do I want to make my existing code unbreakable?
-//! * Do I need an executor which is using system resources efficiently?
-//! * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
+//! To have a quick start please head to: [Bastion System Documentation](struct.Bastion.html).
 //!
 //! ## Features
 //! * Message-based communication makes this project a lean mesh of actor system.
@@ -31,10 +24,24 @@
 //! ## Guarantees
 //! * At most once delivery for all the messages.
 //! * Completely asynchronous system design.
-//! * Asynchronous program boundaries
-//! *
+//! * Asynchronous program boundaries with [fort].
+//! * Dynamic supervision of supervisors (adding a subtree later during the execution)
+//! * Lifecycle management both at `futures` and `lightproc` layers.
+//! * Faster middleware development.
+//! * Above all "fault-tolerance".
+//!
+//! ## Why Bastion?
+//! If one of the questions below answered with yes, then Bastion is just for you:
+//! * Do I need fault-tolerance in my project?
+//! * Do I need to write resilient middleware/s?
+//! * I shouldn't need a webserver to run an actor system, right?
+//! * Do I want to make my existing code unbreakable?
+//! * Do I need an executor which is using system resources efficiently?
+//! * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
+//!
 //!
 //! [lightproc]: https://docs.rs/lightproc/
+//! [fort]: https://docs.rs/fort/
 //!
 
 #![doc(
@@ -55,6 +62,8 @@ pub mod children;
 pub mod message;
 pub mod supervisor;
 
+///
+/// Prelude of Bastion
 pub mod prelude {
     pub use crate::bastion::Bastion;
     pub use crate::children::{ChildRef, Children, ChildrenRef};

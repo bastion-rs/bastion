@@ -11,6 +11,31 @@ pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub(crate) struct BastionId(Uuid);
 
+///
+/// Context for the inter children communication.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             format!("{:#?}", ctx.current());
+///             Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
