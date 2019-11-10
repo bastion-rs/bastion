@@ -1,3 +1,5 @@
+//!
+//! Handle for recoverable process
 use crate::proc_data::ProcData;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::ProcStack;
@@ -7,6 +9,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::thread;
 
+/// Recoverable handle which encapsulates a standard Proc Handle and contain all panics inside.
+///
+/// Execution of `after_panic` will be immediate on polling the [RecoverableHandle]'s future.
 pub struct RecoverableHandle<R>(pub(crate) ProcHandle<thread::Result<R>>);
 
 impl<R> RecoverableHandle<R> {
