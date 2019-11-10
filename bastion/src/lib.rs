@@ -11,7 +11,7 @@
 //!
 //! ## Why Bastion?
 //! If one of the questions below answered with yes, then Bastion is just for you:
-//! * Do I need fault-tolerancy in my project?
+//! * Do I need fault-tolerance in my project?
 //! * Do I hate to implement weird Actor traits?
 //! * I shouldn't need a webserver to run an actor system, right?
 //! * Do I want to make my existing code unbreakable?

@@ -1,3 +1,7 @@
+//!
+//! Blocking run of the async processes
+//!
+//!
 use super::worker;
 use crossbeam_utils::sync::Parker;
 use lightproc::proc_stack::ProcStack;
@@ -10,6 +14,26 @@ use std::sync::Arc;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::{mem, panic};
 
+///
+/// This method blocks the current thread until passed future is resolved with an output (including the panic).
+///
+/// It is called `block_on` or `blocking` in some executors.
+///
+/// # Example
+/// ```rust
+/// use bastion_executor::prelude::*;
+/// use lightproc::prelude::*;
+/// let mut sum = 0;
+///
+/// run(
+///     async {
+///         (0..10_000_000).for_each(|_| {
+///             sum += 1;
+///         });
+///     },
+///     ProcStack::default(),
+/// );
+/// ```
 pub fn run<F, T>(future: F, stack: ProcStack) -> T
 where
     F: Future<Output = T>,

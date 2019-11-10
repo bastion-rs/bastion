@@ -1,4 +1,6 @@
-//! Concurrent work-stealing deques.
+//! Concurrent work-stealing deques with proportional stealing enabled.
+//!
+//! Adapted from [crossbeam-deque].
 //!
 //! These data structures are most commonly used in work-stealing schedulers. The typical setup
 //! involves a number of threads, each having its own FIFO or LIFO queue (*worker*). There is also
@@ -256,6 +258,7 @@ impl<T> Worker<T> {
         }
     }
 
+    /// Get the worker's run queue size
     pub fn worker_run_queue_size(&self) -> usize {
         let b = self.inner.back.load(Ordering::Relaxed);
         let f = self.inner.front.load(Ordering::SeqCst);
@@ -508,6 +511,7 @@ impl<T> Stealer<T> {
         b.wrapping_sub(f) <= 0
     }
 
+    /// Returns back the run queue size for the current worker through stealer
     pub fn run_queue_size(&self) -> usize {
         let b = self.inner.back.load(Ordering::Acquire);
         atomic::fence(Ordering::SeqCst);
@@ -893,6 +897,9 @@ impl<T> Stealer<T> {
         Steal::Success(task)
     }
 
+    ///
+    /// Steals a batch of tasks and amend to the given worker's run queue with the specified amount.
+    /// If requested amount is above the threshold of time-ahead it defaults to time-ahead amount.
     pub fn steal_batch_and_pop_with_amount(&self, dest: &Worker<T>, amount: usize) -> Steal<T> {
         // Load the front index.
         let mut f = self.inner.front.load(Ordering::Acquire);
@@ -920,7 +927,7 @@ impl<T> Stealer<T> {
             return Steal::Empty;
         }
 
-        let default_time_ahead = ((len as usize - 1) / 2);
+        let default_time_ahead = (len as usize - 1) / 2;
         if amount > default_time_ahead as usize {
             amount = default_time_ahead;
         }

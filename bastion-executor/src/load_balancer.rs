@@ -1,17 +1,28 @@
+//!
+//! Module for gathering statistics about the run queues of the runtime
+//!
+//! Load balancer calculates sampled mean to provide average process execution amount
+//! to all runtime.
+//!
+
 use super::placement;
 use lazy_static::*;
 
 use std::thread;
 
 use super::load_balancer;
-use crate::worker;
 use crossbeam_utils::sync::ShardedLock;
 use rustc_hash::FxHashMap;
 use std::time::Duration;
 
+///
+/// Loadbalancer struct which is just a convenience wrapper over the statistics calculations.
+#[derive(Debug)]
 pub struct LoadBalancer();
 
 impl LoadBalancer {
+    ///
+    /// Statistics sampling thread for run queue load balancing.
     pub fn sample() {
         thread::Builder::new()
             .name("load-balancer-thread".to_string())
@@ -36,7 +47,14 @@ impl LoadBalancer {
     }
 }
 
-#[derive(Clone)]
+///
+/// Holding all statistics related to the run queue
+///
+/// Contains:
+/// * Global run queue size
+/// * Mean level of processes in the run queues
+/// * SMP queue distributions
+#[derive(Clone, Debug)]
 pub struct Stats {
     pub(crate) global_run_queue: usize,
     pub(crate) mean_level: usize,
@@ -46,6 +64,8 @@ pub struct Stats {
 unsafe impl Send for Stats {}
 unsafe impl Sync for Stats {}
 
+///
+/// Static access to runtime statistics
 #[inline]
 pub fn stats() -> &'static ShardedLock<Stats> {
     lazy_static! {
