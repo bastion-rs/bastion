@@ -45,6 +45,7 @@
 #![warn(missing_debug_implementations)]
 
 pub use self::bastion::Bastion;
+pub use self::context::BastionContext;
 
 mod bastion;
 mod broadcast;
