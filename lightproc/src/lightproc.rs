@@ -57,6 +57,36 @@ unsafe impl Send for LightProc {}
 unsafe impl Sync for LightProc {}
 
 impl LightProc {
+    ///
+    /// Creates a recoverable process which will signal occurred
+    /// panic back to the poller.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use lightproc::prelude::*;
+    /// #
+    /// # // ... future that does work
+    /// # let future = async {
+    /// #     println!("Doing some work");
+    /// # };
+    /// #
+    /// # // ... basic schedule function with no waker logic
+    /// # fn schedule_function(proc: LightProc) {;}
+    /// #
+    /// # // ... process stack with a lifecycle callback
+    /// # let proc_stack =
+    /// #     ProcStack::default()
+    /// #         .with_after_panic(|| {
+    /// #             println!("After panic started!");
+    /// #         });
+    /// #
+    /// // ... creating a recoverable process
+    /// let panic_recoverable = LightProc::recoverable(
+    ///     future,
+    ///     schedule_function,
+    ///     proc_stack
+    /// );
+    /// ```
     pub fn recoverable<F, R, S>(
         future: F,
         schedule: S,
@@ -72,6 +102,35 @@ impl LightProc {
         (proc, RecoverableHandle(handle))
     }
 
+    ///
+    /// Creates a standard process which will stop it's execution on occurrence of panic.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use lightproc::prelude::*;
+    /// #
+    /// # // ... future that does work
+    /// # let future = async {
+    /// #     println!("Doing some work");
+    /// # };
+    /// #
+    /// # // ... basic schedule function with no waker logic
+    /// # fn schedule_function(proc: LightProc) {;}
+    /// #
+    /// # // ... process stack with a lifecycle callback
+    /// # let proc_stack =
+    /// #     ProcStack::default()
+    /// #         .with_after_panic(|| {
+    /// #             println!("After panic started!");
+    /// #         });
+    /// #
+    /// // ... creating a standard process
+    /// let standard = LightProc::build(
+    ///     future,
+    ///     schedule_function,
+    ///     proc_stack
+    /// );
+    /// ```
     pub fn build<F, R, S>(future: F, schedule: S, stack: ProcStack) -> (LightProc, ProcHandle<R>)
     where
         F: Future<Output = R> + Send + 'static,
@@ -87,6 +146,8 @@ impl LightProc {
         (proc, handle)
     }
 
+    ///
+    /// Schedule the lightweight process with passed `schedule` function at the build time.
     pub fn schedule(self) {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
@@ -97,6 +158,8 @@ impl LightProc {
         }
     }
 
+    ///
+    /// Schedule the lightproc for runnning on the thread.
     pub fn run(self) {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
@@ -107,6 +170,8 @@ impl LightProc {
         }
     }
 
+    ///
+    /// Cancel polling the lightproc's inner future, thus cancelling th proc itself.
     pub fn cancel(&self) {
         let ptr = self.raw_proc.as_ptr();
         let pdata = ptr as *const ProcData;
@@ -116,6 +181,8 @@ impl LightProc {
         }
     }
 
+    ///
+    /// Gives a reference to given [ProcStack] when building the light proc.
     pub fn stack(&self) -> &ProcStack {
         let offset = ProcData::offset_stack();
         let ptr = self.raw_proc.as_ptr();
