@@ -1,3 +1,6 @@
+//!
+//! Children are a group of child supervised under a supervisor
+//! Allows users to communicate with children through the mailboxes.
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{Answer, BastionMessage, Message};

@@ -1,3 +1,11 @@
+//!
+//! Dynamic dispatch oriented messaging system
+//!
+//! This system allows:
+//! * Generic communication between mailboxes.
+//! * All message communication relies on at-most-once delivery guarantee.
+//! * Messages are not guaranteed to be ordered, all message's order is causal.
+//!
 use crate::children::Children;
 use crate::context::BastionId;
 use crate::supervisor::{SupervisionStrategy, Supervisor};
