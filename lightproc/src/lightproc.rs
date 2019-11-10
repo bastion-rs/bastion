@@ -1,3 +1,39 @@
+//!
+//! Lightweight process implementation which enables users
+//! to create either panic recoverable process or
+//! ordinary process.
+//!
+//! Lightweight processes needs a stack to use their lifecycle
+//! operations like `before_start`, `after_complete` and more...
+//!
+//! # Example Usage
+//!
+//! ```rust
+//! use lightproc::prelude::*;
+//!
+//! // ... future that does work
+//! let future = async {
+//!     println!("Doing some work");
+//! };
+//!
+//! // ... basic schedule function with no waker logic
+//! fn schedule_function(proc: LightProc) {;}
+//!
+//! // ... process stack with a lifecycle callback
+//! let proc_stack =
+//!     ProcStack::default()
+//!         .with_after_panic(|| {
+//!             println!("After panic started!");
+//!         });
+//!
+//! // ... creating a recoverable process
+//! let panic_recoverable = LightProc::recoverable(
+//!     future,
+//!     schedule_function,
+//!     proc_stack
+//! );
+//! ```
+
 use crate::proc_data::ProcData;
 use crate::proc_ext::ProcFutureExt;
 use crate::proc_handle::ProcHandle;
@@ -11,6 +47,7 @@ use std::mem;
 use std::panic::AssertUnwindSafe;
 use std::ptr::NonNull;
 
+/// Struct to create and operate lightweight processes
 pub struct LightProc {
     /// A pointer to the heap-allocated proc.
     pub(crate) raw_proc: NonNull<()>,

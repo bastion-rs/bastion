@@ -1,3 +1,6 @@
+//!
+//! Handle for tasks which don't need to unwind panics inside
+//! the given futures.
 use crate::proc_data::ProcData;
 use crate::proc_stack::ProcStack;
 use crate::state::*;
