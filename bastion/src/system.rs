@@ -10,7 +10,7 @@ use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::Qutex;
-use std::cell::RefCell;
+
 use std::task::Poll;
 
 static mut ROOT_SPV: Option<SupervisorRef> = None;

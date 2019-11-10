@@ -1,15 +1,26 @@
+//!
+//! Core placement configuration and management
+//!
+//! Placement module enables thread placement onto the cores.
+//! CPU level affinity assignment is done here.
+
 /// This function tries to retrieve information
 /// on all the "cores" active on this system.
 pub fn get_core_ids() -> Option<Vec<CoreId>> {
     get_core_ids_helper()
 }
 
+///
+/// Sets the current threads affinity
 pub fn set_for_current(core_id: CoreId) {
     set_for_current_helper(core_id);
 }
 
+///
+/// CoreID implementation to identify system cores.
 #[derive(Copy, Clone, Debug)]
 pub struct CoreId {
+    /// Used core ID
     pub id: usize,
 }
 

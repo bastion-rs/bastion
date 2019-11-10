@@ -58,13 +58,13 @@ fn main() {
                 async move {
                     // ...receiving and matching messages...
                     msg! { ctx.recv().await?,
-                        ref msg: &'static str => {
+                        ref _msg: &'static str => {
                             // ...
                         };
-                        msg: &'static str => {
+                        _msg: &'static str => {
                             // ...
                         };
-                        msg: &'static str =!> {
+                        _msg: &'static str =!> {
                             // ...
                         };
                         // ...
@@ -111,7 +111,7 @@ fn main() {
         .expect("Couldn't send the message.");
     async {
         // ...until the child eventually answers back...
-        let answer: Result<Msg, ()> = answer.await;
+        let _answer: Result<Msg, ()> = answer.await;
     };
 
     // ...and then even stop or kill it...
