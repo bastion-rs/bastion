@@ -4,15 +4,7 @@
 
 -----------------
 
-<h1 align="center">Bastion: Fault-tolerant Runtime for Rust applications</h1>
-
-*The breeze of the cold winter had come. This time of the year, Crashers arrive in the village. These are the giants who can't be evaded. They born to destroy and take people to the Paniks Heights. Suddenly, The developer descried the blurry silhouettes of Crashers from afar.*
-
-*With cold and cracked voice, he whispered:*
-
-*It is time to go to **Bastion Fort**.*
-
----
+<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
 
 <table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 <tr>
@@ -62,11 +54,11 @@
 
 ---
 
-Bastion is a Fault-tolerant Runtime for Rust applications.
-It detect panics during runs of your code and serves a runtime to
-prevent abrupt exits. Also, it enables you to continue serving in case of
-a failure. You can select your own recovery scenario, scale your workers and
-define whole application on top of it. 
+Bastion is a highly-available, fault-tolerant runtime system
+with dynamic dispatch oriented lightweight process model.
+It supplies actor model like concurrency with lightweight process implementation
+and utilize all the system resources efficiently with giving promise of
+at-most-once message delivery guarantee.
 
 ---
 
@@ -74,6 +66,25 @@ define whole application on top of it.
 
 Bastion comes with a default one-for-one strategy root supervisor.
 You can use this to launch automatically supervised tasks.
+
+## Features
+* Message-based communication makes this project a lean mesh of actor system.
+    * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
+* Runtime fault-tolerance makes it a good candidate for distributed systems.
+    * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
+* Completely asynchronous runtime with NUMA-aware and cache-affine SMP executor.
+    * Exploiting hardware locality wherever it is possible. It is designed for servers.
+* Supervision system makes it easy to manage lifecycles.
+    * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
+
+## Guarantees
+* At most once delivery for all the messages.
+* Completely asynchronous system design.
+* Asynchronous program boundaries with [fort].
+* Dynamic supervision of supervisors (adding a subtree later during the execution)
+* Lifecycle management both at `futures` and `lightproc` layers.
+* Faster middleware development.
+* Above all "fault-tolerance".
 
 ## Why Bastion?
 If one of the questions below answered with yes, then Bastion is just for you:
@@ -83,56 +94,17 @@ If one of the questions below answered with yes, then Bastion is just for you:
 * Do I want to make my existing code unbreakable?
 * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
 
-## Features
-* Message-based communication makes this project a lean mesh of actor system.
-    * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
-* Runtime fault-tolerance makes it a good candidate for small scale distributed system code.
-    * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
-* Supervision makes it easy to manage lifecycles.
-    * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
-All up to you. And it should be up to you.
-
 ### Get Started
-Check basic [root supervisor](https://github.com/bastion-rs/bastion/blob/master/examples/root_spv.rs) example in examples.
+Check [getting started example](https://github.com/bastion-rs/bastion/blob/master/examples/getting_started.rs) in examples.
 
 [Examples](https://github.com/bastion-rs/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
 
 Include bastion to your project with:
 ```toml
-bastion = "0.2"
+bastion = "0.3"
 ```
 
-In most simple way you can use Bastion like here:
-```rust
-use bastion::prelude::*;
-
-fn main() {
-    Bastion::platform();
-
-    // Define, calculate or prepare messages to be sent to the processes. 
-    let message = String::from("Some message to be passed");
-
-    Bastion::spawn(
-        |context: BastionContext, msg: Box<dyn Message>| {
-            // Message can be selected with receiver here. Take action!
-            receive! { msg,
-                String => |e| { println!("Received string :: {}", e)},
-                i32 => |e| {println!("Received i32 :: {}", e)},
-                _ => println!("No message as expected. Default")
-            }
-
-            // Do some processing in body
-            println!("root supervisor - spawn_at_root - 1");
-
-            // Rebind to the system
-            context.hook();
-        },
-        message,
-    );
-
-    Bastion::start()
-}
-```
+For more information please check [Bastion Documentation](https://docs.rs/bastion)
 
 ## Architecture of the Runtime
 
@@ -160,7 +132,7 @@ at your option.
 Official documentation is hosted on [docs.rs](https://docs.rs/bastion).
 
 ## Getting Help
-Please head to our [Discord](https://discord.gg/DqRqtRT) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastionframework)
+Please head to our [Discord](https://discord.gg/DqRqtRT) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastion)
 
 ## Discussion and Development
 We use [Discord](https://discord.gg/DqRqtRT) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
