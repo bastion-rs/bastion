@@ -118,7 +118,7 @@ impl ProcStack {
     ///
     /// let proc = ProcStack::default().with_pid(123);
     ///
-    /// assert!(proc.get_pid(), 123);
+    /// assert_eq!(proc.get_pid(), 123);
     /// ```
     pub fn get_pid(&self) -> usize {
         self.pid.load(Ordering::Acquire)
