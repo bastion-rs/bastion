@@ -273,6 +273,9 @@ impl Bastion {
     /// created children group it it succeeded, or `Err(())`
     /// otherwise.
     ///
+    /// Note that the "system supervisor" is a supervisor created
+    /// by the system at startup.
+    ///
     /// # Arguments
     ///
     /// * `init` - The closure taking the new [`Children`] as an
