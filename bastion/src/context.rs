@@ -41,6 +41,10 @@ pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
     children: ChildrenRef,
+    // A reference to the child's group's supervisor or
+    // `None` if its the "system supervisor" (ie. if the
+    // children group was created by using
+    // `Bastion::children`).
     supervisor: Option<SupervisorRef>,
     state: Qutex<ContextState>,
 }

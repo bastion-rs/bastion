@@ -153,10 +153,18 @@ impl Supervisor {
         ProcStack::default()
     }
 
+    /// Resets the supervisor, killing all its supervised elements,
+    /// changing its assigned [`Broadcast`] (it is isn't the "system
+    /// supervisor") and resetting all its supervised elements.
+    ///
+    /// [`Broadcast`]: broadcast/struct.Broadcast.html
     pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
         // TODO: stop or kill?
         let killed = self.kill(0..).await;
 
+        // If this is the "system supervisor", it shouldn't change
+        // its `Broadcast` because it would make `SYSTEM_SPV`
+        // invalid.
         if let Some(bcast) = bcast {
             self.bcast = bcast;
         } else {
@@ -166,6 +174,8 @@ impl Supervisor {
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
+        // Reset all the supervised elements with a new `Broadcast`
+        // having this supervisor's new `Broadcast` as a parent...
         let mut reset = FuturesOrdered::new();
         for supervised in killed {
             let parent = Parent::supervisor(self.as_ref());
@@ -177,6 +187,7 @@ impl Supervisor {
             })
         }
 
+        // Re-launch all the supervised elements...
         while let Some(supervised) = reset.next().await {
             let id = supervised.id().clone();
 
@@ -186,6 +197,9 @@ impl Supervisor {
             self.order.push(id);
         }
 
+        // If the supervisor was already started before being
+        // reset, send a message to all the supervised elements
+        // to start them...
         if self.started {
             let msg = BastionMessage::start();
             self.bcast.send_children(msg);
@@ -254,6 +268,9 @@ impl Supervisor {
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
 
+        // Send the initialized supervisor over the `Broadcast` so
+        // that it will get deployed after this supervisor has been
+        // started...
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
 
@@ -308,6 +325,9 @@ impl Supervisor {
         let supervisor = init(supervisor);
         let supervisor_ref = supervisor.as_ref();
 
+        // Send the initialized supervisor over the `Broadcast` so
+        // that it will get deployed after this supervisor has been
+        // started...
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
 
@@ -371,6 +391,9 @@ impl Supervisor {
         // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
 
+        // Send the initialized children group over the `Broadcast` so
+        // that it will get deployed after this supervisor has been
+        // started...
         let msg = BastionMessage::deploy_children(children);
         self.bcast.send_self(msg);
 
@@ -432,11 +455,13 @@ impl Supervisor {
 
         let children = Children::new(bcast);
         let mut children = init(children);
-
         // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
         let children_ref = children.as_ref();
 
+        // Send the initialized children group over the `Broadcast` so
+        // that it will get deployed after this supervisor has been
+        // started...
         let msg = BastionMessage::deploy_children(children);
         self.bcast.send_self(msg);
 
