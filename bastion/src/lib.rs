@@ -52,10 +52,12 @@
 #![warn(missing_debug_implementations)]
 
 pub use self::bastion::Bastion;
+pub use self::callbacks::Callbacks;
 pub use self::context::BastionContext;
 
 mod bastion;
 mod broadcast;
+mod callbacks;
 mod context;
 mod system;
 
@@ -67,6 +69,7 @@ pub mod supervisor;
 /// Prelude of Bastion
 pub mod prelude {
     pub use crate::bastion::Bastion;
+    pub use crate::callbacks::Callbacks;
     pub use crate::children::{ChildRef, Children, ChildrenRef};
     pub use crate::context::BastionContext;
     pub use crate::message::{Answer, Message, Msg, Sender};
