@@ -89,7 +89,7 @@ impl System {
         } else {
             Some(Broadcast::new(parent))
         };
-      
+
         supervisor.reset(bcast).await;
         supervisor.callbacks().after_restart();
 
