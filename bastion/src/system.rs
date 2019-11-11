@@ -13,7 +13,7 @@ use qutex::Qutex;
 
 use std::task::Poll;
 
-static mut ROOT_SPV: Option<SupervisorRef> = None;
+static mut SYSTEM_SPV: Option<SupervisorRef> = None;
 
 lazy_static! {
     pub(crate) static ref SYSTEM: Qutex<Option<RecoverableHandle<()>>> = Qutex::new(None);
@@ -70,13 +70,13 @@ impl System {
         *system = Some(handle);
 
         // FIXME: unsafe?
-        unsafe { ROOT_SPV = Some(supervisor_ref) };
+        unsafe { SYSTEM_SPV = Some(supervisor_ref) };
 
         sender
     }
 
     pub(crate) fn root_supervisor() -> Option<&'static SupervisorRef> {
-        unsafe { ROOT_SPV.as_ref() }
+        unsafe { SYSTEM_SPV.as_ref() }
     }
 
     // TODO: set a limit?
