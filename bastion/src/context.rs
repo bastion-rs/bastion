@@ -4,12 +4,14 @@ use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
+use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
 pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub(crate) struct BastionId(Uuid);
+// TODO: doc
+pub struct BastionId(Uuid);
 
 ///
 /// Context for the inter children communication.
@@ -306,5 +308,11 @@ impl ContextState {
 
     pub(crate) fn push_msg(&mut self, msg: Msg) {
         self.msgs.push_back(msg)
+    }
+}
+
+impl Display for BastionId {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        self.0.fmt(fmt)
     }
 }

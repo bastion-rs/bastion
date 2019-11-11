@@ -227,7 +227,8 @@ impl Supervisor {
         self.killed.shrink_to_fit();
     }
 
-    pub(crate) fn id(&self) -> &BastionId {
+    // TODO: doc
+    pub fn id(&self) -> &BastionId {
         &self.bcast.id()
     }
 
@@ -864,6 +865,11 @@ impl Supervisor {
 impl SupervisorRef {
     pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
         SupervisorRef { id, sender }
+    }
+
+    // TODO: doc
+    pub fn id(&self) -> &BastionId {
+        &self.id
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified

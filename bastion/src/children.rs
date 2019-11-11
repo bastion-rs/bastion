@@ -171,7 +171,8 @@ impl Children {
         self.launch_elems();
     }
 
-    pub(crate) fn id(&self) -> &BastionId {
+    // TODO: doc
+    pub fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
@@ -497,6 +498,11 @@ impl ChildrenRef {
         }
     }
 
+    // TODO: doc
+    pub fn id(&self) -> &BastionId {
+        &self.id
+    }
+
     /// Returns a list of [`ChildRef`] referencing the elements
     /// of the children group this `ChildrenRef` is referencing.
     ///
@@ -771,6 +777,11 @@ impl Child {
 impl ChildRef {
     fn new(id: BastionId, sender: Sender) -> ChildRef {
         ChildRef { id, sender }
+    }
+
+    // TODO: doc
+    pub fn id(&self) -> &BastionId {
+        &self.id
     }
 
     /// Sends a message to the child this `ChildRef` is referencing.
