@@ -76,10 +76,6 @@ pub struct Supervisor {
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
-    // Whether the supervisor referenced was started by
-    // the system (in which case, users shouldn't be able
-    // to get a reference to it).
-    is_system_supervisor: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -195,9 +191,8 @@ impl Supervisor {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
-        let is_system_supervisor = self.is_system_supervisor;
 
-        SupervisorRef::new(id, sender, is_system_supervisor)
+        SupervisorRef::new(id, sender)
     }
 
     /// Creates a new supervisor, passes it through the specified
@@ -764,11 +759,10 @@ impl Supervisor {
 }
 
 impl SupervisorRef {
-    pub(crate) fn new(id: BastionId, sender: Sender, is_system_supervisor: bool) -> Self {
+    pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
         SupervisorRef {
             id,
             sender,
-            is_system_supervisor,
         }
     }
 
@@ -1052,10 +1046,6 @@ impl SupervisorRef {
     pub fn kill(&self) -> Result<(), ()> {
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
-    }
-
-    pub(crate) fn is_system_supervisor(&self) -> bool {
-        self.is_system_supervisor
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {

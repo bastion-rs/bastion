@@ -16,7 +16,7 @@ pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
     children: ChildrenRef,
-    supervisor: SupervisorRef,
+    supervisor: Option<SupervisorRef>,
     state: Qutex<ContextState>,
 }
 
@@ -38,7 +38,7 @@ impl BastionContext {
         id: BastionId,
         child: ChildRef,
         children: ChildrenRef,
-        supervisor: SupervisorRef,
+        supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
     ) -> Self {
         BastionContext {
@@ -172,11 +172,7 @@ impl BastionContext {
     /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     /// [`Bastion::children`]: struct.Bastion.html#method.children
     pub fn supervisor(&self) -> Option<&SupervisorRef> {
-        if self.supervisor.is_system_supervisor() {
-            None
-        } else {
-            Some(&self.supervisor)
-        }
+        self.supervisor.as_ref()
     }
 
     /// Tries to retrieve asynchronously a message received by

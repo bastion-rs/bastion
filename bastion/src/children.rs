@@ -403,8 +403,7 @@ impl Children {
 
             let child_ref = ChildRef::new(id.clone(), sender.clone());
             let children = self.as_ref();
-            // FIXME
-            let supervisor = self.bcast.parent().clone().into_supervisor().unwrap();
+            let supervisor = self.bcast.parent().clone().into_supervisor();
 
             let state = ContextState::new();
             let state = Qutex::new(state);
