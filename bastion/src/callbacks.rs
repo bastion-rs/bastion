@@ -1,24 +1,48 @@
 use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
-pub trait BeforeStart: Fn() + Send + Sync + 'static {}
-impl<T> BeforeStart for T where T: Fn() + Send + Sync + 'static {}
-
-pub trait BeforeRestart: Fn() + Send + Sync + 'static {}
-impl<T> BeforeRestart for T where T: Fn() + Send + Sync + 'static {}
-
-pub trait AfterRestart: Fn() + Send + Sync + 'static {}
-impl<T> AfterRestart for T where T: Fn() + Send + Sync + 'static {}
-
-pub trait AfterStop: Fn() + Send + Sync + 'static {}
-impl<T> AfterStop for T where T: Fn() + Send + Sync + 'static {}
-
 #[derive(Default)]
+/// A set of methods that will get called at different states of
+/// a [`Supervisor`] or [`Children`] life.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// Bastion::children(|children| {
+///     let callbacks = Callbacks::new()
+///         .with_before_start(|| println!("Children group started."))
+///         .with_after_stop(|| println!("Children group stopped."));
+///
+///     children
+///         .with_callbacks(callbacks)
+///         .with_exec(|ctx| {
+///             // -- Children group started.
+///             async move {
+///                 // ...
+///                 # Ok(())
+///             }
+///             // -- Children group stopped.
+///         })
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`Supervisor`]: supervisor/struct.Supervisor.html
+/// [`Children`]: children/struct.Children.html
 pub struct Callbacks {
-    before_start: Option<Arc<dyn BeforeStart>>,
-    before_restart: Option<Arc<dyn BeforeRestart>>,
-    after_restart: Option<Arc<dyn AfterRestart>>,
-    after_stop: Option<Arc<dyn AfterStop>>,
+    before_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    before_restart: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_restart: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_stop: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl Callbacks {
@@ -26,43 +50,337 @@ impl Callbacks {
         Callbacks::default()
     }
 
-    pub fn with_before_start<C: BeforeStart>(mut self, before_start: C) -> Self {
+    /// Sets the method that will get called before the [`Supervisor`]
+    /// or [`Children`] is launched if:
+    /// - it was never called before
+    /// - or the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it was already
+    ///     stopped or killed
+    /// - or the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed but did not have a callback defined using
+    ///     [`with_after_restart`]
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # Bastion::supervisor(|supervisor| {
+    /// supervisor.children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_before_restart(|| println!("Children group restarting."))
+    ///         .with_after_restart(|| println!("Children group restarted."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///
+    ///                 // This will stop the children group...
+    ///                 Ok(())
+    ///                 // Note that because the children group stopped by itself,
+    ///                 // if its supervisor restarts it, its `before_start` callback
+    ///                 // will get called and not `after_restart`.
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    ///         .with_callbacks(callbacks)
+    /// })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Children`]: children/struct.Children.html
+    /// [`with_after_restart`]: #method.with_after_start
+    pub fn with_before_start<C>(mut self, before_start: C) -> Self
+    where
+        C: Fn() + Send + Sync + 'static,
+    {
         let before_start = Arc::new(before_start);
         self.before_start = Some(before_start);
         self
     }
 
-    pub fn with_before_restart<C: BeforeRestart>(mut self, before_restart: C) -> Self {
+    /// Sets the method that will get called before the [`Supervisor`]
+    /// or [`Children`] is reset if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed
+    ///
+    /// Note that if this callback isn't defined but one was defined using
+    /// [`with_after_stop`], it will get called instead.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # Bastion::supervisor(|supervisor| {
+    /// supervisor.children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_before_restart(|| println!("Children group restarting."))
+    ///         .with_after_restart(|| println!("Children group restarted."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_exec(|ctx| {
+    ///             // Once -- Children group started.
+    ///             // and then -- Children group restarted.
+    ///             async move {
+    ///                 // ...
+    ///
+    ///                 // This will make the children group fault and get
+    ///                 // restarted by its supervisor...
+    ///                 Err(())
+    ///             }
+    ///             // -- Children group restarting.
+    ///             // Note that if a `before_restart` wasn't specified for
+    ///             // this children group, `after_stop` would get called
+    ///             // instead.
+    ///         })
+    ///         .with_callbacks(callbacks)
+    /// })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Children`]: children/struct.Children.html
+    /// [`with_after_stop`]: #method.with_after_stop
+    pub fn with_before_restart<C>(mut self, before_restart: C) -> Self
+    where
+        C: Fn() + Send + Sync + 'static,
+    {
         let before_restart = Arc::new(before_restart);
         self.before_restart = Some(before_restart);
         self
     }
 
-    pub fn with_after_restart<C: AfterRestart>(mut self, after_restart: C) -> Self {
+    /// Sets the method that will get called before the [`Supervisor`]
+    /// or [`Children`] is launched if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed
+    ///
+    /// Note that if this callback isn't defined but one was defined using
+    /// [`with_before_start`], it will get called instead.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # Bastion::supervisor(|supervisor| {
+    /// supervisor.children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_before_restart(|| println!("Children group restarting."))
+    ///         .with_after_restart(|| println!("Children group restarted."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_exec(|ctx| {
+    ///             // Once -- Children group started.
+    ///             // and then -- Children group restarted.
+    ///             // Note that if a `after_restart` callback wasn't specified
+    ///             // for this children group, `before_restart` would get called
+    ///             // instead.
+    ///             async move {
+    ///                 // ...
+    ///
+    ///                 // This will make the children group fault and get
+    ///                 // restarted by its supervisor...
+    ///                 Err(())
+    ///             }
+    ///             // -- Children group restarting.
+    ///         })
+    ///         .with_callbacks(callbacks)
+    /// })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Children`]: children/struct.Children.html
+    /// [`with_before_start`]: #method.with_before_start
+    pub fn with_after_restart<C>(mut self, after_restart: C) -> Self
+    where
+        C: Fn() + Send + Sync + 'static,
+    {
         let after_restart = Arc::new(after_restart);
         self.after_restart = Some(after_restart);
         self
     }
 
-    pub fn with_after_stop<C: AfterStop>(mut self, after_stop: C) -> Self {
+    /// Sets the method that will get called after the [`Supervisor`]
+    /// or [`Children`] is stopped or killed if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to stop (not restart nor kill) it and
+    ///     it wasn't already stopped or killed
+    /// - or the supervisor or children group using this callback
+    ///     stopped or killed itself or was stopped or killed by a
+    ///     reference to it
+    /// - or the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed but did not have a callback defined using
+    ///     [`with_before_restart`]
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # Bastion::supervisor(|supervisor| {
+    /// supervisor.children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_before_restart(|| println!("Children group restarting."))
+    ///         .with_after_restart(|| println!("Children group restarted."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///
+    ///                 // This will stop the children group...
+    ///                 Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///             // Note that because the children group stopped by itself,
+    ///             // it its supervisor restarts it, its `before_restart` callback
+    ///             // will not get called.
+    ///         })
+    ///         .with_callbacks(callbacks)
+    /// })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Children`]: children/struct.Children.html
+    /// [`with_before_restart`]: #method.with_before_restart
+    pub fn with_after_stop<C>(mut self, after_stop: C) -> Self
+    where
+        C: Fn() + Send + Sync + 'static,
+    {
         let after_stop = Arc::new(after_stop);
         self.after_stop = Some(after_stop);
         self
     }
 
-    pub fn contains_before_start(&self) -> bool {
+    /// Returns whether a callback was defined using [`with_before_start`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    /// let callbacks = Callbacks::new()
+    ///     .with_before_start(|| println!("Children group started."));
+    ///
+    /// assert!(callbacks.has_before_start());
+    /// # }
+    /// ```
+    ///
+    /// [`with_before_start`]: #method.with_before_start
+    pub fn has_before_start(&self) -> bool {
         self.before_start.is_some()
     }
 
-    pub fn contains_before_restart(&self) -> bool {
+    /// Returns whether a callback was defined using [`with_before_restart`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    /// let callbacks = Callbacks::new()
+    ///     .with_before_restart(|| println!("Children group restarting."));
+    ///
+    /// assert!(callbacks.has_before_restart());
+    /// # }
+    /// ```
+    ///
+    /// [`with_before_restart`]: #method.with_before_restart
+    pub fn has_before_restart(&self) -> bool {
         self.before_restart.is_some()
     }
 
-    pub fn contains_after_restart(&self) -> bool {
+    /// Returns whether a callback was defined using [`with_after_restart`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    /// let callbacks = Callbacks::new()
+    ///     .with_after_restart(|| println!("Children group restarted."));
+    ///
+    /// assert!(callbacks.has_after_restart());
+    /// # }
+    /// ```
+    ///
+    /// [`with_after_restart`]: #method.with_after_restart
+    pub fn has_after_restart(&self) -> bool {
         self.after_restart.is_some()
     }
 
-    pub fn contains_after_stop(&self) -> bool {
+    /// Returns whether a callback was defined using [`with_after_stop`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    /// let callbacks = Callbacks::new()
+    ///     .with_after_stop(|| println!("Children group stopped."));
+    ///
+    /// assert!(callbacks.has_after_stop());
+    /// # }
+    /// ```
+    ///
+    /// [`with_after_stop`]: #method.with_after_stop
+    pub fn has_after_stop(&self) -> bool {
         self.after_stop.is_some()
     }
 

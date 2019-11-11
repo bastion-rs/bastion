@@ -45,20 +45,21 @@
 #![warn(missing_debug_implementations)]
 
 pub use self::bastion::Bastion;
+pub use self::callbacks::Callbacks;
 
 mod bastion;
 mod broadcast;
+mod callbacks;
 mod context;
 mod system;
 
-pub mod callbacks;
 pub mod children;
 pub mod message;
 pub mod supervisor;
 
 pub mod prelude {
     pub use crate::bastion::Bastion;
-    pub use crate::callbacks::{AfterRestart, AfterStop, BeforeRestart, BeforeStart, Callbacks};
+    pub use crate::callbacks::Callbacks;
     pub use crate::children::{ChildRef, Children, ChildrenRef};
     pub use crate::context::BastionContext;
     pub use crate::message::{Answer, Message, Msg, Sender};
