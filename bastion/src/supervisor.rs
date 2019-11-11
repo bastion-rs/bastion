@@ -57,11 +57,12 @@ pub struct Supervisor {
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
     stopped: FxHashMap<BastionId, Supervised>,
-    // TODO: doc
-    // TODO: killed should be empty before calling `kill` and after restarting
+    // Supervised children and supervisors that were killed.
+    // This is used when resetting only.
     killed: FxHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
-    // TODO: doc
+    // The callbacks called at the supervisor's different
+    // lifecycle events.
     callbacks: Callbacks,
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
@@ -144,7 +145,7 @@ impl Supervisor {
 
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
         // TODO: stop or kill?
-        let killed = self.kill(0..).await;
+        self.kill(0..).await;
 
         self.bcast = bcast;
         self.pre_start_msgs.clear();
@@ -162,7 +163,7 @@ impl Supervisor {
                 unimplemented!();
             };
 
-            let killed = killed.contains(supervised.id());
+            let killed = self.killed.contains_key(supervised.id());
             if killed {
                 supervised.callbacks().before_restart();
             }
@@ -508,7 +509,7 @@ impl Supervisor {
     }
 
     /// Sets the callbacks that will get called at this supervisor's
-    /// different lifecycle moments.
+    /// different lifecycle events.
     ///
     /// See [`Callbacks`]'s documentation for more information about the
     /// different callbacks available.
@@ -548,7 +549,7 @@ impl Supervisor {
 
     async fn restart(&mut self, range: RangeFrom<usize>) {
         // TODO: stop or kill?
-        let killed = self.kill(range.clone()).await;
+        self.kill(range.clone()).await;
 
         let parent = Parent::supervisor(self.as_ref());
         let mut reset = FuturesOrdered::new();
@@ -562,7 +563,7 @@ impl Supervisor {
                 unimplemented!();
             };
 
-            let killed = killed.contains(supervised.id());
+            let killed = self.killed.contains_key(supervised.id());
             if killed {
                 supervised.callbacks().before_restart();
             }
@@ -631,7 +632,7 @@ impl Supervisor {
         }
     }
 
-    async fn kill(&mut self, range: RangeFrom<usize>) -> Vec<BastionId> {
+    async fn kill(&mut self, range: RangeFrom<usize>) {
         if range.start == 0 {
             self.bcast.kill_children();
         } else {
@@ -651,20 +652,16 @@ impl Supervisor {
             }
         }
 
-        let mut killed = Vec::with_capacity(supervised.len());
         while let Some(supervised) = supervised.next().await {
             match supervised {
                 Some(supervised) => {
                     let id = supervised.id().clone();
-                    killed.push(id.clone());
                     self.killed.insert(id, supervised);
                 }
                 // FIXME
                 None => unimplemented!(),
             }
         }
-
-        killed
     }
 
     fn stopped(&mut self) {

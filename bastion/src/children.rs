@@ -73,7 +73,8 @@ pub struct Children {
     // every element of the group.
     init: Init,
     redundancy: usize,
-    // TODO: doc
+    // The callbacks called at the group's different lifecycle
+    // events.
     callbacks: Callbacks,
     // Messages that were received before the group was
     // started. Those will be "replayed" once a start message
@@ -283,7 +284,7 @@ impl Children {
     }
 
     /// Sets the callbacks that will get called at this children group's
-    /// different lifecycle moments.
+    /// different lifecycle events.
     ///
     /// See [`Callbacks`]'s documentation for more information about the
     /// different callbacks available.
