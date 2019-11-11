@@ -55,7 +55,7 @@ impl System {
         let parent = Parent::system();
         let bcast = Broadcast::with_id(parent, NIL_ID);
 
-        let supervisor = Supervisor::new(bcast);
+        let supervisor = Supervisor::system(bcast);
         let supervisor_ref = supervisor.as_ref();
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
