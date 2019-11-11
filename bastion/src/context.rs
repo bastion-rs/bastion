@@ -11,8 +11,9 @@ pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub(crate) struct BastionId(Uuid);
 
-///
-/// Context for the inter children communication.
+/// A child's context, allowing to access to get messages
+/// received by it, get a reference to it or a reference
+/// to its children group or supervisor.
 ///
 /// # Example
 ///
@@ -25,7 +26,15 @@ pub(crate) struct BastionId(Uuid);
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
-///             format!("{:#?}", ctx.current());
+///             // Send and receive messages...
+///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+///             // ...get a reference to the child...
+///             let child_ref: &ChildRef = ctx.current();
+///             // ...or children group...
+///             let children_ref: &ChildrenRef = ctx.parent();
+///             // ...or eventually supervisor...
+///             let supervisor_ref: Option<&SupervisorRef> = ctx.supervisor();
+///
 ///             Ok(())
 ///         }
 ///     })
