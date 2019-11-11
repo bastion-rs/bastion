@@ -1,14 +1,44 @@
+//!
+//! Pool of threads to run lightweight processes
+//!
+//! Pool management and tracking belongs here.
+//! We spawn futures onto the pool with [spawn] method of global run queue or
+//! with corresponding [Worker]'s spawn method.
+
 use super::distributor::Distributor;
 
-use super::run_queue::{Injector, Stealer, Worker};
+use super::run_queue::{Injector, Stealer};
 use super::sleepers::Sleepers;
 use super::worker;
 use lazy_static::*;
 use lightproc::prelude::*;
 use std::future::Future;
 
-use crate::load_balancer;
-
+///
+/// Spawn a process (which contains future + process stack) onto the executor from the global level.
+///
+/// # Example
+/// ```rust
+/// use bastion_executor::prelude::*;
+/// use lightproc::prelude::*;
+///
+/// let pid = 1;
+/// let stack = ProcStack::default().with_pid(pid);
+///
+/// let handle = spawn(
+///     async {
+///         panic!("test");
+///     },
+///     stack.clone(),
+/// );
+///
+/// run(
+///     async {
+///         handle.await;
+///     },
+///     stack.clone(),
+/// );
+/// ```
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
 where
     F: Future<Output = T> + Send + 'static,
@@ -17,9 +47,18 @@ where
     self::get().spawn(future, stack)
 }
 
+///
+/// Pool that global run queue, stealers of the workers, and parked threads.
+#[derive(Debug)]
 pub struct Pool {
+    ///
+    /// Global run queue implementation
     pub injector: Injector<LightProc>,
+    ///
+    /// Stealers of the workers
     pub stealers: Vec<Stealer<LightProc>>,
+    ///
+    /// Container of parked threads
     pub sleepers: Sleepers,
 }
 
@@ -30,6 +69,8 @@ impl Pool {
         unimplemented!()
     }
 
+    ///
+    /// Spawn a process (which contains future + process stack) onto the executor via [Pool] interface.
     pub fn spawn<F, T>(&self, future: F, stack: ProcStack) -> RecoverableHandle<T>
     where
         F: Future<Output = T> + Send + 'static,
@@ -45,6 +86,8 @@ impl Pool {
     }
 }
 
+///
+/// Acquire the static Pool reference
 #[inline]
 pub fn get() -> &'static Pool {
     lazy_static! {

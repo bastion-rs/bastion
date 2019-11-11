@@ -6,7 +6,7 @@
 ///
 /// This flag can't be set when the proc is completed. However, it can be set while the proc is
 /// running, in which case it will be rescheduled as soon as polling finishes.
-pub(crate) const SCHEDULED: usize = 1 << 0;
+pub(crate) const SCHEDULED: usize = 1;
 
 /// Set if the proc is running.
 ///

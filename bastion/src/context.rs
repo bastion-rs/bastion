@@ -11,12 +11,37 @@ pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub(crate) struct BastionId(Uuid);
 
+///
+/// Context for the inter children communication.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             format!("{:#?}", ctx.current());
+///             Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
     children: ChildrenRef,
-    supervisor: SupervisorRef,
+    supervisor: Option<SupervisorRef>,
     state: Qutex<ContextState>,
 }
 
@@ -38,7 +63,7 @@ impl BastionContext {
         id: BastionId,
         child: ChildRef,
         children: ChildrenRef,
-        supervisor: SupervisorRef,
+        supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
     ) -> Self {
         BastionContext {
@@ -120,7 +145,9 @@ impl BastionContext {
 
     /// Returns a [`SupervisorRef`] referencing the supervisor
     /// that supervises the element that is linked to this
-    /// `BastionContext`.
+    /// `BastionContext` if it isn't the system supervisor
+    /// (ie. if the children group wasn't created using
+    /// [`Bastion::children`]).
     ///
     /// # Example
     ///
@@ -130,12 +157,31 @@ impl BastionContext {
     /// # fn main() {
     ///     # Bastion::init();
     ///     #
+    /// // When calling the method from a children group supervised
+    /// // by a supervisor created by the user...
+    /// Bastion::supervisor(|sp| {
+    ///     sp.children(|children| {
+    ///         children.with_exec(|ctx: BastionContext| {
+    ///             async move {
+    ///                 // ...the method will return a SupervisorRef referencing the
+    ///                 // user-created supervisor...
+    ///                 let supervisor: Option<&SupervisorRef> = ctx.supervisor(); // Some
+    ///                 assert!(supervisor.is_some());
+    ///
+    ///                 Ok(())
+    ///             }
+    ///         })
+    ///     })
+    /// }).expect("Couldn't create the supervisor.");
+    ///
+    /// // When calling the method from a children group supervised
+    /// // by the system's supervisor...
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
-    ///             let supervisor: &SupervisorRef = ctx.supervisor();
-    ///             // Add new children or nested supervisors, broadcast messages,
-    ///             // or stop or kill the supervisor...
+    ///             // ...the method won't return a SupervisorRef...
+    ///             let supervisor: Option<&SupervisorRef> = ctx.supervisor(); // None
+    ///             assert!(supervisor.is_none());
     ///
     ///             Ok(())
     ///         }
@@ -149,8 +195,9 @@ impl BastionContext {
     /// ```
     ///
     /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
-    pub fn supervisor(&self) -> &SupervisorRef {
-        &self.supervisor
+    /// [`Bastion::children`]: struct.Bastion.html#method.children
+    pub fn supervisor(&self) -> Option<&SupervisorRef> {
+        self.supervisor.as_ref()
     }
 
     /// Tries to retrieve asynchronously a message received by

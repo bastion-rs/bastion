@@ -1,3 +1,6 @@
+//!
+//! Supervisors enable users to supervise a subtree of children
+//! or other supervisor trees under themselves.
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
 use crate::children::{Children, ChildrenRef};
@@ -23,6 +26,10 @@ use std::task::Poll;
 /// supervisor will restart it and eventually some of its other
 /// supervised entities, depending on its supervision strategy.
 ///
+/// Note that a supervisor, called the "system supervisor", is
+/// created by the system at startup and is the supervisor
+/// supervising children groups created via [`Bastion::children`].
+///
 /// # Example
 ///
 /// ```
@@ -46,6 +53,7 @@ use std::task::Poll;
 /// [`Children`]: children/struct.Children.html
 /// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
 /// [`with_strategy`]: #method.with_strategy
+/// [`Bastion::children`]: struct.Bastion.html#method.children
 pub struct Supervisor {
     bcast: Broadcast,
     // The order in which children and supervisors were added.
@@ -64,6 +72,10 @@ pub struct Supervisor {
     // The callbacks called at the supervisor's different
     // lifecycle events.
     callbacks: Callbacks,
+    // Whether this supervisor was started by the system (in
+    // which case, users shouldn't be able to get a reference
+    // to it).
+    is_system_supervisor: bool,
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -122,6 +134,7 @@ impl Supervisor {
         let killed = FxHashMap::default();
         let strategy = SupervisionStrategy::default();
         let callbacks = Callbacks::new();
+        let is_system_supervisor = false;
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -133,9 +146,17 @@ impl Supervisor {
             killed,
             strategy,
             callbacks,
+            is_system_supervisor,
             pre_start_msgs,
             started,
         }
+    }
+
+    pub(crate) fn system(bcast: Broadcast) -> Self {
+        let mut supervisor = Supervisor::new(bcast);
+        supervisor.is_system_supervisor = true;
+
+        supervisor
     }
 
     fn stack(&self) -> ProcStack {
@@ -143,11 +164,16 @@ impl Supervisor {
         ProcStack::default()
     }
 
-    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
+    pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
         // TODO: stop or kill?
         self.kill(0..).await;
 
-        self.bcast = bcast;
+        if let Some(bcast) = bcast {
+            self.bcast = bcast;
+        } else {
+            self.bcast.clear_children();
+        }
+
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
@@ -383,6 +409,7 @@ impl Supervisor {
 
         let children = Children::new(bcast);
         let mut children = init(children);
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
 
         let msg = BastionMessage::deploy_children(children);
@@ -447,6 +474,7 @@ impl Supervisor {
         let children = Children::new(bcast);
         let mut children = init(children);
 
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
         let children_ref = children.as_ref();
 
@@ -948,6 +976,7 @@ impl SupervisorRef {
         let children = Children::new(bcast);
         let mut children = init(children);
 
+        // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
         let children_ref = children.as_ref();
 
@@ -1167,7 +1196,7 @@ impl Supervised {
                 let stack = ProcStack::default();
                 pool::spawn(
                     async {
-                        supervisor.reset(bcast).await;
+                        supervisor.reset(Some(bcast)).await;
                         Supervised::Supervisor(supervisor)
                     },
                     stack,

@@ -1,3 +1,8 @@
+//!
+//! Cache affine thread pool distributor
+//!
+//! Distributor provides a fair distribution of threads and pinning them to cores for fair execution.
+//! It assigns threads in round-robin fashion to all cores.
 use super::placement;
 use super::placement::CoreId;
 use super::run_queue::{Stealer, Worker};
@@ -18,7 +23,7 @@ impl Distributor {
         }
     }
 
-    pub fn assign(mut self) -> Vec<Stealer<LightProc>> {
+    pub fn assign(self) -> Vec<Stealer<LightProc>> {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
 
         for core in self.cores {

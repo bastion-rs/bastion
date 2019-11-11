@@ -9,13 +9,15 @@ use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
-use qutex::{QrwLock, Qutex};
+use qutex::Qutex;
+
 use std::task::Poll;
+
+static mut ROOT_SPV: Option<SupervisorRef> = None;
 
 lazy_static! {
     pub(crate) static ref SYSTEM: Qutex<Option<RecoverableHandle<()>>> = Qutex::new(None);
     pub(crate) static ref SYSTEM_SENDER: Sender = System::init();
-    pub(crate) static ref ROOT_SPV: QrwLock<Option<SupervisorRef>> = QrwLock::new(None);
 }
 
 #[derive(Debug)]
@@ -30,7 +32,7 @@ pub(crate) struct System {
 }
 
 impl System {
-    pub(crate) fn init() -> Sender {
+    fn init() -> Sender {
         let parent = Parent::none();
         let bcast = Broadcast::with_id(parent, NIL_ID);
         let launched = FxHashMap::default();
@@ -53,7 +55,7 @@ impl System {
         let parent = Parent::system();
         let bcast = Broadcast::with_id(parent, NIL_ID);
 
-        let supervisor = Supervisor::new(bcast);
+        let supervisor = Supervisor::system(bcast);
         let supervisor_ref = supervisor.as_ref();
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
@@ -67,11 +69,14 @@ impl System {
         let mut system = SYSTEM.clone().lock().wait().unwrap();
         *system = Some(handle);
 
-        // FIXME: panics?
-        let mut root_spv = ROOT_SPV.clone().write().wait().unwrap();
-        *root_spv = Some(supervisor_ref);
+        // FIXME: unsafe?
+        unsafe { ROOT_SPV = Some(supervisor_ref) };
 
         sender
+    }
+
+    pub(crate) fn root_supervisor() -> Option<&'static SupervisorRef> {
+        unsafe { ROOT_SPV.as_ref() }
     }
 
     // TODO: set a limit?
@@ -80,17 +85,17 @@ impl System {
 
         let parent = Parent::system();
         let bcast = if supervisor.id() == &NIL_ID {
-            Broadcast::with_id(parent, NIL_ID)
+            None
         } else {
-            Broadcast::new(parent)
+            Some(Broadcast::new(parent))
         };
-
-        let id = bcast.id().clone();
+      
         supervisor.reset(bcast).await;
         supervisor.callbacks().after_restart();
 
         self.bcast.register(supervisor.bcast());
 
+        let id = supervisor.id().clone();
         let launched = supervisor.launch();
         self.launched.insert(id, launched);
     }

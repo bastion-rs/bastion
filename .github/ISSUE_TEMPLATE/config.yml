@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ⁉️ Need help with Bastion?
+    url: https://discord.gg/DqRqtRT
+    about: Join to our Discord server.
+  - name: 🧰️ Found a problem with Fort?
+    url: https://github.com/bastion-rs/fort/issues/new
+    about: Please file an issue in the Fort repo.
+  - name: ⚙️ Found a problem with Numanji?
+    url: https://github.com/bastion-rs/numanji/issues/new
+    about: Please file an issue in the Numanji repo.
+  - name: 🌐 Found a problem with bastion.rs?
+    url: https://github.com/bastion-rs/bastion-rs.github.io/issues/new
+    about: Please file an issue in the Bastion.rs website repo.

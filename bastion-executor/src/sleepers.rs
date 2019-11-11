@@ -1,3 +1,7 @@
+//!
+//! Where workers went to parking while no workload is in their worker queue.
+//!
+//! If a workload received pool will wake them up.
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex};
 

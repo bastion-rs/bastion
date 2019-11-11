@@ -1,3 +1,6 @@
+//!
+//! Children are a group of child supervised under a supervisor
+//! Allows users to communicate with children through the mailboxes.
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
 use crate::context::{BastionContext, BastionId, ContextState};
@@ -410,6 +413,10 @@ impl Children {
 
     async fn run(mut self) -> Self {
         loop {
+            for (_, launched) in self.launched.values_mut() {
+                let _ = poll!(launched);
+            }
+
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
@@ -442,11 +449,7 @@ impl Children {
 
                     return self;
                 }
-                Poll::Pending => (),
-            }
-
-            for (_, launched) in self.launched.values_mut() {
-                let _ = poll!(launched);
+                Poll::Pending => pending!(),
             }
         }
     }
@@ -461,8 +464,7 @@ impl Children {
 
             let child_ref = ChildRef::new(id.clone(), sender.clone());
             let children = self.as_ref();
-            // FIXME: panics?
-            let supervisor = self.bcast.parent().clone().into_supervisor().unwrap();
+            let supervisor = self.bcast.parent().clone().into_supervisor();
 
             let state = ContextState::new();
             let state = Qutex::new(state);

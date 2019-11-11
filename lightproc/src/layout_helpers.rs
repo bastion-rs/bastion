@@ -9,14 +9,11 @@ pub(crate) fn extend(layout: Layout, next: Layout) -> (Layout, usize) {
     let offset = layout
         .size()
         .checked_add(pad)
-        .ok_or(Error::new(
-            ErrorKind::Other,
-            "Padding overflow check failed",
-        ))
+        .ok_or_else(|| Error::new(ErrorKind::Other, "Padding overflow check failed"))
         .unwrap();
     let new_size = offset
         .checked_add(next.size())
-        .ok_or(Error::new(ErrorKind::Other, "New size can't be computed"))
+        .ok_or_else(|| Error::new(ErrorKind::Other, "New size can't be computed"))
         .unwrap();
 
     let layout = Layout::from_size_align(new_size, new_align).unwrap();
