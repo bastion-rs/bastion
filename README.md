@@ -60,6 +60,8 @@ It supplies actor model like concurrency with lightweight process implementation
 and utilize all the system resources efficiently with giving promise of
 at-most-once message delivery guarantee.
 
+<h6 align="center">Please note that Bastion is not production-ready yet and might break some backward compatibility for now.</h6>
+
 ---
 
 ## Usage
