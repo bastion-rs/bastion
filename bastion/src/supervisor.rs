@@ -507,7 +507,40 @@ impl Supervisor {
         self
     }
 
-    // TODO: doc
+    /// Sets the callbacks that will get called at this supervisor's
+    /// different lifecycle moments.
+    ///
+    /// See [`Callbacks`]'s documentation for more information about the
+    /// different callbacks available.
+    ///
+    /// # Arguments
+    ///
+    /// * `callbacks` - The callbacks that will get called for this
+    ///     supervisor.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::supervisor(|sp| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Supervisor started."))
+    ///         .with_after_stop(|| println!("Supervisor stopped."));
+    ///
+    ///     sp.with_callbacks(callbacks)
+    /// }).expect("Couldn't create the supervisor.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         self.callbacks = callbacks;
         self

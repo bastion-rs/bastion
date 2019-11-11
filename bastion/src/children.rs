@@ -282,7 +282,49 @@ impl Children {
         self
     }
 
-    // TODO: doc
+    /// Sets the callbacks that will get called at this children group's
+    /// different lifecycle moments.
+    ///
+    /// See [`Callbacks`]'s documentation for more information about the
+    /// different callbacks available.
+    ///
+    /// # Arguments
+    ///
+    /// * `callbacks` - The callbacks that will get called for this
+    ///     children group.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_callbacks(callbacks)
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///                 # Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         self.callbacks = callbacks;
         self
