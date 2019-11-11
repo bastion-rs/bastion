@@ -266,15 +266,12 @@ impl Bastion {
     }
 
     /// Creates a new [`Children`], passes it through the specified
-    /// `init` closure and then sends it to the system supervisor
-    /// for it to start supervising it.
+    /// `init` closure and then sends it to the system's default
+    /// supervisor for it to start supervising it.
     ///
     /// This methods returns a [`ChildrenRef`] referencing the newly
     /// created children group it it succeeded, or `Err(())`
     /// otherwise.
-    ///
-    /// Note that the "system supervisor" is a supervisor created
-    /// by the system at startup.
     ///
     /// # Arguments
     ///
