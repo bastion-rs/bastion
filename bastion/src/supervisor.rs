@@ -57,7 +57,9 @@ pub struct Supervisor {
     // supervision strategy is not "one-for-one".
     stopped: FxHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
-    // TODO: doc
+    // Whether this supervisor was started by the system (in
+    // which case, users shouldn't be able to get a reference
+    // to it).
     is_system_supervisor: bool,
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
@@ -74,7 +76,9 @@ pub struct Supervisor {
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
-    // TODO: doc
+    // Whether the supervisor referenced was started by
+    // the system (in which case, users shouldn't be able
+    // to get a reference to it).
     is_system_supervisor: bool,
 }
 
