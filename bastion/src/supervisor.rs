@@ -760,10 +760,7 @@ impl Supervisor {
 
 impl SupervisorRef {
     pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
-        SupervisorRef {
-            id,
-            sender,
-        }
+        SupervisorRef { id, sender }
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified
