@@ -10,9 +10,8 @@ use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use std::iter::FromIterator;
 use std::ops::RangeFrom;
 use std::task::Poll;
 
@@ -707,7 +706,6 @@ impl Supervisor {
                 // TODO: add a "waiting" list and poll from it instead of awaiting
                 // FIXME: panics?
                 let supervised = launched.await.unwrap();
-                dbg!();
                 supervised.callbacks().before_restart();
 
                 self.bcast.unregister(supervised.id());

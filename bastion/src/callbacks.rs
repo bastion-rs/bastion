@@ -46,6 +46,42 @@ pub struct Callbacks {
 }
 
 impl Callbacks {
+    /// Creates a new instance of `Callbacks` for
+    /// [`Supervisor::with_callbacks`] or [`Children::with_callbacks`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_callbacks(callbacks)
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///                 # Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor::with_callbacks`]: supervisor/struct.Supervisor.html#method.with_callbacks
+    /// [`Children::with_callbacks`]: children/struct.Children.html#method.with_callbacks
     pub fn new() -> Self {
         Callbacks::default()
     }
