@@ -179,16 +179,15 @@ impl Supervisor {
         let parent = Parent::supervisor(self.as_ref());
         let mut reset = FuturesOrdered::new();
         for id in self.order.drain(..) {
-            let supervised = if let Some(supervised) = self.stopped.remove(&id) {
-                supervised
+            let (killed, supervised) = if let Some(supervised) = self.stopped.remove(&id) {
+                (false, supervised)
             } else if let Some(supervised) = self.killed.remove(&id) {
-                supervised
+                (true, supervised)
             } else {
                 // FIXME
                 unimplemented!();
             };
 
-            let killed = self.killed.contains_key(supervised.id());
             if killed {
                 supervised.callbacks().before_restart();
             }
@@ -581,16 +580,15 @@ impl Supervisor {
         let parent = Parent::supervisor(self.as_ref());
         let mut reset = FuturesOrdered::new();
         for id in self.order.drain(range) {
-            let supervised = if let Some(supervised) = self.stopped.remove(&id) {
-                supervised
+            let (killed, supervised) = if let Some(supervised) = self.stopped.remove(&id) {
+                (false, supervised)
             } else if let Some(supervised) = self.killed.remove(&id) {
-                supervised
+                (true, supervised)
             } else {
                 // FIXME
                 unimplemented!();
             };
 
-            let killed = self.killed.contains_key(supervised.id());
             if killed {
                 supervised.callbacks().before_restart();
             }
