@@ -172,8 +172,6 @@ impl Broadcast {
     /// Sends a message saying that this `Broadcast` stopped
     /// to its parent.
     pub(crate) fn stopped(&mut self) {
-        self.stop_children();
-
         let msg = BastionMessage::stopped(self.id.clone());
         // FIXME: Err(msg)
         self.send_parent(msg).ok();
@@ -182,8 +180,6 @@ impl Broadcast {
     /// Sends a message saying that this `Broadcast` faulted
     /// to its parent.
     pub(crate) fn faulted(&mut self) {
-        self.kill_children();
-
         let msg = BastionMessage::faulted(self.id.clone());
         // FIXME: Err(msg)
         self.send_parent(msg).ok();
