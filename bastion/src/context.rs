@@ -120,8 +120,8 @@ impl BastionContext {
 
     /// Returns a [`SupervisorRef`] referencing the supervisor
     /// that supervises the element that is linked to this
-    /// `BastionContext` if it isn't the system's supervisor
-    /// (if the children group wasn't created using
+    /// `BastionContext` if it isn't the system supervisor
+    /// (ie. if the children group wasn't created using
     /// [`Bastion::children`]).
     ///
     /// # Example

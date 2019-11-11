@@ -22,6 +22,10 @@ use std::task::Poll;
 /// supervisor will restart it and eventually some of its other
 /// supervised entities, depending on its supervision strategy.
 ///
+/// Note that a supervisor, called the "system supervisor", is
+/// created by the system at startup and is the supervisor
+/// supervising children groups created via [`Bastion::children`].
+///
 /// # Example
 ///
 /// ```
@@ -45,6 +49,7 @@ use std::task::Poll;
 /// [`Children`]: children/struct.Children.html
 /// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
 /// [`with_strategy`]: #method.with_strategy
+/// [`Bastion::children`]: struct.Bastion.html#method.children
 pub struct Supervisor {
     bcast: Broadcast,
     // The order in which children and supervisors were added.
