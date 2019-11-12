@@ -867,7 +867,7 @@ impl ChildRef {
     /// This method returns `()` if it succeeded, or `Err(msg)`
     /// otherwise.
     ///
-    /// # Argument
+    /// # Arguments
     ///
     /// * `msg` - The message to send.
     ///
@@ -923,7 +923,7 @@ impl ChildRef {
     /// This method returns [`Answer`] if it succeeded, or `Err(msg)`
     /// otherwise.
     ///
-    /// # Argument
+    /// # Arguments
     ///
     /// * `msg` - The message to send.
     ///
