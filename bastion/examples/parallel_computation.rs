@@ -30,13 +30,9 @@ fn main() {
                                 println!("Child doubled the value of {} and gave {}", msg, data); // true
                                 let _ = answer!(data);
                             };
-                            // This won't happen because this example
-                            // only "asks" a u64...
                             _: _ => ();
                         }
                     }
-
-                    Ok(())
                 }
             })
     })
@@ -48,7 +44,7 @@ fn main() {
     //
     // Mapper that generates work.
     Bastion::children(|children: Children| {
-        children.with_exec(move |ctx: BastionContext| {
+        children.with_exec(move |_ctx: BastionContext| {
             let workers = workers.clone();
             async move {
                 println!("Mapper started!");
@@ -67,8 +63,6 @@ fn main() {
                             println!("Source received the computed value: {}", msg);
                             sum_of_doubles += msg;
                         };
-                        // This won't happen because this example
-                        // only answers a `&'static str`...
                         _: _ => ();
                     }
                 }
