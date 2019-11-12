@@ -227,7 +227,31 @@ impl Supervisor {
         self.killed.shrink_to_fit();
     }
 
-    // TODO: doc
+    /// Returns this supervisor's identifier.
+    ///
+    /// Note that the supervisor's identifier is reset when it is
+    /// restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::supervisor(|sp| {
+    ///     let supervisor_id: &BastionId = sp.id();
+    ///     // ...
+    ///     # sp
+    /// }).expect("Couldn't create the supervisor.");
+    ///
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
     pub fn id(&self) -> &BastionId {
         &self.bcast.id()
     }
@@ -867,7 +891,32 @@ impl SupervisorRef {
         SupervisorRef { id, sender }
     }
 
-    // TODO: doc
+    /// Returns the identifier of the supervisor this `SupervisorRef`
+    /// is referencing.
+    ///
+    /// Note that the supervisor's identifier is reset when it is
+    /// restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// let supervisor_ref = Bastion::supervisor(|sp| {
+    ///     // ...
+    ///     # sp
+    /// }).expect("Couldn't create the supervisor.");
+    ///
+    /// let supervisor_id: &BastionId = supervisor_ref.id();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
     }

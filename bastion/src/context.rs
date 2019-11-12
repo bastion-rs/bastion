@@ -10,7 +10,38 @@ use uuid::Uuid;
 pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-// TODO: doc
+/// An identifier used by supervisors, children groups and
+/// their elements to identify themselves, using a v4 UUID.
+///
+/// A `BastionId` is unique to its attached element and is
+/// reset when it is restarted. A special `BastionId` exists
+/// for the "system supervisor" (the supervisor created by
+/// the system at startup) which is a nil UUID
+/// (00000000-0000-0000-0000-000000000000).
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx| {
+///         async move {
+///             let child_id: &BastionId = ctx.current().id();
+///             // ...
+///             # Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
 pub struct BastionId(Uuid);
 
 ///
