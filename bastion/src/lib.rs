@@ -51,6 +51,8 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
+#[macro_use] extern crate log;
+
 pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
 pub use self::config::Config;
