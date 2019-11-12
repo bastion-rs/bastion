@@ -18,8 +18,7 @@ use std::thread;
 ///
 /// fn main() {
 ///     /// Creating the system's configuration...
-///     let config = Config::new()
-///         .hide_backtraces();
+///     let config = Config::new().hide_backtraces();
 ///     // ...and initializing the system with it (this is required)...
 ///     Bastion::init_with(config);
 ///

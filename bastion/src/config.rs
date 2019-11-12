@@ -11,8 +11,7 @@
 /// use bastion::prelude::*;
 ///
 /// fn main() {
-///     let config = Config::new()
-///         .show_backtraces();
+///     let config = Config::new().show_backtraces();
 ///
 ///     Bastion::init_with(config);
 ///
@@ -61,8 +60,7 @@ impl Config {
     /// use bastion::prelude::*;
     ///
     /// fn main() {
-    ///     let config = Config::new()
-    ///         .show_backtraces();
+    ///     let config = Config::new().show_backtraces();
     ///
     ///     Bastion::init_with(config);
     ///
@@ -90,8 +88,7 @@ impl Config {
     /// use bastion::prelude::*;
     ///
     /// fn main() {
-    ///     let config = Config::new()
-    ///         .hide_backtraces();
+    ///     let config = Config::new().hide_backtraces();
     ///
     ///     Bastion::init_with(config);
     ///
