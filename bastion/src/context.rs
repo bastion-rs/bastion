@@ -1,3 +1,7 @@
+//!
+//! A context allows a child's future to access its received
+//! messages, parent and supervisor.
+
 use crate::children::{ChildRef, ChildrenRef};
 use crate::message::Msg;
 use crate::supervisor::SupervisorRef;
