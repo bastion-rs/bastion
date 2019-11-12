@@ -13,6 +13,7 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use qutex::Qutex;
+use std::cmp::{Eq, PartialEq};
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
@@ -171,7 +172,31 @@ impl Children {
         self.launch_elems();
     }
 
-    pub(crate) fn id(&self) -> &BastionId {
+    /// Returns this children group's identifier.
+    ///
+    /// Note that the children group's identifier is reset when it
+    /// is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     let children_id: &BastionId = children.id();
+    ///     // ...
+    ///     # children
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
@@ -497,6 +522,36 @@ impl ChildrenRef {
         }
     }
 
+    /// Returns the identifier of the children group this `ChildrenRef`
+    /// is referencing.
+    ///
+    /// Note that the children group's identifier is reset when it
+    /// is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// let children_ref = Bastion::children(|children| {
+    ///     // ...
+    ///     # children
+    /// }).expect("Couldn't create the children group.");
+    ///
+    /// let children_id: &BastionId = children_ref.id();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
+        &self.id
+    }
+
     /// Returns a list of [`ChildRef`] referencing the elements
     /// of the children group this `ChildrenRef` is referencing.
     ///
@@ -773,6 +828,39 @@ impl ChildRef {
         ChildRef { id, sender }
     }
 
+    /// Returns the identifier of the children group element this
+    /// `ChildRef` is referencing.
+    ///
+    /// Note that the children group element's identifier is reset
+    /// when it is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx| {
+    ///         async move {
+    ///             let child_id: &BastionId = ctx.current().id();
+    ///             // ...
+    ///             # Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
+        &self.id
+    }
+
     /// Sends a message to the child this `ChildRef` is referencing.
     ///
     /// This method returns `()` if it succeeded, or `Err(msg)`
@@ -988,6 +1076,21 @@ impl Default for Init {
         Init::new(|_| async { Ok(()) })
     }
 }
+
+impl PartialEq for ChildrenRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialEq for ChildRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for ChildrenRef {}
+impl Eq for ChildRef {}
 
 impl Debug for Init {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
