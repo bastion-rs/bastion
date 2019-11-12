@@ -262,8 +262,10 @@ impl System {
                         return;
                     }
                 }
-                // FIXME
-                Poll::Ready(None) => unimplemented!(),
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
         }

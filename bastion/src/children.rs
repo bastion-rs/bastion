@@ -484,13 +484,10 @@ impl Children {
                         return self;
                     }
                 }
-                Poll::Ready(None) => {
-                    // TODO: stop or kill?
-                    self.kill().await;
-                    self.faulted();
-
-                    return self;
-                }
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
         }
@@ -841,11 +838,10 @@ impl Child {
 
                     continue;
                 }
-                Poll::Ready(None) => {
-                    self.faulted();
-
-                    return;
-                }
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => (),
             }
 
