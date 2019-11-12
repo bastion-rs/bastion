@@ -43,3 +43,4 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
 proptest = "0.9"
+snap = "0.2"
