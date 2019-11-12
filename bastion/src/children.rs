@@ -38,7 +38,7 @@ struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -241,7 +241,7 @@ impl Children {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -288,7 +288,7 @@ impl Children {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -557,7 +557,7 @@ impl ChildrenRef {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -594,7 +594,7 @@ impl ChildrenRef {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -644,7 +644,7 @@ impl ChildrenRef {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -672,7 +672,7 @@ impl ChildrenRef {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -872,7 +872,7 @@ impl ChildRef {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {

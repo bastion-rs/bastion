@@ -1,5 +1,6 @@
 use crate::broadcast::{Broadcast, Parent};
 use crate::children::{Children, ChildrenRef};
+use crate::config::Config;
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{System, SYSTEM, SYSTEM_SENDER};
@@ -12,12 +13,17 @@ use std::thread;
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// use bastion::prelude::*;
 ///
 /// fn main() {
-///     // Initializing the system (this is required)...
-///     Bastion::init();
+///     /// Creating the system's configuration...
+///     let config = Config::new().hide_backtraces();
+///     // ...and initializing the system with it (this is required)...
+///     Bastion::init_with(config);
+///
+///     // Note that `Bastion::init();` would work too and initialize
+///     // the system with the default config.
 ///
 ///     // Starting the system...
 ///     Bastion::start();
@@ -136,14 +142,16 @@ pub struct Bastion {
 }
 
 impl Bastion {
-    /// Initializes the system if it hasn't already been done.
+    /// Initializes the system if it hasn't already been done, using
+    /// the default [`Config`].
     ///
-    /// **It is required that you call this method at least once
-    /// before using any of bastion's features.**
+    /// **It is required that you call `Bastion::init` or
+    /// [`Bastion::init_with`] at least once before using any of
+    /// bastion's features.**
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -156,9 +164,50 @@ impl Bastion {
     ///     # Bastion::block_until_stopped();
     /// }
     /// ```
+    ///
+    /// [`Config`]: struct.Config.html
+    /// [`Bastion::init_with`]: #method.init_with
     pub fn init() {
-        // NOTE: this hides all panic messages
-        //std::panic::set_hook(Box::new(|_| ()));
+        let config = Config::default();
+        Bastion::init_with(config)
+    }
+
+    /// Initializes the system if it hasn't already been done, using
+    /// the specified [`Config`].
+    ///
+    /// **It is required that you call [`Bastion::init`] or
+    /// `Bastion::init_with` at least once before using any of
+    /// bastion's features.**
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration used to initialize the system.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use bastion::prelude::*;
+    ///
+    /// fn main() {
+    ///     let config = Config::new()
+    ///         .show_backtraces();
+    ///
+    ///     Bastion::init_with(config);
+    ///
+    ///     // You can now use bastion...
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// }
+    /// ```
+    ///
+    /// [`Config`]: struct.Config.html
+    /// [`Bastion::init`]: #method.init
+    pub fn init_with(config: Config) {
+        if config.backtraces().is_hide() {
+            std::panic::set_hook(Box::new(|_| ()));
+        }
 
         // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
         SYSTEM_SENDER.is_closed();
@@ -179,7 +228,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -234,7 +283,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -290,7 +339,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -335,7 +384,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -363,7 +412,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -391,7 +440,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -425,7 +474,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {

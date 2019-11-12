@@ -42,7 +42,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -118,7 +118,7 @@ pub struct Answer(Receiver<Msg>);
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -450,7 +450,7 @@ impl Future for Answer {
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {

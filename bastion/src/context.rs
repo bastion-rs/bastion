@@ -117,7 +117,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -151,7 +151,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -188,7 +188,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -248,7 +248,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -293,7 +293,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {

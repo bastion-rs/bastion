@@ -1,8 +1,13 @@
 use bastion::prelude::*;
 
 fn main() {
-    // Initializing the system (this is required)...
-    Bastion::init();
+    /// Creating the system's configuration...
+    let config = Config::new().hide_backtraces();
+    // ...and initializing the system with it (this is required)...
+    Bastion::init_with(config);
+
+    // Note that `Bastion::init();` would work too and initialize
+    // the system with the default config.
 
     // Starting the system...
     Bastion::start();

@@ -32,7 +32,7 @@ use std::task::Poll;
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -287,7 +287,7 @@ impl Supervisor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -339,7 +339,7 @@ impl Supervisor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -393,7 +393,7 @@ impl Supervisor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -456,7 +456,7 @@ impl Supervisor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -535,7 +535,7 @@ impl Supervisor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
