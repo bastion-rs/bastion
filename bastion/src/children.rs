@@ -160,11 +160,13 @@ impl Children {
     }
 
     fn stack(&self) -> ProcStack {
+        trace!("Children({}): Creating ProcStack.", self.id());
         // FIXME: with_pid
         ProcStack::default()
     }
 
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
+        debug!("Children({}): Resetting to Children({}).", self.id(), bcast.id());
         // TODO: stop or kill?
         self.kill().await;
 
@@ -373,15 +375,19 @@ impl Children {
     }
 
     async fn stop(&mut self) {
+        debug!("Children({}): Stopping.", self.id());
         self.bcast.stop_children();
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {})
+            .for_each_concurrent(None, |_| async {
+                trace!("Children({}): Unknown child stopped.", self.id());
+            })
             .await;
     }
 
     async fn kill(&mut self) {
+        debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
 
         let mut children = FuturesOrdered::new();
@@ -391,14 +397,18 @@ impl Children {
             children.push(launched);
         }
 
-        children.for_each_concurrent(None, |_| async {}).await;
+        children.for_each_concurrent(None, |_| async {
+            trace!("Children({}): Unknown child stopped.", self.id());
+        }).await;
     }
 
     fn stopped(&mut self) {
+        debug!("Children({}): Stopped.", self.id());
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
+        debug!("Children({}): Faulted.", self.id());
         self.bcast.faulted();
     }
 
@@ -406,14 +416,12 @@ impl Children {
         match msg {
             BastionMessage::Start => unreachable!(),
             BastionMessage::Stop => {
-                debug!("Children({}): Stopping.", self.id());
                 self.stop().await;
                 self.stopped();
 
                 return Err(());
             }
             BastionMessage::Kill => {
-                debug!("Children({}): Killing.", self.id());
                 self.kill().await;
                 self.stopped();
 
@@ -767,7 +775,7 @@ impl Child {
     }
 
     fn stack(&self) -> ProcStack {
-        debug!("Child({}): Creating ProcStack.", self.id());
+        trace!("Child({}): Creating ProcStack.", self.id());
         let id = self.bcast.id().clone();
         // FIXME: panics?
         let parent = self.bcast.parent().clone().into_children().unwrap();
@@ -789,10 +797,12 @@ impl Child {
     }
 
     fn stopped(&mut self) {
+        debug!("Child({}): Stopped.", self.id());
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
+        debug!("Child({}): Faulted.", self.id());
         self.bcast.faulted();
     }
 
@@ -800,13 +810,11 @@ impl Child {
         match msg {
             BastionMessage::Start => unreachable!(),
             BastionMessage::Stop => {
-                debug!("Child({}): Stopping.", self.id());
                 self.stopped();
 
                 return Err(());
             }
             BastionMessage::Kill => {
-                debug!("Child({}): Killing.", self.id());
                 self.stopped();
 
                 return Err(());
