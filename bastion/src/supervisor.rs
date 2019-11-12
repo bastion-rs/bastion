@@ -12,6 +12,7 @@ use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
+use std::cmp::{Eq, PartialEq};
 use std::ops::RangeFrom;
 use std::task::Poll;
 
@@ -1302,3 +1303,11 @@ impl Default for SupervisionStrategy {
         SupervisionStrategy::OneForOne
     }
 }
+
+impl PartialEq for SupervisorRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for SupervisorRef {}

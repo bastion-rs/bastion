@@ -13,6 +13,7 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use qutex::Qutex;
+use std::cmp::{Eq, PartialEq};
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
@@ -1075,6 +1076,21 @@ impl Default for Init {
         Init::new(|_| async { Ok(()) })
     }
 }
+
+impl PartialEq for ChildrenRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialEq for ChildRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for ChildrenRef {}
+impl Eq for ChildRef {}
 
 impl Debug for Init {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
