@@ -310,7 +310,11 @@ impl Children {
     ///
     /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
-        trace!("Children({}): Setting redundancy: {:?}", self.id(), redundancy);
+        trace!(
+            "Children({}): Setting redundancy: {:?}",
+            self.id(),
+            redundancy
+        );
         self.redundancy = redundancy;
         self
     }
@@ -359,7 +363,11 @@ impl Children {
     ///
     /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
-        trace!("Children({}): Setting callbacks: {:?}", self.id(), callbacks);
+        trace!(
+            "Children({}): Setting callbacks: {:?}",
+            self.id(),
+            callbacks
+        );
         self.callbacks = callbacks;
         self
     }
@@ -418,7 +426,11 @@ impl Children {
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
             BastionMessage::Message(ref message) => {
-                debug!("Children({}): Broadcasting a message: {:?}", self.id(), message);
+                debug!(
+                    "Children({}): Broadcasting a message: {:?}",
+                    self.id(),
+                    message
+                );
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
@@ -456,7 +468,11 @@ impl Children {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
-                    trace!("Children({}): Received a new message (started=false): {:?}", self.id(), BastionMessage::Start);
+                    trace!(
+                        "Children({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        BastionMessage::Start
+                    );
                     debug!("Children({}): Starting.", self.id());
                     self.started = true;
 
@@ -466,7 +482,10 @@ impl Children {
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
-                    debug!("Children({}): Replaying messages received before starting.", self.id());
+                    debug!(
+                        "Children({}): Replaying messages received before starting.",
+                        self.id()
+                    );
                     for msg in msgs {
                         trace!("Children({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
@@ -475,11 +494,19 @@ impl Children {
                     }
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
-                    trace!("Children({}): Received a new message (started=false): {:?}", self.id(), msg);
+                    trace!(
+                        "Children({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        msg
+                    );
                     self.pre_start_msgs.push(msg);
                 }
                 Poll::Ready(Some(msg)) => {
-                    trace!("Children({}): Received a new message (started=true): {:?}", self.id(), msg);
+                    trace!(
+                        "Children({}): Received a new message (started=true): {:?}",
+                        self.id(),
+                        msg
+                    );
                     if self.handle(msg).await.is_err() {
                         return self;
                     }
@@ -509,13 +536,16 @@ impl Children {
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let ctx =
-                BastionContext::new(id, child_ref, children, supervisor, state.clone());
+            let ctx = BastionContext::new(id, child_ref, children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);
 
-            debug!("Children({}): Initializing Child({}).", self.id(), bcast.id());
+            debug!(
+                "Children({}): Initializing Child({}).",
+                self.id(),
+                bcast.id()
+            );
             let child = Child::new(exec, bcast, state);
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
@@ -679,7 +709,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
-        debug!("ChildrenRef({}): Stopping.");
+        debug!("ChildrenRef({}): Stopping.", self.id);
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -708,7 +738,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
-        debug!("ChildrenRef({}): Killing.");
+        debug!("ChildrenRef({}): Killing.", self.id);
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
@@ -746,7 +776,7 @@ impl Child {
         ProcStack::default().with_after_panic(move || {
             // FIXME: clones
             let id = id.clone();
-            warn!("Child({}): Panicked.");
+            warn!("Child({}): Panicked.", id);
 
             let msg = BastionMessage::faulted(id);
             // TODO: handle errors
@@ -788,7 +818,7 @@ impl Child {
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
             BastionMessage::Message(msg) => {
-                debug!("Child({}): Received a message: {:?}", msg);
+                debug!("Child({}): Received a message: {:?}", self.id(), msg);
                 let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
                 state.push_msg(msg);
             }
@@ -807,14 +837,21 @@ impl Child {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
-                    trace!("Child({}): Received a new message (started=false): {:?}", self.id(), BastionMessage::Start);
+                    trace!(
+                        "Child({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        BastionMessage::Start
+                    );
                     debug!("Child({}): Starting.", self.id());
                     self.started = true;
 
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
-                    debug!("Child({}): Replaying messages received before starting.", self.id());
+                    debug!(
+                        "Child({}): Replaying messages received before starting.",
+                        self.id()
+                    );
                     for msg in msgs {
                         trace!("Child({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
@@ -825,13 +862,21 @@ impl Child {
                     continue;
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
-                    trace!("Child({}): Received a new message (started=false): {:?}", self.id(), msg);
+                    trace!(
+                        "Child({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        msg
+                    );
                     self.pre_start_msgs.push(msg);
 
                     continue;
                 }
                 Poll::Ready(Some(msg)) => {
-                    trace!("Child({}): Received a new message (started=true): {:?}", self.id(), msg);
+                    trace!(
+                        "Child({}): Received a new message (started=true): {:?}",
+                        self.id(),
+                        msg
+                    );
                     if self.handle(msg).await.is_err() {
                         return;
                     }
@@ -853,13 +898,16 @@ impl Child {
 
             match poll!(&mut self.exec) {
                 Poll::Ready(Ok(())) => {
-                    debug!("Child({}): The future finished executing successfully.")
-                    return self.stopped()
-                },
+                    debug!(
+                        "Child({}): The future finished executing successfully.",
+                        self.id()
+                    );
+                    return self.stopped();
+                }
                 Poll::Ready(Err(())) => {
-                    warn!("Child({}): The future returned an error.");
-                    return self.faulted()
-                },
+                    warn!("Child({}): The future returned an error.", self.id());
+                    return self.faulted();
+                }
                 Poll::Pending => (),
             }
 
@@ -1076,7 +1124,7 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
-        debug!("ChildRef({}): Stopping.");
+        debug!("ChildRef({}): Stopping.", self.id);
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -1105,7 +1153,7 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
-        debug!("ChildRef({}): Killing.");
+        debug!("ChildRef({}): Killing.", self.id);
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }

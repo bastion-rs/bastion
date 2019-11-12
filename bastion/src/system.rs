@@ -125,7 +125,7 @@ impl System {
                 }
                 Poll::Ready(Some(None)) => {
                     error!("System: Unknown supervisor cancelled instead of stopped.");
-                },
+                }
                 Poll::Ready(None) => return supervisors,
                 Poll::Pending => pending!(),
             }
@@ -255,7 +255,10 @@ impl System {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
-                    trace!("System: Received a new message (started=false): {:?}", BastionMessage::Start);
+                    trace!(
+                        "System: Received a new message (started=false): {:?}",
+                        BastionMessage::Start
+                    );
                     info!("System: Starting.");
                     self.started = true;
 
