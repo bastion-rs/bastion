@@ -39,3 +39,6 @@ lazy_static = "1.4"
 lightproc = { version = "= 0.3.3-alpha.1", path = "../lightproc" }
 qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
+
+[dev-dependencies]
+proptest = "0.9"
