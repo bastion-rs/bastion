@@ -8,7 +8,7 @@ static START: Once = Once::new();
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1_000))]
     #[test]
-    fn proptest_intra_message(message in "\\PC*") {
+    fn proptest_bcast_message(message in "\\PC*") {
         START.call_once(|| {
             Bastion::init();
         });
@@ -20,7 +20,7 @@ proptest! {
                     async move {
                         msg! { ctx.recv().await?,
                             ref msg: &'static str => {
-                                println!("Broadcasted :: {}", msg);
+                                ;
                             };
                             // This won't happen because this example
                             // only "asks" a `&'static str`...

@@ -36,7 +36,7 @@ proptest! {
 
                         msg! { answer.await?,
                             msg: &'static str => {
-                                println!("Intercom :: {}", msg);
+                                ;
                             };
                             _: _ => ();
                         }
