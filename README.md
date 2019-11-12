@@ -97,9 +97,9 @@ If one of the questions below answered with yes, then Bastion is just for you:
 * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
 
 ### Get Started
-Check [getting started example](https://github.com/bastion-rs/bastion/blob/master/examples/getting_started.rs) in examples.
+Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
 
-[Examples](https://github.com/bastion-rs/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
+[Examples](https://github.com/bastion-rs/bastion/blob/master/bastion/examples) cover possible use cases of the crate.
 
 Include bastion to your project with:
 ```toml
