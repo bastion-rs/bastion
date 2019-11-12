@@ -1,10 +1,6 @@
 //!
-//! Dynamic dispatch oriented messaging system
-//!
-//! This system allows:
-//! * Generic communication between mailboxes.
-//! * All message communication relies on at-most-once delivery guarantee.
-//! * Messages are not guaranteed to be ordered, all message's order is causal.
+//! Dynamic dispatch oriented messaging system which allows for
+//! generic messages, broadcast or direct messages and answers.
 //!
 use crate::children::Children;
 use crate::context::BastionId;

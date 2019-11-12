@@ -1,6 +1,7 @@
 //!
-//! Supervisors enable users to supervise a subtree of children
-//! or other supervisor trees under themselves.
+//! Supervisors enable users to supervise children groups and
+//! others supervisors.
+//!
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::children::{Children, ChildrenRef};
 use crate::context::BastionId;
