@@ -5,7 +5,7 @@ use std::sync::Arc;
 /// Parallel computation (MapReduce) job example
 ///
 /// Prologue:
-/// This example maps a range of values([0,1,2,3,4,0,1,2,3,4...]) one by one:
+/// This example maps a stream of cycling values([0,1,2,3,4,0,1,2,3,4...]) one by one:
 /// to 10 workers and every worker compute the double of what they receive and send back.
 ///
 /// Then mapper aggregates the doubled values and sum them.
@@ -91,8 +91,6 @@ fn main() {
 
 fn cycle(x: u64, at_most: u64) -> u64 {
     let mut x = x;
-    x ^= (x << 21);
-    x ^= (x >> 35);
-    x ^= (x << 4);
+    x += 1;
     x % at_most
 }
