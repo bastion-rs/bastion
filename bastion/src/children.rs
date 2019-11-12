@@ -3,6 +3,7 @@
 //! all running a similar future and linked to each other.
 //!
 use crate::broadcast::{Broadcast, Parent, Sender};
+use crate::callbacks::Callbacks;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::message::{Answer, BastionMessage, Message};
 use bastion_executor::pool;
@@ -13,6 +14,7 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use qutex::Qutex;
+use std::cmp::{Eq, PartialEq};
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
@@ -76,6 +78,9 @@ pub struct Children {
     // every element of the group.
     init: Init,
     redundancy: usize,
+    // The callbacks called at the group's different lifecycle
+    // events.
+    callbacks: Callbacks,
     // Messages that were received before the group was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -139,6 +144,7 @@ impl Children {
         let launched = FxHashMap::default();
         let init = Init::default();
         let redundancy = 1;
+        let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -147,6 +153,7 @@ impl Children {
             launched,
             init,
             redundancy,
+            callbacks,
             pre_start_msgs,
             started,
         }
@@ -166,12 +173,40 @@ impl Children {
         self.launch_elems();
     }
 
-    pub(crate) fn id(&self) -> &BastionId {
+    /// Returns this children group's identifier.
+    ///
+    /// Note that the children group's identifier is reset when it
+    /// is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     let children_id: &BastionId = children.id();
+    ///     // ...
+    ///     # children
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
     pub(crate) fn bcast(&self) -> &Broadcast {
         &self.bcast
+    }
+
+    pub(crate) fn callbacks(&self) -> &Callbacks {
+        &self.callbacks
     }
 
     pub(crate) fn as_ref(&self) -> ChildrenRef {
@@ -274,6 +309,54 @@ impl Children {
     /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         self.redundancy = redundancy;
+        self
+    }
+
+    /// Sets the callbacks that will get called at this children group's
+    /// different lifecycle events.
+    ///
+    /// See [`Callbacks`]'s documentation for more information about the
+    /// different callbacks available.
+    ///
+    /// # Arguments
+    ///
+    /// * `callbacks` - The callbacks that will get called for this
+    ///     children group.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_before_start(|| println!("Children group started."))
+    ///         .with_after_stop(|| println!("Children group stopped."));
+    ///
+    ///     children
+    ///         .with_callbacks(callbacks)
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///                 # Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Callbacks`]: struct.Callbacks.html
+    pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        self.callbacks = callbacks;
         self
     }
 
@@ -438,6 +521,36 @@ impl ChildrenRef {
             sender,
             children,
         }
+    }
+
+    /// Returns the identifier of the children group this `ChildrenRef`
+    /// is referencing.
+    ///
+    /// Note that the children group's identifier is reset when it
+    /// is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// let children_ref = Bastion::children(|children| {
+    ///     // ...
+    ///     # children
+    /// }).expect("Couldn't create the children group.");
+    ///
+    /// let children_id: &BastionId = children_ref.id();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
+        &self.id
     }
 
     /// Returns a list of [`ChildRef`] referencing the elements
@@ -716,6 +829,39 @@ impl ChildRef {
         ChildRef { id, sender }
     }
 
+    /// Returns the identifier of the children group element this
+    /// `ChildRef` is referencing.
+    ///
+    /// Note that the children group element's identifier is reset
+    /// when it is restarted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx| {
+    ///         async move {
+    ///             let child_id: &BastionId = ctx.current().id();
+    ///             // ...
+    ///             # Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn id(&self) -> &BastionId {
+        &self.id
+    }
+
     /// Sends a message to the child this `ChildRef` is referencing.
     ///
     /// This method returns `()` if it succeeded, or `Err(msg)`
@@ -931,6 +1077,21 @@ impl Default for Init {
         Init::new(|_| async { Ok(()) })
     }
 }
+
+impl PartialEq for ChildrenRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialEq for ChildRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for ChildrenRef {}
+impl Eq for ChildRef {}
 
 impl Debug for Init {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {

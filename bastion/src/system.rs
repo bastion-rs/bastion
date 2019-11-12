@@ -81,6 +81,8 @@ impl System {
 
     // TODO: set a limit?
     async fn recover(&mut self, mut supervisor: Supervisor) {
+        supervisor.callbacks().before_restart();
+
         let parent = Parent::system();
         let bcast = if supervisor.id() == &NIL_ID {
             None
@@ -89,6 +91,8 @@ impl System {
         };
 
         supervisor.reset(bcast).await;
+        supervisor.callbacks().after_restart();
+
         self.bcast.register(supervisor.bcast());
 
         let id = supervisor.id().clone();
@@ -96,23 +100,25 @@ impl System {
         self.launched.insert(id, launched);
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Vec<Supervisor> {
         self.bcast.stop_children();
 
         for (_, launched) in self.launched.drain() {
             self.waiting.push(launched);
         }
 
+        let mut supervisors = Vec::new();
         loop {
             match poll!(&mut self.waiting.next()) {
-                Poll::Ready(Some(_)) => (),
-                Poll::Ready(None) => return,
+                Poll::Ready(Some(Some(supervisor))) => supervisors.push(supervisor),
+                Poll::Ready(Some(None)) => (),
+                Poll::Ready(None) => return supervisors,
                 Poll::Pending => pending!(),
             }
         }
     }
 
-    async fn kill(&mut self) {
+    async fn kill(&mut self) -> Vec<Supervisor> {
         self.bcast.kill_children();
 
         for launched in self.waiting.iter_mut() {
@@ -125,10 +131,12 @@ impl System {
             self.waiting.push(launched);
         }
 
+        let mut supervisors = Vec::new();
         loop {
             match poll!(&mut self.waiting.next()) {
-                Poll::Ready(Some(_)) => (),
-                Poll::Ready(None) => return,
+                Poll::Ready(Some(Some(supervisor))) => supervisors.push(supervisor),
+                Poll::Ready(Some(None)) => (),
+                Poll::Ready(None) => return supervisors,
                 Poll::Pending => pending!(),
             }
         }
@@ -140,7 +148,9 @@ impl System {
             BastionMessage::Stop => {
                 self.started = false;
 
-                self.stop().await;
+                for supervisor in self.stop().await {
+                    supervisor.callbacks().after_stop();
+                }
 
                 return Err(());
             }
@@ -153,6 +163,8 @@ impl System {
             }
             BastionMessage::Deploy(deployment) => match deployment {
                 Deployment::Supervisor(supervisor) => {
+                    supervisor.callbacks().before_start();
+
                     self.bcast.register(supervisor.bcast());
                     if self.started {
                         let msg = BastionMessage::start();
@@ -206,6 +218,8 @@ impl System {
 
                     if self.restart.remove(&id) {
                         self.recover(supervisor).await;
+                    } else {
+                        supervisor.callbacks().after_stop();
                     }
 
                     continue;

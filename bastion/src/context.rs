@@ -1,15 +1,52 @@
+//!
+//! A context allows a child's future to access its received
+//! messages, parent and supervisor.
+
 use crate::children::{ChildRef, ChildrenRef};
 use crate::message::Msg;
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
+use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
 pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub(crate) struct BastionId(Uuid);
+/// An identifier used by supervisors, children groups and
+/// their elements to identify themselves, using a v4 UUID.
+///
+/// A `BastionId` is unique to its attached element and is
+/// reset when it is restarted. A special `BastionId` exists
+/// for the "system supervisor" (the supervisor created by
+/// the system at startup) which is a nil UUID
+/// (00000000-0000-0000-0000-000000000000).
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     #
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx| {
+///         async move {
+///             let child_id: &BastionId = ctx.current().id();
+///             // ...
+///             # Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+pub struct BastionId(Uuid);
 
 /// A child's context, allowing to access to get messages
 /// received by it, get a reference to it or a reference
@@ -319,5 +356,11 @@ impl ContextState {
 
     pub(crate) fn push_msg(&mut self, msg: Msg) {
         self.msgs.push_back(msg)
+    }
+}
+
+impl Display for BastionId {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        self.0.fmt(fmt)
     }
 }

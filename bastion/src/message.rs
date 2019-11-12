@@ -159,8 +159,8 @@ pub struct Answer(Receiver<Msg>);
 /// # }
 /// ```
 ///
-/// [`BastionContext::recv`]: struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: struct.BastionContext.html#method.try_recv
+/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
+/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
 /// [`msg!`]: macro.msg.html
 pub struct Msg(MsgInner);
 
@@ -503,8 +503,8 @@ impl Future for Answer {
 /// ```
 ///
 /// [`Msg`]: children/struct.Msg.html
-/// [`BastionContext::recv`]: struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: struct.BastionContext.html#method.try_recv
+/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
+/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
 macro_rules! msg {
     ($msg:expr, $($tokens:tt)+) => {
         { msg!(@internal $msg, (), (), (), $($tokens)+); }
