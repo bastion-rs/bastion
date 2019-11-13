@@ -1,6 +1,6 @@
 [package]
 name = "bastion"
-version = "0.2.1-alpha.0"
+version = "0.3.0"
 description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
@@ -35,11 +35,11 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { path = "../bastion-executor" }
+bastion-executor = { version = "0.3", path = "../bastion-executor" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
-lightproc = { version = "= 0.3.3-alpha.1", path = "../lightproc" }
+lightproc = { version = "0.3", path = "../lightproc" }
 log = "0.4"
 qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
