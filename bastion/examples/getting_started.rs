@@ -1,7 +1,9 @@
 use bastion::prelude::*;
 
 fn main() {
-    /// Creating the system's configuration...
+    env_logger::init();
+
+    // Creating the system's configuration...
     let config = Config::new().hide_backtraces();
     // ...and initializing the system with it (this is required)...
     Bastion::init_with(config);
@@ -127,7 +129,7 @@ fn main() {
     Bastion::broadcast("A message containing data.").expect("Couldn't send the message.");
 
     // Stopping or killing the system...
-    Bastion::stop();
+    //Bastion::stop();
     // Bastion::kill();
 
     // Blocking until the system has stopped (or got killed)...
