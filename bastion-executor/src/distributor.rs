@@ -10,17 +10,17 @@ use lightproc::prelude::*;
 use std::thread;
 
 pub(crate) struct Distributor {
-    pub cores: Vec<CoreId>,
+    pub(crate) cores: Vec<CoreId>,
 }
 
 impl Distributor {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Distributor {
             cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
         }
     }
 
-    pub fn assign(self) -> Vec<Stealer<LightProc>> {
+    pub(crate) fn assign(self) -> Vec<Stealer<LightProc>> {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
 
         for core in self.cores {

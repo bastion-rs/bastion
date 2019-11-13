@@ -13,9 +13,9 @@ use std::thread;
 use std::time::Duration;
 
 ///
-/// Loadbalancer struct which is just a convenience wrapper over the statistics calculations.
+/// Load-balancer struct which is just a convenience wrapper over the statistics calculations.
 #[derive(Debug)]
-pub struct LoadBalancer();
+pub struct LoadBalancer;
 
 impl LoadBalancer {
     ///

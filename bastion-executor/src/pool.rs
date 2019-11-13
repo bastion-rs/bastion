@@ -51,13 +51,13 @@ where
 pub struct Pool {
     ///
     /// Global run queue implementation
-    pub injector: Injector<LightProc>,
+    pub(crate) injector: Injector<LightProc>,
     ///
     /// Stealers of the workers
-    pub stealers: Vec<Stealer<LightProc>>,
+    pub(crate) stealers: Vec<Stealer<LightProc>>,
     ///
     /// Container of parked threads
-    pub sleepers: Sleepers,
+    pub(crate) sleepers: Sleepers,
 }
 
 impl Pool {
