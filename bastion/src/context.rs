@@ -48,8 +48,11 @@ pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```
 pub struct BastionId(Uuid);
 
-///
-/// Context for the inter children communication.
+#[derive(Debug)]
+/// A child's execution context, allowing its [`exec`] future
+/// to receive messages and access a [`ChildRef`] referencing
+/// it, a [`ChildrenRef`] referencing its children group and
+/// a [`SupervisorRef`] referencing its supervisor.
 ///
 /// # Example
 ///
@@ -62,7 +65,25 @@ pub struct BastionId(Uuid);
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
-///             format!("{:#?}", ctx.current());
+///             // Get a `ChildRef` referencing the child executing
+///             // this future...
+///             let current: &ChildRef = ctx.current();
+///             // Get a `ChildrenRef` referencing the children
+///             // group of the child executing this future...
+///             let parent: &ChildrenRef = ctx.parent();
+///             // Try to get a `SupervisorRef` referencing the
+///             // supervisor of the child executing this future...
+///             let supervisor: Option<&SupervisorRef> = ctx.supervisor();
+///             // Note that `supervisor` will be `None` because
+///             // this child was created using `Bastion::children`,
+///             // which made it supervised by the system supervisor
+///             // (which users can't get a reference to).
+///
+///             // Try to receive a message...
+///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+///             // Wait for a message to be received...
+///             let msg: Msg = ctx.recv().await?;
+///
 ///             Ok(())
 ///         }
 ///     })
@@ -73,7 +94,6 @@ pub struct BastionId(Uuid);
 ///     # Bastion::block_until_stopped();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
