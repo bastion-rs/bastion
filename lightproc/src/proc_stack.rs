@@ -5,7 +5,6 @@
 //!
 //! If we want to make an analogy, stack abstraction is similar to actor lifecycle abstractions
 //! in frameworks like Akka, but tailored version for Rust environment.
-
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
