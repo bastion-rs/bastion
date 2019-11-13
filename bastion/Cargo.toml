@@ -41,7 +41,9 @@ fxhash = "0.2"
 lazy_static = "1.4"
 lightproc = { version = "= 0.3.3-alpha.1", path = "../lightproc" }
 log = "0.4"
-qutex = { version = "0.2", features = ["async_await"] }
+# TODO: https://github.com/cogciprocate/qutex/pull/5
+# TODO: https://github.com/cogciprocate/qutex/pull/6
+bastion-qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
