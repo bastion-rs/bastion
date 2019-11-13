@@ -54,11 +54,10 @@
 
 ---
 
-Bastion is a highly-available, fault-tolerant runtime system
-with dynamic dispatch oriented lightweight process model.
-It supplies actor model like concurrency with lightweight process implementation
-and utilize all the system resources efficiently with giving promise of
-at-most-once message delivery guarantee.
+Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented,
+lightweight process model. It supplies actor-model-like concurrency with a lightweight process
+implementation and utilizes all of the system resources efficiently guaranteeing
+of at-most-once message delivery.
 
 <h6 align="center">Please note that Bastion is not production-ready yet and might break some backward compatibility for now.</h6>
 
@@ -82,9 +81,9 @@ You can use this to launch automatically supervised tasks.
 ## Guarantees
 * At most once delivery for all the messages.
 * Completely asynchronous system design.
-* Asynchronous program boundaries with [fort].
+* Asynchronous program boundaries with [fort](https://github.com/bastion-rs/fort).
 * Dynamic supervision of supervisors (adding a subtree later during the execution)
-* Lifecycle management both at `futures` and `lightproc` layers.
+* Lifecycle management both at `futures` and [lightproc](https://github.com/bastion-rs/bastion/tree/master/lightproc) layers.
 * Faster middleware development.
 * Above all "fault-tolerance".
 
