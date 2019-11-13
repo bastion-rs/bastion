@@ -8,7 +8,7 @@ categories = ["concurrency", "asynchronous"]
 homepage = "https://github.com/bastion-rs/bastion"
 repository = "https://github.com/bastion-rs/bastion"
 documentation = "https://docs.rs/bastion"
-readme = "README.md"
+readme = "../README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
 exclude = [
@@ -35,7 +35,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.0-alpha.1", path = "../bastion-executor" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
