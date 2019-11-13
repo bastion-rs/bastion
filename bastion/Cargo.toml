@@ -31,6 +31,9 @@ exclude = [
 travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
+[features]
+unstable = ["bastion-executor/unstable"]
+
 [dependencies]
 bastion-executor = { path = "../bastion-executor" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
