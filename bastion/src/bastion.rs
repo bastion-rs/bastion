@@ -205,7 +205,9 @@ impl Bastion {
     /// [`Config`]: struct.Config.html
     /// [`Bastion::init`]: #method.init
     pub fn init_with(config: Config) {
+        debug!("Bastion: Initializing with config: {:?}", config);
         if config.backtraces().is_hide() {
+            debug!("Bastion: Hiding backtraces.");
             std::panic::set_hook(Box::new(|_| ()));
         }
 
@@ -252,14 +254,19 @@ impl Bastion {
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
+        debug!("Bastion: Creating supervisor.");
         let parent = Parent::system();
         let bcast = Broadcast::new(parent);
 
+        debug!("Bastion: Initializing Supervisor({}).", bcast.id());
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
+        debug!("Supervisor({}): Initialized.", supervisor.id());
         let supervisor_ref = supervisor.as_ref();
 
+        debug!("Bastion: Deploying Supervisor({}).", supervisor.id());
         let msg = BastionMessage::deploy_supervisor(supervisor);
+        trace!("Bastion: Sending message: {:?}", msg);
         SYSTEM_SENDER.unbounded_send(msg).map_err(|_| ())?;
 
         Ok(supervisor_ref)
@@ -317,11 +324,13 @@ impl Bastion {
     where
         C: FnOnce(Children) -> Children,
     {
+        debug!("Bastion: Creating children group.");
         // FIXME: unsafe?
         if let Some(supervisor) = System::root_supervisor() {
             supervisor.children(init)
         } else {
             // TODO: Err(Error)
+            error!("Bastion: Using uninitialized system.");
             Err(())
         }
     }
@@ -372,7 +381,9 @@ impl Bastion {
     /// # }
     /// ```
     pub fn broadcast<M: Message>(msg: M) -> Result<(), M> {
+        debug!("Bastion: Broadcasting message: {:?}", msg);
         let msg = BastionMessage::broadcast(msg);
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: panics?
         SYSTEM_SENDER
             .unbounded_send(msg)
@@ -402,7 +413,9 @@ impl Bastion {
     /// }
     /// ```
     pub fn start() {
+        debug!("Bastion: Starting.");
         let msg = BastionMessage::start();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
     }
@@ -430,7 +443,9 @@ impl Bastion {
     /// }
     /// ```
     pub fn stop() {
+        debug!("Bastion: Stopping.");
         let msg = BastionMessage::stop();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
     }
@@ -457,13 +472,16 @@ impl Bastion {
     /// }
     /// ```
     pub fn kill() {
+        debug!("Bastion: Killing.");
         let msg = BastionMessage::kill();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
 
         // FIXME: panics
         let mut system = SYSTEM.clone().lock().wait().unwrap();
         if let Some(system) = system.take() {
+            debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }
     }
@@ -496,10 +514,12 @@ impl Bastion {
     /// [`Bastion::stop()`]: #method.stop
     /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
+        debug!("Bastion: Blocking until system is stopped.");
         loop {
             // FIXME: panics
             let system = SYSTEM.clone().lock().wait().unwrap();
             if system.is_none() {
+                debug!("Bastion: Unblocking because system is stopped.");
                 return;
             }
 

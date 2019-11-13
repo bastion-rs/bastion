@@ -140,6 +140,7 @@ impl Init {
 
 impl Children {
     pub(crate) fn new(bcast: Broadcast) -> Self {
+        debug!("Children({}): Initializing.", bcast.id());
         let launched = FxHashMap::default();
         let init = Init::default();
         let redundancy = 1;
@@ -159,15 +160,30 @@ impl Children {
     }
 
     fn stack(&self) -> ProcStack {
+        trace!("Children({}): Creating ProcStack.", self.id());
         // FIXME: with_pid
         ProcStack::default()
     }
 
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
+        debug!(
+            "Children({}): Resetting to Children({}).",
+            self.id(),
+            bcast.id()
+        );
         // TODO: stop or kill?
         self.kill().await;
 
         self.bcast = bcast;
+        self.started = false;
+
+        trace!(
+            "Children({}): Removing {} pre-start messages.",
+            self.id(),
+            self.pre_start_msgs.len()
+        );
+        self.pre_start_msgs.clear();
+        self.pre_start_msgs.shrink_to_fit();
 
         self.launch_elems();
     }
@@ -209,12 +225,18 @@ impl Children {
     }
 
     pub(crate) fn as_ref(&self) -> ChildrenRef {
+        trace!(
+            "Children({}): Creating new ChildrenRef({}).",
+            self.id(),
+            self.id()
+        );
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
 
         let mut children = Vec::with_capacity(self.launched.len());
         for (id, (sender, _)) in &self.launched {
+            trace!("Children({}): Creating new ChildRef({}).", self.id(), id);
             // TODO: clone or ref?
             let child = ChildRef::new(id.clone(), sender.clone());
             children.push(child);
@@ -271,6 +293,7 @@ impl Children {
         I: Fn(BastionContext) -> F + Send + Sync + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
+        trace!("Children({}): Setting exec closure.", self.id());
         self.init = Init::new(init);
         self
     }
@@ -307,6 +330,11 @@ impl Children {
     ///
     /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
+        trace!(
+            "Children({}): Setting redundancy: {}",
+            self.id(),
+            redundancy
+        );
         self.redundancy = redundancy;
         self
     }
@@ -355,20 +383,31 @@ impl Children {
     ///
     /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        trace!(
+            "Children({}): Setting callbacks: {:?}",
+            self.id(),
+            callbacks
+        );
         self.callbacks = callbacks;
         self
     }
 
     async fn stop(&mut self) {
+        debug!("Children({}): Stopping.", self.id());
         self.bcast.stop_children();
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {})
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
+            })
             .await;
     }
 
     async fn kill(&mut self) {
+        debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
 
         let mut children = FuturesOrdered::new();
@@ -378,14 +417,22 @@ impl Children {
             children.push(launched);
         }
 
-        children.for_each_concurrent(None, |_| async {}).await;
+        children
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
+            })
+            .await;
     }
 
     fn stopped(&mut self) {
+        debug!("Children({}): Stopped.", self.id());
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
+        debug!("Children({}): Faulted.", self.id());
         self.bcast.faulted();
     }
 
@@ -410,12 +457,18 @@ impl Children {
             BastionMessage::Prune { .. } => unimplemented!(),
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message { .. } => {
+            BastionMessage::Message(ref message) => {
+                debug!(
+                    "Children({}): Broadcasting a message: {:?}",
+                    self.id(),
+                    message
+                );
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
+                    debug!("Children({}): Child({}) stopped.", self.id(), id);
                     self.stop().await;
                     self.stopped();
 
@@ -425,6 +478,7 @@ impl Children {
             BastionMessage::Faulted { id } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
+                    warn!("Children({}): Child({}) faulted.", self.id(), id);
                     self.kill().await;
                     self.faulted();
 
@@ -437,6 +491,7 @@ impl Children {
     }
 
     async fn run(mut self) -> Self {
+        debug!("Children({}): Launched.", self.id());
         loop {
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
@@ -445,6 +500,12 @@ impl Children {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
+                    trace!(
+                        "Children({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        BastionMessage::Start
+                    );
+                    debug!("Children({}): Starting.", self.id());
                     self.started = true;
 
                     let msg = BastionMessage::start();
@@ -453,61 +514,82 @@ impl Children {
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
+                    debug!(
+                        "Children({}): Replaying messages received before starting.",
+                        self.id()
+                    );
                     for msg in msgs {
+                        trace!("Children({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
                             return self;
                         }
                     }
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
+                    trace!(
+                        "Children({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        msg
+                    );
                     self.pre_start_msgs.push(msg);
                 }
                 Poll::Ready(Some(msg)) => {
+                    trace!(
+                        "Children({}): Received a new message (started=true): {:?}",
+                        self.id(),
+                        msg
+                    );
                     if self.handle(msg).await.is_err() {
                         return self;
                     }
                 }
-                Poll::Ready(None) => {
-                    // TODO: stop or kill?
-                    self.kill().await;
-                    self.faulted();
-
-                    return self;
-                }
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
         }
     }
 
     pub(crate) fn launch_elems(&mut self) {
+        debug!("Children({}): Launching elements.", self.id());
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
             let bcast = Broadcast::new(parent);
+
             // TODO: clone or ref?
             let id = bcast.id().clone();
             let sender = bcast.sender().clone();
-
             let child_ref = ChildRef::new(id.clone(), sender.clone());
+
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
 
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let ctx =
-                BastionContext::new(id.clone(), child_ref, children, supervisor, state.clone());
+            let ctx = BastionContext::new(id, child_ref, children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);
 
+            debug!(
+                "Children({}): Initializing Child({}).",
+                self.id(),
+                bcast.id()
+            );
             let child = Child::new(exec, bcast, state);
+            debug!("Children({}): Launching Child({}).", self.id(), child.id());
+            let id = child.id().clone();
             let launched = child.launch();
 
-            self.launched.insert(id.clone(), (sender, launched));
+            self.launched.insert(id, (sender, launched));
         }
     }
 
     pub(crate) fn launch(self) -> RecoverableHandle<Self> {
+        debug!("Children({}): Launching.", self.id());
         let stack = self.stack();
         pool::spawn(self.run(), stack)
     }
@@ -630,6 +712,11 @@ impl ChildrenRef {
     ///
     /// [`elems`]: #method.elems
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
+        debug!(
+            "ChildrenRef({}): Broadcasting message: {:?}",
+            self.id(),
+            msg
+        );
         let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
         self.send(msg).map_err(|err| err.into_msg().unwrap())
@@ -659,6 +746,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
+        debug!("ChildrenRef({}): Stopping.", self.id());
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -687,11 +775,13 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
+        debug!("ChildrenRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+        trace!("ChildrenRef({}): Sending message: {:?}", self.id(), msg);
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())
@@ -700,6 +790,7 @@ impl ChildrenRef {
 
 impl Child {
     fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>) -> Self {
+        debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
         let started = false;
 
@@ -713,6 +804,7 @@ impl Child {
     }
 
     fn stack(&self) -> ProcStack {
+        trace!("Child({}): Creating ProcStack.", self.id());
         let id = self.bcast.id().clone();
         // FIXME: panics?
         let parent = self.bcast.parent().clone().into_children().unwrap();
@@ -721,6 +813,7 @@ impl Child {
         ProcStack::default().with_after_panic(move || {
             // FIXME: clones
             let id = id.clone();
+            warn!("Child({}): Panicked.", id);
 
             let msg = BastionMessage::faulted(id);
             // TODO: handle errors
@@ -728,18 +821,29 @@ impl Child {
         })
     }
 
+    fn id(&self) -> &BastionId {
+        self.bcast.id()
+    }
+
     fn stopped(&mut self) {
+        debug!("Child({}): Stopped.", self.id());
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
+        debug!("Child({}): Faulted.", self.id());
         self.bcast.faulted();
     }
 
     async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
         match msg {
             BastionMessage::Start => unreachable!(),
-            BastionMessage::Stop | BastionMessage::Kill => {
+            BastionMessage::Stop => {
+                self.stopped();
+
+                return Err(());
+            }
+            BastionMessage::Kill => {
                 self.stopped();
 
                 return Err(());
@@ -751,6 +855,7 @@ impl Child {
             // FIXME
             BastionMessage::SuperviseWith(_) => unimplemented!(),
             BastionMessage::Message(msg) => {
+                debug!("Child({}): Received a message: {:?}", self.id(), msg);
                 let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
                 state.push_msg(msg);
             }
@@ -764,16 +869,28 @@ impl Child {
     }
 
     async fn run(mut self) {
+        debug!("Child({}): Launched.", self.id());
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
+                    trace!(
+                        "Child({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        BastionMessage::Start
+                    );
+                    debug!("Child({}): Starting.", self.id());
                     self.started = true;
 
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
+                    debug!(
+                        "Child({}): Replaying messages received before starting.",
+                        self.id()
+                    );
                     for msg in msgs {
+                        trace!("Child({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
                             return;
                         }
@@ -782,22 +899,31 @@ impl Child {
                     continue;
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
+                    trace!(
+                        "Child({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        msg
+                    );
                     self.pre_start_msgs.push(msg);
 
                     continue;
                 }
                 Poll::Ready(Some(msg)) => {
+                    trace!(
+                        "Child({}): Received a new message (started=true): {:?}",
+                        self.id(),
+                        msg
+                    );
                     if self.handle(msg).await.is_err() {
                         return;
                     }
 
                     continue;
                 }
-                Poll::Ready(None) => {
-                    self.faulted();
-
-                    return;
-                }
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => (),
             }
 
@@ -808,8 +934,17 @@ impl Child {
             }
 
             match poll!(&mut self.exec) {
-                Poll::Ready(Ok(())) => return self.stopped(),
-                Poll::Ready(Err(())) => return self.faulted(),
+                Poll::Ready(Ok(())) => {
+                    debug!(
+                        "Child({}): The future finished executing successfully.",
+                        self.id()
+                    );
+                    return self.stopped();
+                }
+                Poll::Ready(Err(())) => {
+                    warn!("Child({}): The future returned an error.", self.id());
+                    return self.faulted();
+                }
                 Poll::Pending => (),
             }
 
@@ -911,6 +1046,7 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn tell<M: Message>(&self, msg: M) -> Result<(), M> {
+        debug!("ChildRef({}): Telling message: {:?}", self.id(), msg);
         let msg = BastionMessage::tell(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
@@ -993,6 +1129,7 @@ impl ChildRef {
     ///
     /// [`Answer`]: message/struct.Answer.html
     pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
+        debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())?;
@@ -1024,6 +1161,7 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
+        debug!("ChildRef({}): Stopping.", self.id);
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -1052,11 +1190,13 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
+        debug!("ChildRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+        trace!("ChildRef({}): Sending message: {:?}", self.id(), msg);
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())

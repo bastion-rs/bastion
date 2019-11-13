@@ -12,6 +12,7 @@ use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
+use log::Level;
 use std::cmp::{Eq, PartialEq};
 use std::ops::RangeFrom;
 use std::task::Poll;
@@ -128,6 +129,7 @@ enum Supervised {
 
 impl Supervisor {
     pub(crate) fn new(bcast: Broadcast) -> Self {
+        debug!("Supervisor({}): Initializing.", bcast.id());
         let order = Vec::new();
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
@@ -160,11 +162,28 @@ impl Supervisor {
     }
 
     fn stack(&self) -> ProcStack {
+        trace!("Supervisor({}): Creating ProcStack.", self.id());
         // FIXME: with_pid
         ProcStack::default()
     }
 
     pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
+        if log_enabled!(Level::Debug) {
+            if let Some(bcast) = &bcast {
+                debug!(
+                    "Supervisor({}): Resetting to Supervisor({}).",
+                    self.id(),
+                    bcast.id()
+                );
+            } else {
+                debug!(
+                    "Supervisor({}): Resetting to Supervisor({}).",
+                    self.id(),
+                    self.id()
+                );
+            }
+        }
+
         // TODO: stop or kill?
         self.kill(0..).await;
 
@@ -174,57 +193,32 @@ impl Supervisor {
             self.bcast.clear_children();
         }
 
+        debug!(
+            "Supervisor({}): Removing {} pre-start messages.",
+            self.id(),
+            self.pre_start_msgs.len()
+        );
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
-        let parent = Parent::supervisor(self.as_ref());
-        let mut reset = FuturesOrdered::new();
-        for id in self.order.drain(..) {
-            let (killed, supervised) = if let Some(supervised) = self.stopped.remove(&id) {
-                (false, supervised)
-            } else if let Some(supervised) = self.killed.remove(&id) {
-                (true, supervised)
-            } else {
-                // FIXME
-                unimplemented!();
-            };
+        self.restart(0..).await;
 
-            if killed {
-                supervised.callbacks().before_restart();
-            }
-
-            let bcast = Broadcast::new(parent.clone());
-            reset.push(async move {
-                // FIXME: panics?
-                let supervised = supervised.reset(bcast).await.unwrap();
-                // FIXME: might not keep order
-                if killed {
-                    supervised.callbacks().after_restart();
-                } else {
-                    supervised.callbacks().before_start();
-                }
-
-                supervised
-            })
-        }
-
-        while let Some(supervised) = reset.next().await {
-            self.bcast.register(supervised.bcast());
-            // TODO: remove and set the supervised element as started instead?
-            if self.started {
-                let msg = BastionMessage::start();
-                self.bcast.send_child(supervised.id(), msg);
-            }
-
-            let id = supervised.id().clone();
-            let launched = supervised.launch();
-            self.launched
-                .insert(id.clone(), (self.order.len(), launched));
-            self.order.push(id);
-        }
-
+        debug!(
+            "Supervisor({}): Removing {} stopped elements.",
+            self.id(),
+            self.stopped.len()
+        );
         // TODO: should be empty
+        self.stopped.clear();
         self.stopped.shrink_to_fit();
+
+        debug!(
+            "Supervisor({}): Removing {} killed elements.",
+            self.id(),
+            self.killed.len()
+        );
+        // TODO: should be empty
+        self.killed.clear();
         self.killed.shrink_to_fit();
     }
 
@@ -266,6 +260,11 @@ impl Supervisor {
     }
 
     pub(crate) fn as_ref(&self) -> SupervisorRef {
+        trace!(
+            "Supervisor({}): Creating new SupervisorRef({}).",
+            self.id(),
+            self.id()
+        );
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
@@ -313,12 +312,24 @@ impl Supervisor {
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
+        debug!("Supervisor({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "Supervisor({}): Initializing Supervisor({}).",
+            self.id(),
+            bcast.id()
+        );
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
+        debug!("Supervisor({}): Initialized.", supervisor.id());
 
+        debug!(
+            "Supervisor({}): Deploying Supervisor({}).",
+            self.id(),
+            supervisor.id()
+        );
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
 
@@ -366,13 +377,25 @@ impl Supervisor {
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
+        debug!("Supervisor({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "Supervisor({}): Initializing Supervisor({}).",
+            self.id(),
+            bcast.id()
+        );
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
+        debug!("Supervisor({}): Initialized.", supervisor.id());
         let supervisor_ref = supervisor.as_ref();
 
+        debug!(
+            "Supervisor({}): Deploying Supervisor({}).",
+            self.id(),
+            supervisor.id()
+        );
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.bcast.send_self(msg);
 
@@ -428,14 +451,26 @@ impl Supervisor {
     where
         C: FnOnce(Children) -> Children,
     {
+        debug!("Supervisor({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "Supervisor({}): Initializing Children({}).",
+            self.id(),
+            bcast.id()
+        );
         let children = Children::new(bcast);
         let mut children = init(children);
+        debug!("Children({}): Initialized.", children.id());
         // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
 
+        debug!(
+            "Supervisor({}): Deploying Children({}).",
+            self.id(),
+            children.id()
+        );
         let msg = BastionMessage::deploy_children(children);
         self.bcast.send_self(msg);
 
@@ -492,16 +527,27 @@ impl Supervisor {
     where
         C: FnOnce(Children) -> Children,
     {
+        debug!("Supervisor({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.as_ref());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "Supervisor({}): Initializing Children({}).",
+            self.id(),
+            bcast.id()
+        );
         let children = Children::new(bcast);
         let mut children = init(children);
-
+        debug!("Children({}): Initialized.", children.id());
         // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
-        let children_ref = children.as_ref();
 
+        let children_ref = children.as_ref();
+        debug!(
+            "Supervisor({}): Deploying Children({}).",
+            self.id(),
+            children.id()
+        );
         let msg = BastionMessage::deploy_children(children);
         self.bcast.send_self(msg);
 
@@ -556,6 +602,11 @@ impl Supervisor {
     /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
     /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn with_strategy(mut self, strategy: SupervisionStrategy) -> Self {
+        trace!(
+            "Supervisor({}): Setting strategy: {:?}",
+            self.id(),
+            strategy
+        );
         self.strategy = strategy;
         self
     }
@@ -595,14 +646,21 @@ impl Supervisor {
     ///
     /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
+        trace!(
+            "Supervisor({}): Setting callbacks: {:?}",
+            self.id(),
+            callbacks
+        );
         self.callbacks = callbacks;
         self
     }
 
     async fn restart(&mut self, range: RangeFrom<usize>) {
+        debug!("Supervisor({}): Restarting range: {:?}", self.id(), range);
         // TODO: stop or kill?
         self.kill(range.clone()).await;
 
+        let supervisor_id = &self.id().clone();
         let parent = Parent::supervisor(self.as_ref());
         let mut reset = FuturesOrdered::new();
         for id in self.order.drain(range) {
@@ -621,6 +679,13 @@ impl Supervisor {
 
             let bcast = Broadcast::new(parent.clone());
             reset.push(async move {
+                debug!(
+                    "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
+                    supervisor_id,
+                    supervised.id(),
+                    killed,
+                    bcast.id()
+                );
                 // FIXME: panics?
                 let supervised = supervised.reset(bcast).await.unwrap();
                 // FIXME: might not keep order
@@ -634,6 +699,11 @@ impl Supervisor {
             })
         }
 
+        trace!(
+            "Supervisor({}): Resetting {} elements.",
+            self.id(),
+            reset.len()
+        );
         while let Some(supervised) = reset.next().await {
             self.bcast.register(supervised.bcast());
             if self.started {
@@ -641,6 +711,11 @@ impl Supervisor {
                 self.bcast.send_child(supervised.id(), msg);
             }
 
+            debug!(
+                "Supervisor({}): Launching Supervised({}).",
+                self.id(),
+                supervised.id()
+            );
             let id = supervised.id().clone();
             let launched = supervised.launch();
             self.launched
@@ -650,11 +725,13 @@ impl Supervisor {
     }
 
     async fn stop(&mut self, range: RangeFrom<usize>) {
+        debug!("Supervisor({}): Stopping range: {:?}", self.id(), range);
         if range.start == 0 {
             self.bcast.stop_children();
         } else {
             // FIXME: panics
             for id in self.order.get(range.clone()).unwrap() {
+                trace!("Supervised({}): Stopping Supervised({}).", self.id(), id);
                 self.bcast.stop_child(id);
             }
         }
@@ -672,9 +749,14 @@ impl Supervisor {
         while let Some(supervised) = supervised.next().await {
             match supervised {
                 Some(supervised) => {
-                    let id = supervised.id().clone();
-
+                    trace!(
+                        "Supervisor({}): Supervised({}) stopped.",
+                        self.id(),
+                        supervised.id()
+                    );
                     supervised.callbacks().after_stop();
+
+                    let id = supervised.id().clone();
                     self.stopped.insert(id, supervised);
                 }
                 // FIXME
@@ -684,11 +766,13 @@ impl Supervisor {
     }
 
     async fn kill(&mut self, range: RangeFrom<usize>) {
+        debug!("Supervisor({}): Killing range: {:?}", self.id(), range);
         if range.start == 0 {
             self.bcast.kill_children();
         } else {
             // FIXME: panics
             for id in self.order.get(range.clone()).unwrap() {
+                trace!("Supervised({}): Killing Supervised({}).", self.id(), id);
                 self.bcast.kill_child(id);
             }
         }
@@ -706,6 +790,11 @@ impl Supervisor {
         while let Some(supervised) = supervised.next().await {
             match supervised {
                 Some(supervised) => {
+                    trace!(
+                        "Supervisor({}): Supervised({}) stopped.",
+                        self.id(),
+                        supervised.id()
+                    );
                     let id = supervised.id().clone();
                     self.killed.insert(id, supervised);
                 }
@@ -716,14 +805,21 @@ impl Supervisor {
     }
 
     fn stopped(&mut self) {
+        debug!("Supervisor({}): Stopped.", self.id());
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
+        debug!("Supervisor({}): Faulted.", self.id());
         self.bcast.faulted();
     }
 
     async fn recover(&mut self, id: BastionId) -> Result<(), ()> {
+        debug!(
+            "Supervisor({}): Recovering using strategy: {:?}",
+            self.id(),
+            self.strategy
+        );
         match self.strategy {
             SupervisionStrategy::OneForOne => {
                 let (order, launched) = self.launched.remove(&id).ok_or(())?;
@@ -737,6 +833,12 @@ impl Supervisor {
                 let parent = Parent::supervisor(self.as_ref());
                 let bcast = Broadcast::new(parent);
                 let id = bcast.id().clone();
+                debug!(
+                    "Supervisor({}): Resetting Supervised({}) to Supervised({}).",
+                    self.id(),
+                    supervised.id(),
+                    bcast.id()
+                );
                 // FIXME: panics?
                 let supervised = supervised.reset(bcast).await.unwrap();
                 supervised.callbacks().after_restart();
@@ -747,6 +849,11 @@ impl Supervisor {
                     self.bcast.send_child(&id, msg);
                 }
 
+                debug!(
+                    "Supervisor({}): Launching Supervised({}).",
+                    self.id(),
+                    supervised.id()
+                );
                 let launched = supervised.launch();
                 self.launched.insert(id.clone(), (order, launched));
                 self.order[order] = id;
@@ -787,10 +894,20 @@ impl Supervisor {
             BastionMessage::Deploy(deployment) => {
                 let supervised = match deployment {
                     Deployment::Supervisor(supervisor) => {
+                        debug!(
+                            "Supervisor({}): Deploying Supervisor({}).",
+                            self.id(),
+                            supervisor.id()
+                        );
                         supervisor.callbacks().before_start();
                         Supervised::supervisor(supervisor)
                     }
                     Deployment::Children(children) => {
+                        debug!(
+                            "Supervisor({}): Deploying Children({}).",
+                            self.id(),
+                            children.id()
+                        );
                         children.callbacks().before_start();
                         Supervised::children(children)
                     }
@@ -802,6 +919,11 @@ impl Supervisor {
                     self.bcast.send_child(supervised.id(), msg);
                 }
 
+                debug!(
+                    "Supervisor({}): Launching Supervised({}).",
+                    self.id(),
+                    supervised.id()
+                );
                 let id = supervised.id().clone();
                 let launched = supervised.launch();
                 self.launched
@@ -811,14 +933,25 @@ impl Supervisor {
             // FIXME
             BastionMessage::Prune { .. } => unimplemented!(),
             BastionMessage::SuperviseWith(strategy) => {
+                debug!(
+                    "Supervisor({}): Setting strategy: {:?}",
+                    self.id(),
+                    strategy
+                );
                 self.strategy = strategy;
             }
-            BastionMessage::Message(_) => {
+            BastionMessage::Message(ref message) => {
+                debug!(
+                    "Supervisor({}): Broadcasting a message: {:?}",
+                    self.id(),
+                    message
+                );
                 self.bcast.send_children(msg);
             }
             BastionMessage::Stopped { id } => {
                 // FIXME: Err if None?
                 if let Some((_, launched)) = self.launched.remove(&id) {
+                    debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
                     // TODO: add a "waiting" list an poll from it instead of awaiting
                     // FIXME: panics?
                     let supervised = launched.await.unwrap();
@@ -829,6 +962,10 @@ impl Supervisor {
                 }
             }
             BastionMessage::Faulted { id } => {
+                if self.launched.contains_key(&id) {
+                    warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
+                }
+
                 if self.recover(id).await.is_err() {
                     // TODO: stop or kill?
                     self.kill(0..).await;
@@ -843,10 +980,17 @@ impl Supervisor {
     }
 
     async fn run(mut self) -> Self {
+        debug!("Supervisor({}): Launched.", self.id());
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(BastionMessage::Start)) => {
+                    trace!(
+                        "Supervisor({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        BastionMessage::Start
+                    );
+                    debug!("Supervisor({}): Starting.", self.id());
                     self.started = true;
 
                     let msg = BastionMessage::start();
@@ -855,33 +999,46 @@ impl Supervisor {
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
 
+                    debug!(
+                        "Supervisor({}): Replaying messages received before starting.",
+                        self.id()
+                    );
                     for msg in msgs {
+                        trace!("Supervisor({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
                             return self;
                         }
                     }
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
+                    trace!(
+                        "Supervisor({}): Received a new message (started=false): {:?}",
+                        self.id(),
+                        msg
+                    );
                     self.pre_start_msgs.push(msg);
                 }
                 Poll::Ready(Some(msg)) => {
+                    trace!(
+                        "Supervisor({}): Received a new message (started=true): {:?}",
+                        self.id(),
+                        msg
+                    );
                     if self.handle(msg).await.is_err() {
                         return self;
                     }
                 }
-                Poll::Ready(None) => {
-                    // TODO: stop or kill?
-                    self.kill(0..).await;
-                    self.faulted();
-
-                    return self;
-                }
+                // NOTE: because `Broadcast` always holds both a `Sender` and
+                //      `Receiver` of the same channel, this would only be
+                //      possible if the channel was closed, which never happens.
+                Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
         }
     }
 
     pub(crate) fn launch(self) -> RecoverableHandle<Self> {
+        debug!("Supervisor({}): Launching.", self.id());
         let stack = self.stack();
         pool::spawn(self.run(), stack)
     }
@@ -961,13 +1118,25 @@ impl SupervisorRef {
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
+        debug!("SupervisorRef({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.clone());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "SupervisorRef({}): Initializing Supervisor({}).",
+            self.id(),
+            bcast.id()
+        );
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
         let supervisor_ref = supervisor.as_ref();
+        debug!("Supervisor({}): Initialized.", supervisor.id());
 
+        debug!(
+            "SupervisorRef({}): Deploying Supervisor({}).",
+            self.id(),
+            supervisor.id()
+        );
         let msg = BastionMessage::deploy_supervisor(supervisor);
         self.send(msg).map_err(|_| ())?;
 
@@ -1022,16 +1191,27 @@ impl SupervisorRef {
     where
         C: FnOnce(Children) -> Children,
     {
+        debug!("SupervisorRef({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.clone());
         let bcast = Broadcast::new(parent);
 
+        debug!(
+            "SupervisorRef({}): Initializing Children({}).",
+            self.id(),
+            bcast.id()
+        );
         let children = Children::new(bcast);
         let mut children = init(children);
-
+        debug!("Children({}): Initialized.", children.id());
         // FIXME: children group elems launched without the group itself being launched
         children.launch_elems();
-        let children_ref = children.as_ref();
 
+        let children_ref = children.as_ref();
+        debug!(
+            "SupervisorRef({}): Deplying Children({}).",
+            self.id(),
+            children.id()
+        );
         let msg = BastionMessage::deploy_children(children);
         self.send(msg).map_err(|_| ())?;
 
@@ -1090,6 +1270,11 @@ impl SupervisorRef {
     /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
     /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn strategy(&self, strategy: SupervisionStrategy) -> Result<(), ()> {
+        debug!(
+            "SupervisorRef({}): Setting strategy: {:?}",
+            self.id(),
+            strategy
+        );
         let msg = BastionMessage::supervise_with(strategy);
         self.send(msg).map_err(|_| ())
     }
@@ -1143,6 +1328,11 @@ impl SupervisorRef {
     /// # }
     /// ```
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
+        debug!(
+            "SupervisorRef({}): Broadcasting message: {:?}",
+            self.id(),
+            msg
+        );
         let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
@@ -1172,6 +1362,7 @@ impl SupervisorRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
+        debug!("SupervisorRef({}): Stopping.", self.id());
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -1200,11 +1391,13 @@ impl SupervisorRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
+        debug!("SupervisorRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
+        trace!("SupervisorRef({}): Sending message: {:?}", self.id(), msg);
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())
@@ -1218,6 +1411,37 @@ impl Supervised {
 
     fn children(children: Children) -> Self {
         Supervised::Children(children)
+    }
+
+    fn stack(&self) -> ProcStack {
+        trace!("Supervised({}): Creating ProcStack.", self.id());
+        // FIXME: with_id
+        ProcStack::default()
+    }
+
+    fn reset(self, bcast: Broadcast) -> RecoverableHandle<Self> {
+        debug!(
+            "Supervised({}): Resetting to Supervised({}).",
+            self.id(),
+            bcast.id()
+        );
+        let stack = self.stack();
+        match self {
+            Supervised::Supervisor(mut supervisor) => pool::spawn(
+                async {
+                    supervisor.reset(Some(bcast)).await;
+                    Supervised::Supervisor(supervisor)
+                },
+                stack,
+            ),
+            Supervised::Children(mut children) => pool::spawn(
+                async {
+                    children.reset(bcast).await;
+                    Supervised::Children(children)
+                },
+                stack,
+            ),
+        }
     }
 
     fn id(&self) -> &BastionId {
@@ -1241,38 +1465,11 @@ impl Supervised {
         }
     }
 
-    fn reset(self, bcast: Broadcast) -> RecoverableHandle<Self> {
-        match self {
-            Supervised::Supervisor(mut supervisor) => {
-                // FIXME: with_pid
-                let stack = ProcStack::default();
-                pool::spawn(
-                    async {
-                        supervisor.reset(Some(bcast)).await;
-                        Supervised::Supervisor(supervisor)
-                    },
-                    stack,
-                )
-            }
-            Supervised::Children(mut children) => {
-                // FIXME: with_pid
-                let stack = ProcStack::default();
-                pool::spawn(
-                    async {
-                        children.reset(bcast).await;
-                        Supervised::Children(children)
-                    },
-                    stack,
-                )
-            }
-        }
-    }
-
     fn launch(self) -> RecoverableHandle<Self> {
+        debug!("Supervised({}): Launching.", self.id());
+        let stack = self.stack();
         match self {
             Supervised::Supervisor(supervisor) => {
-                // FIXME: with_pid
-                let stack = ProcStack::default();
                 pool::spawn(
                     async {
                         // FIXME: panics?
@@ -1283,8 +1480,6 @@ impl Supervised {
                 )
             }
             Supervised::Children(children) => {
-                // FIXME: with_pid
-                let stack = ProcStack::default();
                 pool::spawn(
                     async {
                         // FIXME: panics?

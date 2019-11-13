@@ -103,6 +103,7 @@ impl BastionContext {
         supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
     ) -> Self {
+        debug!("BastionContext({}): Creating.", id);
         BastionContext {
             id,
             child,
@@ -275,10 +276,17 @@ impl BastionContext {
     /// [`recv`]: #method.recv
     /// [`Msg`]: children/struct.Msg.html
     pub async fn try_recv(&self) -> Option<Msg> {
+        debug!("BastionContext({}): Trying to receive message.", self.id);
         // TODO: Err(Error)
         let mut state = self.state.clone().lock_async().await.ok()?;
 
-        state.msgs.pop_front()
+        if let Some(msg) = state.msgs.pop_front() {
+            trace!("BastionContext({}): Received message: {:?}", self.id, msg);
+            Some(msg)
+        } else {
+            trace!("BastionContext({}): Received no message.", self.id);
+            None
+        }
     }
 
     /// Retrieves asynchronously a message received by the element
@@ -319,11 +327,13 @@ impl BastionContext {
     /// [`try_recv`]: #method.try_recv
     /// [`Msg`]: children/struct.Msg.html
     pub async fn recv(&self) -> Result<Msg, ()> {
+        debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
             // TODO: Err(Error)
             let mut state = self.state.clone().lock_async().await.unwrap();
 
             if let Some(msg) = state.msgs.pop_front() {
+                trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
 
