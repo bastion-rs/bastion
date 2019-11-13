@@ -2,11 +2,10 @@
 //! Blocking run of the async processes
 //!
 //!
-use super::worker;
+use crate::worker;
 use crossbeam_utils::sync::Parker;
 use lightproc::proc_stack::ProcStack;
-use std::cell::Cell;
-use std::cell::UnsafeCell;
+use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;

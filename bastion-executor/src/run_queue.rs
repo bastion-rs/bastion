@@ -51,22 +51,15 @@
 //! [`steal()`]: struct.Stealer.html#method.steal
 //! [`steal_batch()`]: struct.Stealer.html#method.steal_batch
 //! [`steal_batch_and_pop()`]: struct.Stealer.html#method.steal_batch_and_pop
-
-extern crate crossbeam_epoch as epoch;
-extern crate crossbeam_utils as utils;
-
+use crossbeam_epoch::{self as epoch, Atomic, Owned};
+use crossbeam_utils::{Backoff, CachePadded};
 use std::cell::{Cell, UnsafeCell};
-use std::cmp;
-use std::fmt;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
-use std::ptr;
 use std::sync::atomic::{self, AtomicIsize, AtomicPtr, AtomicUsize, Ordering};
 use std::sync::Arc;
-
-use epoch::{Atomic, Owned};
-use utils::{Backoff, CachePadded};
+use std::{cmp, fmt, ptr};
 
 // Minimum buffer capacity.
 const MIN_CAP: usize = 64;

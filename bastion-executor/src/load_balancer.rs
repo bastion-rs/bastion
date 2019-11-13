@@ -4,15 +4,12 @@
 //! Load balancer calculates sampled mean to provide average process execution amount
 //! to all runtime.
 //!
-
-use super::placement;
-use lazy_static::*;
-
-use std::thread;
-
-use super::load_balancer;
+use crate::load_balancer;
+use crate::placement;
 use crossbeam_utils::sync::ShardedLock;
-use rustc_hash::FxHashMap;
+use fxhash::FxHashMap;
+use lazy_static::*;
+use std::thread;
 use std::time::Duration;
 
 ///

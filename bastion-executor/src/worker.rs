@@ -3,17 +3,12 @@
 //!
 //! This worker implementation relies on worker run queue statistics which are hold in the pinned global memory
 //! where workload distribution calculated and amended to their own local queues.
-
-use std::cell::{Cell, UnsafeCell};
-use std::ptr;
-
-use super::pool;
-use super::run_queue::Worker;
 use crate::load_balancer;
-use crate::pool::Pool;
-use crate::run_queue::Steal;
-use core::iter;
+use crate::pool::{self, Pool};
+use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
+use std::cell::{Cell, UnsafeCell};
+use std::{iter, ptr};
 
 ///
 /// Get the current process's stack

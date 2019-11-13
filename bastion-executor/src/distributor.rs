@@ -3,13 +3,10 @@
 //!
 //! Distributor provides a fair distribution of threads and pinning them to cores for fair execution.
 //! It assigns threads in round-robin fashion to all cores.
-use super::placement;
-use super::placement::CoreId;
-use super::run_queue::{Stealer, Worker};
-
-use lightproc::prelude::*;
-
+use crate::placement::{self, CoreId};
+use crate::run_queue::{Stealer, Worker};
 use crate::worker;
+use lightproc::prelude::*;
 use std::thread;
 
 pub(crate) struct Distributor {

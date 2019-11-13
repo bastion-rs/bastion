@@ -4,13 +4,11 @@
 //! Pool management and tracking belongs here.
 //! We spawn futures onto the pool with [spawn] method of global run queue or
 //! with corresponding [Worker]'s spawn method.
-
-use super::distributor::Distributor;
-
-use super::run_queue::{Injector, Stealer};
-use super::sleepers::Sleepers;
-use super::worker;
-use lazy_static::*;
+use crate::distributor::Distributor;
+use crate::run_queue::{Injector, Stealer};
+use crate::sleepers::Sleepers;
+use crate::worker;
+use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use std::future::Future;
 
