@@ -281,10 +281,10 @@ impl BastionContext {
         let mut state = self.state.clone().lock_async().await.ok()?;
 
         if let Some(msg) = state.msgs.pop_front() {
-            trace!("BastionContext({}): Received message: {:?}", msg);
+            trace!("BastionContext({}): Received message: {:?}", self.id, msg);
             Some(msg)
         } else {
-            trace!("BastionContext({}): Received no message.");
+            trace!("BastionContext({}): Received no message.", self.id);
             None
         }
     }
@@ -333,7 +333,7 @@ impl BastionContext {
             let mut state = self.state.clone().lock_async().await.unwrap();
 
             if let Some(msg) = state.msgs.pop_front() {
-                trace!("BastionContext({}): Received message: {:?}", msg);
+                trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
 
