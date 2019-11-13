@@ -19,6 +19,8 @@ use std::sync::Arc;
 /// Try increasing the worker count. Yes!
 /// In addition to that try benchmarking with `ab`, `wrk` or `siege`.
 fn main() {
+    env_logger::init();
+
     Bastion::init();
 
     // Workers that process the work.

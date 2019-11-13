@@ -45,5 +45,6 @@ qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
+env_logger = "0.7"
 proptest = "0.9"
 snap = "0.2"

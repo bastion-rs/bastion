@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 fn main() {
+    env_logger::init();
+
     Bastion::init();
 
     let started = AtomicBool::new(false);
