@@ -166,12 +166,24 @@ impl Children {
     }
 
     pub(crate) async fn reset(&mut self, bcast: Broadcast) {
-        debug!("Children({}): Resetting to Children({}).", self.id(), bcast.id());
+        debug!(
+            "Children({}): Resetting to Children({}).",
+            self.id(),
+            bcast.id()
+        );
         // TODO: stop or kill?
         self.kill().await;
 
         self.bcast = bcast;
         self.started = false;
+
+        trace!(
+            "Children({}): Removing {} pre-start messages.",
+            self.id(),
+            self.pre_start_msgs.len()
+        );
+        self.pre_start_msgs.clear();
+        self.pre_start_msgs.shrink_to_fit();
 
         self.launch_elems();
     }
@@ -213,12 +225,18 @@ impl Children {
     }
 
     pub(crate) fn as_ref(&self) -> ChildrenRef {
+        trace!(
+            "Children({}): Creating new ChildrenRef({}).",
+            self.id(),
+            self.id()
+        );
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
 
         let mut children = Vec::with_capacity(self.launched.len());
         for (id, (sender, _)) in &self.launched {
+            trace!("Children({}): Creating new ChildRef({}).", self.id(), id);
             // TODO: clone or ref?
             let child = ChildRef::new(id.clone(), sender.clone());
             children.push(child);
@@ -313,7 +331,7 @@ impl Children {
     /// [`with_exec`]: #method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         trace!(
-            "Children({}): Setting redundancy: {:?}",
+            "Children({}): Setting redundancy: {}",
             self.id(),
             redundancy
         );
@@ -380,8 +398,10 @@ impl Children {
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
             })
             .await;
     }
@@ -397,9 +417,13 @@ impl Children {
             children.push(launched);
         }
 
-        children.for_each_concurrent(None, |_| async {
-            trace!("Children({}): Unknown child stopped.", self.id());
-        }).await;
+        children
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
+            })
+            .await;
     }
 
     fn stopped(&mut self) {
@@ -529,6 +553,7 @@ impl Children {
     }
 
     pub(crate) fn launch_elems(&mut self) {
+        debug!("Children({}): Launching elements.", self.id());
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
             let bcast = Broadcast::new(parent);
@@ -687,7 +712,11 @@ impl ChildrenRef {
     ///
     /// [`elems`]: #method.elems
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
-        debug!("ChildrenRef({}): Broadcasting message: {:?}", self.id, msg);
+        debug!(
+            "ChildrenRef({}): Broadcasting message: {:?}",
+            self.id(),
+            msg
+        );
         let msg = BastionMessage::broadcast(msg);
         // FIXME: panics?
         self.send(msg).map_err(|err| err.into_msg().unwrap())
@@ -717,7 +746,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
-        debug!("ChildrenRef({}): Stopping.", self.id);
+        debug!("ChildrenRef({}): Stopping.", self.id());
         let msg = BastionMessage::stop();
         self.send(msg).map_err(|_| ())
     }
@@ -746,13 +775,13 @@ impl ChildrenRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
-        debug!("ChildrenRef({}): Killing.", self.id);
+        debug!("ChildrenRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        trace!("ChildrenRef({}): Sending message: {:?}", self.id, msg);
+        trace!("ChildrenRef({}): Sending message: {:?}", self.id(), msg);
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())
@@ -1017,7 +1046,7 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn tell<M: Message>(&self, msg: M) -> Result<(), M> {
-        debug!("ChildRef({}): Telling message: {:?}", self.id, msg);
+        debug!("ChildRef({}): Telling message: {:?}", self.id(), msg);
         let msg = BastionMessage::tell(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())
@@ -1100,7 +1129,7 @@ impl ChildRef {
     ///
     /// [`Answer`]: message/struct.Answer.html
     pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
-        debug!("ChildRef({}): Asking message: {:?}", self.id, msg);
+        debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg);
         // FIXME: panics?
         self.send(msg).map_err(|msg| msg.into_msg().unwrap())?;
@@ -1161,13 +1190,13 @@ impl ChildRef {
     /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
-        debug!("ChildRef({}): Killing.", self.id);
+        debug!("ChildRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
         self.send(msg).map_err(|_| ())
     }
 
     pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        trace!("ChildRef({}): Sending message: {:?}", self.id, msg);
+        trace!("ChildRef({}): Sending message: {:?}", self.id(), msg);
         self.sender
             .unbounded_send(msg)
             .map_err(|err| err.into_inner())

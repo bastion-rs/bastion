@@ -258,6 +258,7 @@ impl Bastion {
         let parent = Parent::system();
         let bcast = Broadcast::new(parent);
 
+        debug!("Bastion: Initializing Supervisor({}).", bcast.id());
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
         debug!("Supervisor({}): Initialized.", supervisor.id());
