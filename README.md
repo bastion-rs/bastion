@@ -69,7 +69,7 @@ You can use this to launch automatically supervised tasks.
 * Message-based communication makes this project a lean mesh of actor system.
     * Without web servers, weird shenanigans, forced trait implementations, and static dispatch.
 * Runtime fault-tolerance makes it a good candidate for distributed systems.
-    * If you want the smell of Erlang and the powerful aspects in Rust. That's it!
+    * If you want the smell of Erlang and the powerful aspects of Rust. That's it!
 * Completely asynchronous runtime with NUMA-aware and cache-affine SMP executor.
     * Exploiting hardware locality wherever it is possible. It is designed for servers.
 * Supervision system makes it easy to manage lifecycles.
