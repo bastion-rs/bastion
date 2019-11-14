@@ -116,6 +116,36 @@ If you are using Bastion open a PR so we can include it in our showcase.
 * [SkyNet](https://github.com/vertexclique/skynet) (a Discord bot which is resending deleted messages)
     * Skynet is running since 0.1.3 release of Bastion on the cloud and haven't killed yet.
 
+## Contributors
+
+### Code Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="https://github.com/bastion-rs/bastion/graphs/contributors"><img src="https://opencollective.com/bastion/contributors.svg?width=890&button=false" /></a>
+
+### Financial Contributors
+
+Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/bastion/contribute)]
+
+#### Individuals
+
+<a href="https://opencollective.com/bastion"><img src="https://opencollective.com/bastion/individuals.svg?width=890"></a>
+
+#### Organizations
+
+Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/bastion/contribute)]
+
+<a href="https://opencollective.com/bastion/organization/0/website"><img src="https://opencollective.com/bastion/organization/0/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/1/website"><img src="https://opencollective.com/bastion/organization/1/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/2/website"><img src="https://opencollective.com/bastion/organization/2/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/3/website"><img src="https://opencollective.com/bastion/organization/3/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/4/website"><img src="https://opencollective.com/bastion/organization/4/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/5/website"><img src="https://opencollective.com/bastion/organization/5/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/6/website"><img src="https://opencollective.com/bastion/organization/6/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/7/website"><img src="https://opencollective.com/bastion/organization/7/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/8/website"><img src="https://opencollective.com/bastion/organization/8/avatar.svg"></a>
+<a href="https://opencollective.com/bastion/organization/9/website"><img src="https://opencollective.com/bastion/organization/9/avatar.svg"></a>
+
 ## License
 
 Licensed under either of
