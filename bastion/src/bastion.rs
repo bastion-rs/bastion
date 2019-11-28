@@ -3,7 +3,7 @@ use crate::children::{Children, ChildrenRef};
 use crate::config::Config;
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
-use crate::system::{System, SYSTEM, SYSTEM_SENDER};
+use crate::system::SYSTEM;
 use std::fmt::{self, Debug, Formatter};
 use std::thread;
 
@@ -211,8 +211,8 @@ impl Bastion {
             std::panic::set_hook(Box::new(|_| ()));
         }
 
-        // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
-        SYSTEM_SENDER.is_closed();
+        // NOTE: this is just to make sure that SYSTEM has been initialized by lazy_static
+        SYSTEM.sender().is_closed();
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified
@@ -267,7 +267,7 @@ impl Bastion {
         debug!("Bastion: Deploying Supervisor({}).", supervisor.id());
         let msg = BastionMessage::deploy_supervisor(supervisor);
         trace!("Bastion: Sending message: {:?}", msg);
-        SYSTEM_SENDER.unbounded_send(msg).map_err(|_| ())?;
+        SYSTEM.sender().unbounded_send(msg).map_err(|_| ())?;
 
         Ok(supervisor_ref)
     }
@@ -325,14 +325,7 @@ impl Bastion {
         C: FnOnce(Children) -> Children,
     {
         debug!("Bastion: Creating children group.");
-        // FIXME: unsafe?
-        if let Some(supervisor) = System::root_supervisor() {
-            supervisor.children(init)
-        } else {
-            // TODO: Err(Error)
-            error!("Bastion: Using uninitialized system.");
-            Err(())
-        }
+        SYSTEM.supervisor().children(init)
     }
 
     /// Sends a message to the system which will then send it to all
@@ -385,7 +378,8 @@ impl Bastion {
         let msg = BastionMessage::broadcast(msg);
         trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: panics?
-        SYSTEM_SENDER
+        SYSTEM
+            .sender()
             .unbounded_send(msg)
             .map_err(|err| err.into_inner().into_msg().unwrap())
     }
@@ -417,7 +411,7 @@ impl Bastion {
         let msg = BastionMessage::start();
         trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
-        SYSTEM_SENDER.unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(msg).ok();
     }
 
     /// Sends a message to the system to tell it to stop
@@ -447,7 +441,7 @@ impl Bastion {
         let msg = BastionMessage::stop();
         trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
-        SYSTEM_SENDER.unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(msg).ok();
     }
 
     /// Sends a message to the system to tell it to kill every
@@ -476,10 +470,10 @@ impl Bastion {
         let msg = BastionMessage::kill();
         trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
-        SYSTEM_SENDER.unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(msg).ok();
 
         // FIXME: panics
-        let mut system = SYSTEM.clone().lock().wait().unwrap();
+        let mut system = SYSTEM.handle().lock().wait().unwrap();
         if let Some(system) = system.take() {
             debug!("Bastion: Cancelling system handle.");
             system.cancel();
@@ -517,7 +511,7 @@ impl Bastion {
         debug!("Bastion: Blocking until system is stopped.");
         loop {
             // FIXME: panics
-            let system = SYSTEM.clone().lock().wait().unwrap();
+            let system = SYSTEM.handle().lock().wait().unwrap();
             if system.is_none() {
                 debug!("Bastion: Unblocking because system is stopped.");
                 return;
