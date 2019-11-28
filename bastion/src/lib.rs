@@ -13,13 +13,13 @@
 //!
 //! ## Features
 //! * Message-based communication makes this project a lean mesh of actor system.
-//!     * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
+//!     * Without web servers, weird shenanigans, forced trait implementations, and static dispatch.
 //! * Runtime fault-tolerance makes it a good candidate for distributed systems.
-//!     * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
+//!     * If you want the smell of Erlang and the powerful aspects in Rust. That's it!
 //! * Completely asynchronous runtime with NUMA-aware and cache-affine SMP executor.
 //!     * Exploiting hardware locality wherever it is possible. It is designed for servers.
 //! * Supervision system makes it easy to manage lifecycles.
-//!     * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
+//!     * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
 //!
 //! ## Guarantees
 //! * At most once delivery for all the messages.
@@ -31,13 +31,14 @@
 //! * Above all "fault-tolerance".
 //!
 //! ## Why Bastion?
-//! If one of the questions below answered with yes, then Bastion is just for you:
+//! If one of the questions below is answered with yes, then Bastion is just for you:
 //! * Do I need fault-tolerance in my project?
 //! * Do I need to write resilient middleware/s?
 //! * I shouldn't need a webserver to run an actor system, right?
 //! * Do I want to make my existing code unbreakable?
 //! * Do I need an executor which is using system resources efficiently?
-//! * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
+//! * Do I have some trust issues with orchestration systems?
+//! * Do I want to implement my own application lifecycle?
 //!
 //!
 //! [lightproc]: https://docs.rs/lightproc/
@@ -51,12 +52,21 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
+#[macro_use]
+extern crate log;
+
+// TODO: https://github.com/cogciprocate/qutex/pull/5
+// TODO: https://github.com/cogciprocate/qutex/pull/6
+extern crate bastion_qutex as qutex;
+
 pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
+pub use self::config::Config;
 
 mod bastion;
 mod broadcast;
 mod callbacks;
+mod config;
 mod system;
 
 pub mod children;
@@ -70,6 +80,7 @@ pub mod prelude {
     pub use crate::bastion::Bastion;
     pub use crate::callbacks::Callbacks;
     pub use crate::children::{ChildRef, Children, ChildrenRef};
+    pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId};
     pub use crate::message::{Answer, Message, Msg, Sender};
     pub use crate::msg;

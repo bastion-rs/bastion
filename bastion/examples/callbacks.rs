@@ -1,6 +1,8 @@
 use bastion::prelude::*;
 
 fn main() {
+    env_logger::init();
+
     Bastion::init();
 
     Bastion::supervisor(sp).expect("Couldn't create the supervisor.");

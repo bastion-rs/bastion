@@ -4,7 +4,7 @@
 
 -----------------
 
-<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
+<h1 align="center">Highly-available Distributed* Fault-tolerant Runtime</h1>
 
 <table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 <tr>
@@ -54,11 +54,7 @@
 
 ---
 
-Bastion is a highly-available, fault-tolerant runtime system
-with dynamic dispatch oriented lightweight process model.
-It supplies actor model like concurrency with lightweight process implementation
-and utilize all the system resources efficiently with giving promise of
-at-most-once message delivery guarantee.
+Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery.
 
 <h6 align="center">Please note that Bastion is not production-ready yet and might break some backward compatibility for now.</h6>
 
@@ -82,9 +78,9 @@ You can use this to launch automatically supervised tasks.
 ## Guarantees
 * At most once delivery for all the messages.
 * Completely asynchronous system design.
-* Asynchronous program boundaries with [fort].
+* Asynchronous program boundaries with [fort](https://github.com/bastion-rs/fort).
 * Dynamic supervision of supervisors (adding a subtree later during the execution)
-* Lifecycle management both at `futures` and `lightproc` layers.
+* Lifecycle management both at `futures` and [lightproc](https://github.com/bastion-rs/bastion/tree/master/lightproc) layers.
 * Faster middleware development.
 * Above all "fault-tolerance".
 
@@ -97,9 +93,9 @@ If one of the questions below answered with yes, then Bastion is just for you:
 * Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
 
 ### Get Started
-Check [getting started example](https://github.com/bastion-rs/bastion/blob/master/examples/getting_started.rs) in examples.
+Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
 
-[Examples](https://github.com/bastion-rs/bastion/blob/master/examples) cover possible use cases in the frame of the crate.
+[Examples](https://github.com/bastion-rs/bastion/blob/master/bastion/examples) cover possible use cases of the crate.
 
 Include bastion to your project with:
 ```toml
@@ -145,3 +141,6 @@ More interaction and more ideas are better!
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 
 A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](.github/CONTRIBUTING.md) on GitHub.
+
+---
+<sup><sub>* Currently, we are working on distributed properties and protocol[.](https://spoti.fi/2OaEsj9)</sub></sup>

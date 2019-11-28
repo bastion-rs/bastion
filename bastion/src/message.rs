@@ -6,7 +6,7 @@ use crate::children::Children;
 use crate::context::BastionId;
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use futures::channel::oneshot::{self, Receiver};
-use std::any::Any;
+use std::any::{type_name, Any};
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
@@ -38,7 +38,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -114,7 +114,7 @@ pub struct Answer(Receiver<Msg>);
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {
@@ -196,7 +196,9 @@ pub(crate) enum Deployment {
 impl Sender {
     #[doc(hidden)]
     pub fn send<M: Message>(self, msg: M) -> Result<(), M> {
+        debug!("{:?}: Sending answer: {:?}", self, msg);
         let msg = Msg::tell(msg);
+        trace!("{:?}: Sending message: {:?}", self, msg);
         self.0.send(msg).map_err(|msg| msg.try_unwrap().unwrap())
     }
 }
@@ -253,6 +255,7 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn take_sender(&mut self) -> Option<Sender> {
+        debug!("{:?}: Taking sender.", self);
         if let MsgInner::Ask { sender, .. } = &mut self.0 {
             sender.take()
         } else {
@@ -262,6 +265,7 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn downcast<M: Message>(self) -> Result<M, Self> {
+        trace!("{:?}: Downcasting to {}.", self, type_name::<M>());
         match self.0 {
             MsgInner::Tell(msg) => {
                 if msg.is::<M>() {
@@ -287,6 +291,7 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn downcast_ref<M: Message>(&self) -> Option<Arc<M>> {
+        trace!("{:?}: Downcasting to ref of {}.", self, type_name::<M>());
         if let MsgInner::Broadcast(msg) = &self.0 {
             if msg.is::<M>() {
                 return Some(msg.clone().downcast::<M>().unwrap());
@@ -297,6 +302,7 @@ impl Msg {
     }
 
     pub(crate) fn try_clone(&self) -> Option<Self> {
+        trace!("{:?}: Trying to clone.", self);
         if let MsgInner::Broadcast(msg) = &self.0 {
             let inner = MsgInner::Broadcast(msg.clone());
             Some(Msg(inner))
@@ -306,6 +312,7 @@ impl Msg {
     }
 
     pub(crate) fn try_unwrap<M: Message>(self) -> Result<M, Self> {
+        debug!("{:?}: Trying to unwrap.", self);
         if let MsgInner::Broadcast(msg) = self.0 {
             match msg.downcast() {
                 Ok(msg) => match Arc::try_unwrap(msg) {
@@ -383,6 +390,7 @@ impl BastionMessage {
     }
 
     pub(crate) fn try_clone(&self) -> Option<Self> {
+        trace!("{:?}: Trying to clone.", self);
         let clone = match self {
             BastionMessage::Start => BastionMessage::start(),
             BastionMessage::Stop => BastionMessage::stop(),
@@ -414,6 +422,7 @@ impl Future for Answer {
     type Output = Result<Msg, ()>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
+        debug!("{:?}: Polling.", self);
         Pin::new(&mut self.get_mut().0).poll(ctx).map_err(|_| ())
     }
 }
@@ -446,7 +455,7 @@ impl Future for Answer {
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// # use bastion::prelude::*;
 /// #
 /// # fn main() {

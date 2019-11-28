@@ -1,8 +1,15 @@
 use bastion::prelude::*;
 
 fn main() {
-    // Initializing the system (this is required)...
-    Bastion::init();
+    env_logger::init();
+
+    // Creating the system's configuration...
+    let config = Config::new().hide_backtraces();
+    // ...and initializing the system with it (this is required)...
+    Bastion::init_with(config);
+
+    // Note that `Bastion::init();` would work too and initialize
+    // the system with the default config.
 
     // Starting the system...
     Bastion::start();
@@ -122,7 +129,7 @@ fn main() {
     Bastion::broadcast("A message containing data.").expect("Couldn't send the message.");
 
     // Stopping or killing the system...
-    Bastion::stop();
+    //Bastion::stop();
     // Bastion::kill();
 
     // Blocking until the system has stopped (or got killed)...

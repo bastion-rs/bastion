@@ -1,5 +1,6 @@
 use crate::broadcast::{Broadcast, Parent};
 use crate::children::{Children, ChildrenRef};
+use crate::config::Config;
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::{System, SYSTEM, SYSTEM_SENDER};
@@ -12,12 +13,17 @@ use std::thread;
 ///
 /// # Example
 ///
-/// ```
+/// ```rust
 /// use bastion::prelude::*;
 ///
 /// fn main() {
-///     // Initializing the system (this is required)...
-///     Bastion::init();
+///     /// Creating the system's configuration...
+///     let config = Config::new().hide_backtraces();
+///     // ...and initializing the system with it (this is required)...
+///     Bastion::init_with(config);
+///
+///     // Note that `Bastion::init();` would work too and initialize
+///     // the system with the default config.
 ///
 ///     // Starting the system...
 ///     Bastion::start();
@@ -136,14 +142,16 @@ pub struct Bastion {
 }
 
 impl Bastion {
-    /// Initializes the system if it hasn't already been done.
+    /// Initializes the system if it hasn't already been done, using
+    /// the default [`Config`].
     ///
-    /// **It is required that you call this method at least once
-    /// before using any of bastion's features.**
+    /// **It is required that you call `Bastion::init` or
+    /// [`Bastion::init_with`] at least once before using any of
+    /// bastion's features.**
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -156,9 +164,52 @@ impl Bastion {
     ///     # Bastion::block_until_stopped();
     /// }
     /// ```
+    ///
+    /// [`Config`]: struct.Config.html
+    /// [`Bastion::init_with`]: #method.init_with
     pub fn init() {
-        // NOTE: this hides all panic messages
-        //std::panic::set_hook(Box::new(|_| ()));
+        let config = Config::default();
+        Bastion::init_with(config)
+    }
+
+    /// Initializes the system if it hasn't already been done, using
+    /// the specified [`Config`].
+    ///
+    /// **It is required that you call [`Bastion::init`] or
+    /// `Bastion::init_with` at least once before using any of
+    /// bastion's features.**
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration used to initialize the system.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use bastion::prelude::*;
+    ///
+    /// fn main() {
+    ///     let config = Config::new()
+    ///         .show_backtraces();
+    ///
+    ///     Bastion::init_with(config);
+    ///
+    ///     // You can now use bastion...
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// }
+    /// ```
+    ///
+    /// [`Config`]: struct.Config.html
+    /// [`Bastion::init`]: #method.init
+    pub fn init_with(config: Config) {
+        debug!("Bastion: Initializing with config: {:?}", config);
+        if config.backtraces().is_hide() {
+            debug!("Bastion: Hiding backtraces.");
+            std::panic::set_hook(Box::new(|_| ()));
+        }
 
         // NOTE: this is just to make sure that SYSTEM_SENDER has been initialized by lazy_static
         SYSTEM_SENDER.is_closed();
@@ -179,7 +230,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -203,22 +254,27 @@ impl Bastion {
     where
         S: FnOnce(Supervisor) -> Supervisor,
     {
+        debug!("Bastion: Creating supervisor.");
         let parent = Parent::system();
         let bcast = Broadcast::new(parent);
 
+        debug!("Bastion: Initializing Supervisor({}).", bcast.id());
         let supervisor = Supervisor::new(bcast);
         let supervisor = init(supervisor);
+        debug!("Supervisor({}): Initialized.", supervisor.id());
         let supervisor_ref = supervisor.as_ref();
 
+        debug!("Bastion: Deploying Supervisor({}).", supervisor.id());
         let msg = BastionMessage::deploy_supervisor(supervisor);
+        trace!("Bastion: Sending message: {:?}", msg);
         SYSTEM_SENDER.unbounded_send(msg).map_err(|_| ())?;
 
         Ok(supervisor_ref)
     }
 
     /// Creates a new [`Children`], passes it through the specified
-    /// `init` closure and then sends it to the system supervisor
-    /// for it to start supervising it.
+    /// `init` closure and then sends it to the system's default
+    /// supervisor for it to start supervising it.
     ///
     /// This methods returns a [`ChildrenRef`] referencing the newly
     /// created children group it it succeeded, or `Err(())`
@@ -234,7 +290,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -268,11 +324,13 @@ impl Bastion {
     where
         C: FnOnce(Children) -> Children,
     {
+        debug!("Bastion: Creating children group.");
         // FIXME: unsafe?
         if let Some(supervisor) = System::root_supervisor() {
             supervisor.children(init)
         } else {
             // TODO: Err(Error)
+            error!("Bastion: Using uninitialized system.");
             Err(())
         }
     }
@@ -290,7 +348,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -323,7 +381,9 @@ impl Bastion {
     /// # }
     /// ```
     pub fn broadcast<M: Message>(msg: M) -> Result<(), M> {
+        debug!("Bastion: Broadcasting message: {:?}", msg);
         let msg = BastionMessage::broadcast(msg);
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: panics?
         SYSTEM_SENDER
             .unbounded_send(msg)
@@ -335,7 +395,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -353,7 +413,9 @@ impl Bastion {
     /// }
     /// ```
     pub fn start() {
+        debug!("Bastion: Starting.");
         let msg = BastionMessage::start();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
     }
@@ -363,7 +425,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -381,7 +443,9 @@ impl Bastion {
     /// }
     /// ```
     pub fn stop() {
+        debug!("Bastion: Stopping.");
         let msg = BastionMessage::stop();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
     }
@@ -391,7 +455,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -408,13 +472,16 @@ impl Bastion {
     /// }
     /// ```
     pub fn kill() {
+        debug!("Bastion: Killing.");
         let msg = BastionMessage::kill();
+        trace!("Bastion: Sending message: {:?}", msg);
         // FIXME: Err(Error)
         SYSTEM_SENDER.unbounded_send(msg).ok();
 
         // FIXME: panics
         let mut system = SYSTEM.clone().lock().wait().unwrap();
         if let Some(system) = system.take() {
+            debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }
     }
@@ -425,7 +492,7 @@ impl Bastion {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use bastion::prelude::*;
     ///
     /// fn main() {
@@ -447,10 +514,12 @@ impl Bastion {
     /// [`Bastion::stop()`]: #method.stop
     /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
+        debug!("Bastion: Blocking until system is stopped.");
         loop {
             // FIXME: panics
             let system = SYSTEM.clone().lock().wait().unwrap();
             if system.is_none() {
+                debug!("Bastion: Unblocking because system is stopped.");
                 return;
             }
 

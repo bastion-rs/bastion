@@ -48,9 +48,11 @@ pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```
 pub struct BastionId(Uuid);
 
-/// A child's context, allowing to access to get messages
-/// received by it, get a reference to it or a reference
-/// to its children group or supervisor.
+#[derive(Debug)]
+/// A child's execution context, allowing its [`exec`] future
+/// to receive messages and access a [`ChildRef`] referencing
+/// it, a [`ChildrenRef`] referencing its children group and
+/// a [`SupervisorRef`] referencing its supervisor.
 ///
 /// # Example
 ///
@@ -63,14 +65,24 @@ pub struct BastionId(Uuid);
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
-///             // Send and receive messages...
+///             // Get a `ChildRef` referencing the child executing
+///             // this future...
+///             let current: &ChildRef = ctx.current();
+///             // Get a `ChildrenRef` referencing the children
+///             // group of the child executing this future...
+///             let parent: &ChildrenRef = ctx.parent();
+///             // Try to get a `SupervisorRef` referencing the
+///             // supervisor of the child executing this future...
+///             let supervisor: Option<&SupervisorRef> = ctx.supervisor();
+///             // Note that `supervisor` will be `None` because
+///             // this child was created using `Bastion::children`,
+///             // which made it supervised by the system supervisor
+///             // (which users can't get a reference to).
+///
+///             // Try to receive a message...
 ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
-///             // ...get a reference to the child...
-///             let child_ref: &ChildRef = ctx.current();
-///             // ...or children group...
-///             let children_ref: &ChildrenRef = ctx.parent();
-///             // ...or eventually supervisor...
-///             let supervisor_ref: Option<&SupervisorRef> = ctx.supervisor();
+///             // Wait for a message to be received...
+///             let msg: Msg = ctx.recv().await?;
 ///
 ///             Ok(())
 ///         }
@@ -82,7 +94,6 @@ pub struct BastionId(Uuid);
 ///     # Bastion::block_until_stopped();
 /// # }
 /// ```
-#[derive(Debug)]
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
@@ -116,6 +127,7 @@ impl BastionContext {
         supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
     ) -> Self {
+        debug!("BastionContext({}): Creating.", id);
         BastionContext {
             id,
             child,
@@ -130,7 +142,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -164,7 +176,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -201,7 +213,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -261,7 +273,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -288,10 +300,17 @@ impl BastionContext {
     /// [`recv`]: #method.recv
     /// [`Msg`]: children/struct.Msg.html
     pub async fn try_recv(&self) -> Option<Msg> {
+        debug!("BastionContext({}): Trying to receive message.", self.id);
         // TODO: Err(Error)
         let mut state = self.state.clone().lock_async().await.ok()?;
 
-        state.msgs.pop_front()
+        if let Some(msg) = state.msgs.pop_front() {
+            trace!("BastionContext({}): Received message: {:?}", self.id, msg);
+            Some(msg)
+        } else {
+            trace!("BastionContext({}): Received no message.", self.id);
+            None
+        }
     }
 
     /// Retrieves asynchronously a message received by the element
@@ -306,7 +325,7 @@ impl BastionContext {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
@@ -332,11 +351,13 @@ impl BastionContext {
     /// [`try_recv`]: #method.try_recv
     /// [`Msg`]: children/struct.Msg.html
     pub async fn recv(&self) -> Result<Msg, ()> {
+        debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
             // TODO: Err(Error)
             let mut state = self.state.clone().lock_async().await.unwrap();
 
             if let Some(msg) = state.msgs.pop_front() {
+                trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
 

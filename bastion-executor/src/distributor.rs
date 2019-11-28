@@ -3,27 +3,24 @@
 //!
 //! Distributor provides a fair distribution of threads and pinning them to cores for fair execution.
 //! It assigns threads in round-robin fashion to all cores.
-use super::placement;
-use super::placement::CoreId;
-use super::run_queue::{Stealer, Worker};
-
-use lightproc::prelude::*;
-
+use crate::placement::{self, CoreId};
+use crate::run_queue::{Stealer, Worker};
 use crate::worker;
+use lightproc::prelude::*;
 use std::thread;
 
 pub(crate) struct Distributor {
-    pub cores: Vec<CoreId>,
+    pub(crate) cores: Vec<CoreId>,
 }
 
 impl Distributor {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Distributor {
             cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
         }
     }
 
-    pub fn assign(self) -> Vec<Stealer<LightProc>> {
+    pub(crate) fn assign(self) -> Vec<Stealer<LightProc>> {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
 
         for core in self.cores {

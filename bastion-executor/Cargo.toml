@@ -1,6 +1,6 @@
 [package]
 name = "bastion-executor"
-version = "0.2.1-alpha.0"
+version = "0.3.0"
 description = "Cache affine NUMA-aware executor for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
@@ -22,12 +22,12 @@ unstable = ["numanji", "allocator-suite", "jemallocator"]
 [dependencies]
 crossbeam-utils = "0.6"
 crossbeam-epoch = "0.7"
+fxhash = "0.2"
 lazy_static = "1.4"
 libc = "0.2"
 num_cpus = "1.10"
-rustc-hash = "1.0.1"
 pin-utils = "0.1.0-alpha.4"
-lightproc = { version = "= 0.3.3-alpha.1", "path" = "../lightproc" }
+lightproc = { version = "= 0.3.3", "path" = "../lightproc" }
 
 # Allocator
 numanji = { version = "^0.1", optional = true, default-features = false }

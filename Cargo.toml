@@ -1,9 +1,3 @@
-# TODO: https://github.com/cogciprocate/qutex/pull/5
-# NOTE: This is a branch based on the above pull request's where debug logs were also deactivated
-[patch.crates-io.qutex]
-git = "https://github.com/bastion-rs/qutex"
-branch = "bastion-0.3"
-
 [workspace]
 members = [
   "bastion",

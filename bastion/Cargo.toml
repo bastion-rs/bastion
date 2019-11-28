@@ -1,6 +1,6 @@
 [package]
 name = "bastion"
-version = "0.2.1-alpha.0"
+version = "0.3.1-alpha.0"
 description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
@@ -8,7 +8,7 @@ categories = ["concurrency", "asynchronous"]
 homepage = "https://github.com/bastion-rs/bastion"
 repository = "https://github.com/bastion-rs/bastion"
 documentation = "https://docs.rs/bastion"
-readme = "README.md"
+readme = "../README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
 exclude = [
@@ -31,14 +31,22 @@ exclude = [
 travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
+[features]
+unstable = ["bastion-executor/unstable"]
+
 [dependencies]
-bastion-executor = { path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.0", path = "../bastion-executor" }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 fxhash = "0.2"
 lazy_static = "1.4"
-lightproc = { version = "= 0.3.3-alpha.1", path = "../lightproc" }
-qutex = { version = "0.2", features = ["async_await"] }
+lightproc = { version = "= 0.3.3", path = "../lightproc" }
+log = "0.4"
+# TODO: https://github.com/cogciprocate/qutex/pull/5
+# TODO: https://github.com/cogciprocate/qutex/pull/6
+bastion-qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
+env_logger = "0.7"
 proptest = "0.9"
+snap = "0.2"
