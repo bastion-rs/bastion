@@ -1,6 +1,5 @@
 use bastion::prelude::*;
 use proptest::prelude::*;
-
 use std::sync::Once;
 
 static START: Once = Once::new();

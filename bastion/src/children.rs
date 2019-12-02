@@ -335,7 +335,12 @@ impl Children {
             self.id(),
             redundancy
         );
-        self.redundancy = redundancy;
+        if redundancy == std::usize::MIN {
+            self.redundancy = redundancy.saturating_add(1);
+        } else {
+            self.redundancy = redundancy;
+        }
+
         self
     }
 
