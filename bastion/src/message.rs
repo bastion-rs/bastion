@@ -268,6 +268,15 @@ impl Msg {
     }
 
     #[doc(hidden)]
+    pub fn is<M: Message>(&self) -> bool {
+        match &self.0 {
+            MsgInner::Tell(msg) => msg.is::<M>(),
+            MsgInner::Ask { msg, .. } => msg.is::<M>(),
+            MsgInner::Broadcast(msg) => msg.is::<M>(),
+        }
+    }
+
+    #[doc(hidden)]
     pub fn downcast<M: Message>(self) -> Result<M, Self> {
         trace!("{:?}: Downcasting to {}.", self, type_name::<M>());
         match self.0 {
@@ -520,7 +529,7 @@ impl Future for Answer {
 /// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
 macro_rules! msg {
     ($msg:expr, $($tokens:tt)+) => {
-        { msg!(@internal $msg, (), (), (), $($tokens)+); }
+        msg!(@internal $msg, (), (), (), $($tokens)+)
     };
 
     (@internal
@@ -592,19 +601,21 @@ macro_rules! msg {
         ($($tvar:ident, $tty:ty, $thandle:expr,)*),
         ($($avar:ident, $aty:ty, $ahandle:expr,)*),
         $var:ident: _ => $handle:expr;
-    ) => {
+    ) => { {
         let mut $var = $msg;
         let sender = $var.take_sender();
         if $var.is_broadcast() {
-            if false {}
+            if false {
+                unreachable!();
+            }
             $(
-                else if let Some($bvar) = $var.downcast_ref::<$bty>() {
-                    let $bvar = &*$bvar;
-                    { $bhandle };
+                else if $var.is::<$bty>() {
+                    let $bvar = &*$var.downcast_ref::<$bty>().unwrap();
+                    { $bhandle }
                 }
             )*
             else {
-                { $handle };
+                { $handle }
             }
         } else if sender.is_some() {
             let sender = sender.unwrap();
@@ -614,35 +625,31 @@ macro_rules! msg {
                 };
             }
 
-            loop {
-                $(
-                    match $var.downcast::<$aty>() {
-                        Ok($avar) => {
-                            { $ahandle };
-                            break;
-                        }
-                        Err(msg_) => $var = msg_,
-                    }
-                )*
-
-                { $handle };
-                break;
+            if false {
+                unreachable!();
+            }
+            $(
+                else if $var.is::<$aty>() {
+                    let $avar = $var.downcast::<$aty>().unwrap();
+                    { $ahandle }
+                }
+            )*
+            else {
+                { $handle }
             }
         } else {
-            loop {
-                $(
-                    match $var.downcast::<$tty>() {
-                        Ok($tvar) => {
-                            { $thandle };
-                            break;
-                        }
-                        Err(msg_) => $var = msg_,
-                    }
-                )*
-
-                { $handle };
-                break;
+            if false {
+                unreachable!();
+            }
+            $(
+                else if $var.is::<$tty>() {
+                    let $tvar = $var.downcast::<$tty>().unwrap();
+                    { $thandle }
+                }
+            )*
+            else {
+                { $handle }
             }
         }
-    };
+    } };
 }
