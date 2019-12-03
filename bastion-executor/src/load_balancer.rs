@@ -31,7 +31,7 @@ impl LoadBalancer {
                             .smp_queues
                             .values()
                             .sum::<usize>()
-                            .wrapping_div(placement::get_core_ids().unwrap().len());
+                            .wrapping_div(*core_retrieval());
                     }
 
                     // Try sleeping for a while to wait
@@ -84,4 +84,15 @@ pub fn stats() -> &'static ShardedLock<Stats> {
         };
     }
     &*LB_STATS
+}
+
+///
+/// Retrieve core count for the runtime scheduling purposes
+#[inline]
+pub fn core_retrieval() -> &'static usize {
+    lazy_static! {
+        static ref CORE_COUNT: usize = { placement::get_core_ids().unwrap().len() };
+    }
+
+    &*CORE_COUNT
 }

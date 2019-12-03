@@ -132,7 +132,7 @@ impl Broadcast {
     }
 
     pub(crate) fn send_children(&self, msg: BastionMessage) {
-        for (_, child) in &self.children {
+        for child in self.children.values() {
             // FIXME: Err(Error) if None
             if let Some(msg) = msg.try_clone() {
                 // FIXME: handle errors
