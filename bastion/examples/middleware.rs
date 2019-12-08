@@ -26,7 +26,7 @@ fn main() {
     // Workers that process the work.
     let workers = Bastion::children(|children: Children| {
         children
-            .with_redundancy(100) // Let's have a pool of ten workers.
+            .with_redundancy(100) // Let's have a pool of an hundred workers.
             .with_exec(move |ctx: BastionContext| {
                 async move {
                     println!("Worker started!");
