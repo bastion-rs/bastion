@@ -1060,7 +1060,7 @@ impl ChildRef {
     /// Sends a message to the child this `ChildRef` is referencing,
     /// allowing it to answer.
     ///
-    /// This method returns [`Answer`] if it succeeded, or `Err(msg)`
+    /// This method returns [`Answer`](../message/struct.Answer.html) if it succeeded, or `Err(msg)`
     /// otherwise.
     ///
     /// # Argument

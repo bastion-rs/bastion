@@ -106,7 +106,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 /// ```
 ///
 /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-/// [`ChildRef::ask`]: children/struct.ChildRef.hmtl#method.ask
+/// [`ChildRef::ask`]: ../children/struct.ChildRef.html#method.ask
 /// [`Msg`]: message/struct.Msg.html
 /// [`msg!`]: macro.msg.html
 pub struct Answer(Receiver<Msg>);

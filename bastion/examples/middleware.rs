@@ -26,7 +26,7 @@ fn main() {
     // Workers that process the work.
     let workers = Bastion::children(|children: Children| {
         children
-            .with_redundancy(10) // Let's have a pool of ten workers.
+            .with_redundancy(100) // Let's have a pool of an hundred workers.
             .with_exec(move |ctx: BastionContext| {
                 async move {
                     println!("Worker started!");
@@ -43,6 +43,7 @@ fn main() {
                                 let response = escape(&compressed);
                                 // println!("Response: {}", response);
                                 stream.write(response.as_bytes()).unwrap();
+                                answer!(stream);
                             };
                             _: _ => ();
                         }
@@ -72,7 +73,10 @@ fn main() {
                     round_robin %= workers.elems().len();
 
                     // Distribute tcp streams
-                    workers.elems()[round_robin].ask(stream.unwrap()).unwrap();
+                    workers.elems()[round_robin]
+                        .ask(stream.unwrap())
+                        .unwrap()
+                        .await;
                 }
 
                 // Send a signal to system that computation is finished.
