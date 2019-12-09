@@ -130,6 +130,7 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                                                 .get(s.0)
                                                 .unwrap()
                                                 .steal_batch_and_pop(&local)
+                                            // TODO: Set evacuation flag in thread_local
                                         }
                                     })
                                     .collect()
@@ -139,7 +140,7 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                     }
                 })
             }
-            Err(_) => Steal::Retry,
+            Err(_) => Steal::Empty, // Behave like there is no job under the contention.
         })
         // Loop while no task was stolen and any steal operation needs to be retried.
         .find(|s| !s.is_retry())

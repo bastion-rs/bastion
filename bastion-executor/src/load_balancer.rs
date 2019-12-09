@@ -19,8 +19,8 @@ pub struct LoadBalancer;
 
 impl LoadBalancer {
     ///
-    /// Statistics sampling thread for run queue load balancing.
-    pub fn sample() {
+    /// AMQL sampling thread for run queue load balancing.
+    pub fn amql_generation() {
         thread::Builder::new()
             .name("load-balancer-thread".to_string())
             .spawn(move || {
@@ -34,8 +34,11 @@ impl LoadBalancer {
                             .wrapping_div(*core_retrieval());
                     }
 
+                    // We don't have β-reduction here… Life is unfair. Life is cruel.
+                    //
                     // Try sleeping for a while to wait
-                    thread::sleep(Duration::new(0, 10));
+                    // Should be smaller time slice than 4 times per second to not miss
+                    thread::sleep(Duration::from_millis(245));
                     // Yield immediately back to os so we can advance in workers
                     thread::yield_now();
                 }
@@ -76,8 +79,8 @@ pub fn stats() -> &'static ShardedLock<Stats> {
                 )
             };
 
-            // Start sampler
-            LoadBalancer::sample();
+            // Start AMQL generator
+            LoadBalancer::amql_generation();
 
             // Return stats
             ShardedLock::new(stats)
