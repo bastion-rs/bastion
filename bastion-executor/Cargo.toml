@@ -1,6 +1,6 @@
 [package]
 name = "bastion-executor"
-version = "0.3.0"
+version = "0.3.1"
 description = "Cache affine NUMA-aware executor for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]

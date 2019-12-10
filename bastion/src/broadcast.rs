@@ -2,7 +2,7 @@ use crate::children::ChildrenRef;
 use crate::context::BastionId;
 use crate::message::BastionMessage;
 use crate::supervisor::SupervisorRef;
-use crate::system::SYSTEM_SENDER;
+use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;
@@ -292,7 +292,7 @@ impl Broadcast {
     ///
     /// * `msg` - The message that should be sent.
     pub(crate) fn send_children(&self, msg: BastionMessage) {
-        for (_, child) in &self.children {
+        for child in self.children.values() {
             // FIXME: Err(Error) if None
             if let Some(msg) = msg.try_clone() {
                 // FIXME: handle errors
@@ -409,7 +409,8 @@ impl Parent {
         match self {
             // FIXME
             Parent::None => unimplemented!(),
-            Parent::System => SYSTEM_SENDER
+            Parent::System => SYSTEM
+                .sender()
                 .unbounded_send(msg)
                 .map_err(|err| err.into_inner()),
             Parent::Supervisor(supervisor) => supervisor.send(msg),

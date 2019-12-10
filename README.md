@@ -67,13 +67,13 @@ You can use this to launch automatically supervised tasks.
 
 ## Features
 * Message-based communication makes this project a lean mesh of actor system.
-    * without web servers, weird shenanigans, forced trait implementations, and static dispatch.
+    * Without web servers, weird shenanigans, forced trait implementations, and static dispatch.
 * Runtime fault-tolerance makes it a good candidate for distributed systems.
-    * If you want to smell of Erlang and it's powerful aspects in Rust. That's it!
+    * If you want the smell of Erlang and the powerful aspects of Rust. That's it!
 * Completely asynchronous runtime with NUMA-aware and cache-affine SMP executor.
     * Exploiting hardware locality wherever it is possible. It is designed for servers.
 * Supervision system makes it easy to manage lifecycles.
-    * Kill your application in certain condition or restart you subprocesses whenever a certain condition met.
+    * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
 
 ## Guarantees
 * At most once delivery for all the messages.
@@ -90,7 +90,8 @@ If one of the questions below answered with yes, then Bastion is just for you:
 * Do I hate to implement weird Actor traits?
 * I shouldn't need a webserver to run an actor system, right?
 * Do I want to make my existing code unbreakable?
-* Do I have some trust issues against orchestration systems? Because I want to implement my own application lifecycle.
+* Do I have some trust issues with orchestration systems?
+* Do I want to implement my own application lifecycle?
 
 ### Get Started
 Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
@@ -105,7 +106,6 @@ bastion = "0.3"
 For more information please check [Bastion Documentation](https://docs.rs/bastion)
 
 ## Architecture of the Runtime
-
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
 

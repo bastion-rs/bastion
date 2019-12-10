@@ -138,9 +138,9 @@ impl LightProc {
         S: Fn(LightProc) + Send + Sync + 'static,
     {
         let raw_proc = RawProc::allocate(stack, future, schedule);
-        let proc = LightProc { raw_proc: raw_proc };
+        let proc = LightProc { raw_proc };
         let handle = ProcHandle {
-            raw_proc: raw_proc,
+            raw_proc,
             _marker: PhantomData,
         };
         (proc, handle)

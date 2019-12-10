@@ -10,18 +10,20 @@ use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::Qutex;
-
 use std::task::Poll;
 
-static mut SYSTEM_SPV: Option<SupervisorRef> = None;
+pub(crate) struct GlobalSystem {
+    sender: Sender,
+    supervisor: SupervisorRef,
+    handle: Qutex<Option<RecoverableHandle<()>>>,
+}
 
 lazy_static! {
-    pub(crate) static ref SYSTEM: Qutex<Option<RecoverableHandle<()>>> = Qutex::new(None);
-    pub(crate) static ref SYSTEM_SENDER: Sender = System::init();
+    pub(crate) static ref SYSTEM: GlobalSystem = System::init();
 }
 
 #[derive(Debug)]
-pub(crate) struct System {
+struct System {
     bcast: Broadcast,
     launched: FxHashMap<BastionId, RecoverableHandle<Supervisor>>,
     // TODO: set limit
@@ -31,8 +33,33 @@ pub(crate) struct System {
     started: bool,
 }
 
+impl GlobalSystem {
+    fn new(sender: Sender, supervisor: SupervisorRef, handle: RecoverableHandle<()>) -> Self {
+        let handle = Some(handle);
+        let handle = Qutex::new(handle);
+
+        GlobalSystem {
+            sender,
+            supervisor,
+            handle,
+        }
+    }
+
+    pub(crate) fn sender(&self) -> &Sender {
+        &self.sender
+    }
+
+    pub(crate) fn supervisor(&self) -> &SupervisorRef {
+        &self.supervisor
+    }
+
+    pub(crate) fn handle(&self) -> Qutex<Option<RecoverableHandle<()>>> {
+        self.handle.clone()
+    }
+}
+
 impl System {
-    fn init() -> Sender {
+    fn init() -> GlobalSystem {
         info!("System: Initializing.");
         let parent = Parent::none();
         let bcast = Broadcast::with_id(parent, NIL_ID);
@@ -67,23 +94,12 @@ impl System {
         let stack = system.stack();
         let handle = pool::spawn(system.run(), stack);
 
-        // FIXME: panics?
-        let mut system = SYSTEM.clone().lock().wait().unwrap();
-        *system = Some(handle);
-
-        // FIXME: unsafe?
-        unsafe { SYSTEM_SPV = Some(supervisor_ref) };
-
-        sender
+        GlobalSystem::new(sender, supervisor_ref, handle)
     }
 
     fn stack(&self) -> ProcStack {
         // FIXME: with_id
         ProcStack::default()
-    }
-
-    pub(crate) fn root_supervisor() -> Option<&'static SupervisorRef> {
-        unsafe { SYSTEM_SPV.as_ref() }
     }
 
     // TODO: set a limit?
@@ -274,7 +290,7 @@ impl System {
                         // FIXME: Err(Error)?
                         if self.handle(msg).await.is_err() {
                             // FIXME: panics?
-                            let mut system = SYSTEM.clone().lock_async().await.unwrap();
+                            let mut system = SYSTEM.handle().lock_async().await.unwrap();
                             *system = None;
 
                             return;
@@ -289,7 +305,7 @@ impl System {
                     trace!("System: Received a new message (started=true): {:?}", msg);
                     if self.handle(msg).await.is_err() {
                         // FIXME: panics?
-                        let mut system = SYSTEM.clone().lock_async().await.unwrap();
+                        let mut system = SYSTEM.handle().lock_async().await.unwrap();
                         *system = None;
 
                         return;

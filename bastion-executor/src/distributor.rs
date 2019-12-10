@@ -34,9 +34,9 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // run initial stats generation for cores
-                    worker::stats_generator(core.id.clone(), &wrk);
+                    worker::stats_generator(core.id, &wrk);
                     // actual execution
-                    worker::main_loop(core.id.clone(), wrk);
+                    worker::main_loop(core.id, wrk);
                 })
                 .expect("cannot start the thread for running proc");
         }

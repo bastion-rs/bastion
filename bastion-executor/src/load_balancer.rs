@@ -19,8 +19,8 @@ pub struct LoadBalancer;
 
 impl LoadBalancer {
     ///
-    /// Statistics sampling thread for run queue load balancing.
-    pub fn sample() {
+    /// AMQL sampling thread for run queue load balancing.
+    pub fn amql_generation() {
         thread::Builder::new()
             .name("load-balancer-thread".to_string())
             .spawn(move || {
@@ -31,11 +31,14 @@ impl LoadBalancer {
                             .smp_queues
                             .values()
                             .sum::<usize>()
-                            .wrapping_div(placement::get_core_ids().unwrap().len());
+                            .wrapping_div(*core_retrieval());
                     }
 
+                    // We don't have β-reduction here… Life is unfair. Life is cruel.
+                    //
                     // Try sleeping for a while to wait
-                    thread::sleep(Duration::new(0, 10));
+                    // Should be smaller time slice than 4 times per second to not miss
+                    thread::sleep(Duration::from_millis(245));
                     // Yield immediately back to os so we can advance in workers
                     thread::yield_now();
                 }
@@ -76,12 +79,23 @@ pub fn stats() -> &'static ShardedLock<Stats> {
                 )
             };
 
-            // Start sampler
-            LoadBalancer::sample();
+            // Start AMQL generator
+            LoadBalancer::amql_generation();
 
             // Return stats
             ShardedLock::new(stats)
         };
     }
     &*LB_STATS
+}
+
+///
+/// Retrieve core count for the runtime scheduling purposes
+#[inline]
+pub fn core_retrieval() -> &'static usize {
+    lazy_static! {
+        static ref CORE_COUNT: usize = { placement::get_core_ids().unwrap().len() };
+    }
+
+    &*CORE_COUNT
 }
