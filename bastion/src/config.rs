@@ -23,7 +23,8 @@
 /// }
 /// ```
 ///
-/// [`Bastion::init_with`]: struct.Bastion.html#method.init_with
+/// [`Bastion::init_with`]: /struct.Bastion.html#method.init_with
+/// [`Config::show_backtraces`]: /struct.Config.html#method.show_backtraces
 pub struct Config {
     backtraces: Backtraces,
 }
@@ -43,7 +44,7 @@ impl Config {
     /// behaviors:
     /// - All backtraces are shown (see [`Config::show_backtraces`]).
     ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
+    /// [`Config::show_backtraces`]: /struct.Config.html#method.show_backtraces
     pub fn new() -> Self {
         Config::default()
     }
@@ -101,7 +102,7 @@ impl Config {
     /// }
     /// ```
     ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
+    /// [`Config::show_backtraces`]: /struct.Config.html#method.show_backtraces
     pub fn hide_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::hide();
         self

@@ -52,10 +52,11 @@ use std::task::Poll;
 /// # }
 /// ```
 ///
-/// [`Children`]: children/struct.Children.html
-/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
-/// [`with_strategy`]: #method.with_strategy
-/// [`Bastion::children`]: struct.Bastion.html#method.children
+/// [`Children`]: /children/struct.Children.html
+/// [`SupervisionStrategy`]: /supervisor/enum.SupervisionStrategy.html
+/// [`with_strategy`]: /supervisor/struct.Supervisor.html#method.with_strategy
+/// [`SupervisionStrategy::OneForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForOne
+/// [`Bastion::children`]: /struct.Bastion.html#method.children
 pub struct Supervisor {
     bcast: Broadcast,
     // The order in which children and supervisors were added.
@@ -89,7 +90,7 @@ pub struct Supervisor {
 /// A "reference" to a [`Supervisor`], allowing to
 /// communicate with it.
 ///
-/// [`Supervisor`]: supervisor/struct.Supervisor.html
+/// [`Supervisor`]: /supervisor/struct.Supervisor.html
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
@@ -101,7 +102,9 @@ pub struct SupervisorRef {
 /// the case of a children group, it could be because one
 /// of its elements panicked or returned an error).
 ///
-/// The default strategy is `OneForOne`.
+/// The default strategy is [`OneForOne`].
+///
+/// [`OneForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForOne
 pub enum SupervisionStrategy {
     /// When a children group dies (either because it got
     /// killed, it panicked or returned an error), only
@@ -172,7 +175,7 @@ impl Supervisor {
     /// changing its assigned [`Broadcast`] (it is isn't the "system
     /// supervisor") and resetting all its supervised elements.
     ///
-    /// [`Broadcast`]: broadcast/struct.Broadcast.html
+    /// [`Broadcast`]: /broadcast/struct.Broadcast.html
     pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
         if log_enabled!(Level::Debug) {
             if let Some(bcast) = &bcast {
@@ -194,7 +197,7 @@ impl Supervisor {
         self.kill(0..).await;
 
         // If this is the "system supervisor", it shouldn't change
-        // its `Broadcast` because it would make `SYSTEM_SPV`
+        // its `Broadcast` because it would make `SYSTEM.supervisor`
         // invalid.
         if let Some(bcast) = bcast {
             self.bcast = bcast;
@@ -315,8 +318,8 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: ../struct.SupervisorRef.html
-    /// [`supervisor_ref`]: #method.supervisor_ref
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
+    /// [`supervisor_ref`]: /supervisor/struct.Supervisor.html#method.supervisor_ref
     pub fn supervisor<S>(self, init: S) -> Self
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -383,8 +386,8 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: ../struct.SupervisorRef.html
-    /// [`supervisor`]: #method.supervisor
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
+    /// [`supervisor`]: /supervisor/struct.Supervisor.html#method.supervisor
     pub fn supervisor_ref<S>(&mut self, init: S) -> SupervisorRef
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -459,9 +462,9 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`children_ref`]: #method.children_ref
+    /// [`Children`]: /children/struct.Children.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
+    /// [`children_ref`]: /supervisor/struct.Supervisor.html#method.children_ref
     pub fn children<C>(self, init: C) -> Self
     where
         C: FnOnce(Children) -> Children,
@@ -538,9 +541,9 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`children`]: #method.children
+    /// [`Children`]: /children/struct.Children.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
+    /// [`children`]: /supervisor/struct.Supevisor.html#method.children
     pub fn children_ref<C>(&self, init: C) -> ChildrenRef
     where
         C: FnOnce(Children) -> Children,
@@ -619,9 +622,9 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
-    /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
-    /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
+    /// [`SupervisionStrategy::OneForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForOne
+    /// [`SupervisionStrategy::OneForAll`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForAll
+    /// [`SupervisionStrategy::RestForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn with_strategy(mut self, strategy: SupervisionStrategy) -> Self {
         trace!(
             "Supervisor({}): Setting strategy: {:?}",
@@ -665,7 +668,7 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`Callbacks`]: struct.Callbacks.html
+    /// [`Callbacks`]: /struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         trace!(
             "Supervisor({}): Setting callbacks: {:?}",
@@ -1134,7 +1137,7 @@ impl SupervisorRef {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
     pub fn supervisor<S>(&self, init: S) -> Result<Self, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -1206,8 +1209,8 @@ impl SupervisorRef {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
     pub fn children<C>(&self, init: C) -> Result<ChildrenRef, ()>
     where
         C: FnOnce(Children) -> Children,
@@ -1246,7 +1249,7 @@ impl SupervisorRef {
     /// it could be because one of its elements panicked or
     /// returned an error).
     ///
-    /// The default strategy `Supervisor` is
+    /// The default strategy is
     /// [`SupervisionStrategy::OneForOne`].
     ///
     /// This method returns `()` if it succeeded, or `Err(())`
@@ -1287,9 +1290,9 @@ impl SupervisorRef {
     /// # }
     /// ```
     ///
-    /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
-    /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
-    /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
+    /// [`SupervisionStrategy::OneForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForOne
+    /// [`SupervisionStrategy::OneForAll`]: /supervisor/enum.SupervisionStrategy.html#variant.OneForAll
+    /// [`SupervisionStrategy::RestForOne`]: /supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn strategy(&self, strategy: SupervisionStrategy) -> Result<(), ()> {
         debug!(
             "SupervisorRef({}): Setting strategy: {:?}",

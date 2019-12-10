@@ -26,14 +26,14 @@ pub(crate) enum Parent {
     /// Used by the [`System`] to indicate that it doesn't have a
     /// parent.
     ///
-    /// [`System`]: system/struct.System.html
+    /// [`System`]: /system/struct.System.html
     None,
     /// Used by the [`Supervisor`]s created via [`Bastion::supervisor`]
     /// and, thus, directly supervised by the [`System`].
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Bastion::supervisor`]: struct.Bastion.html#method.supervisor
-    /// [`System`]: system/struct.System.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Bastion::supervisor`]: /struct.Bastion.html#method.supervisor
+    /// [`System`]: /system/struct.System.html
     System,
     /// Used by the [`Supervisor`]s created via [`Supervisor::supervisor`],
     /// [`Supervisor::supervisor_ref`] and [`SupervisorRef::supervisor`] and
@@ -42,20 +42,20 @@ pub(crate) enum Parent {
     /// This contains a [`SupervisorRef`] referencing the supervisor that
     /// the supervised element was started on.
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Supervisor::supervisor`]: supervisor/struct.Supervisor.html#method.supervisor
-    /// [`Supervisor::supervisor_ref`]: supervisor/struct.Supervisor.html#method.supervisor
-    /// [`SupervisorRef::supervisor`]: supervisor/struct.SupervisorRef.html#method.supervisor
-    /// [`Children`]: children/struct.Children.html
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Supervisor::supervisor`]: /supervisor/struct.Supervisor.html#method.supervisor
+    /// [`Supervisor::supervisor_ref`]: /supervisor/struct.Supervisor.html#method.supervisor
+    /// [`SupervisorRef::supervisor`]: /supervisor/struct.SupervisorRef.html#method.supervisor
+    /// [`Children`]: /children/struct.Children.html
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
     Supervisor(SupervisorRef),
     /// Used by the [`Child`]s.
     ///
     /// This contains a [`ChildrenRef`] referencing the children group that
     /// the `Child` was started on.
     ///
-    /// [`Child`]: children/struct.Child.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`Child`]: /children/struct.Child.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
     Children(ChildrenRef),
 }
 
@@ -70,11 +70,11 @@ impl Broadcast {
     ///
     /// * `parent` - The parent of this `Broadcast`.
     ///
-    /// [`Parent`]: broadcast/enum.Parent.html
-    /// [`BastionId`]: context/struct.BastionId.html
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`Child`]: children/struct.Child.html
+    /// [`Parent`]: /broadcast/enum.Parent.html
+    /// [`BastionId`]: /context/struct.BastionId.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`Child`]: /children/struct.Child.html
     pub(crate) fn new(parent: Parent) -> Self {
         let id = BastionId::new();
         let (sender, recver) = mpsc::unbounded();
@@ -101,11 +101,11 @@ impl Broadcast {
     /// * `id` - The `BastionId` that should identify the new
     ///     `Broadcast`.
     ///
-    /// [`Parent`]: broadcast/enum.Parent.html
-    /// [`BastionId`]: context/struct.BastionId.html
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`Child`]: children/struct.Child.html
+    /// [`Parent`]: /broadcast/enum.Parent.html
+    /// [`BastionId`]: /context/struct.BastionId.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`Child`]: /children/struct.Child.html
     pub(crate) fn with_id(parent: Parent, id: BastionId) -> Self {
         let mut bcast = Broadcast::new(parent);
         bcast.id = id;
@@ -140,16 +140,16 @@ impl Broadcast {
     /// * `child` - A `ref` to the `Broadcast` that should get
     ///     registered as a child.
     ///
-    /// [`send_children`]: #method.send_children
-    /// [`stop_children`]: #method.stop_children
-    /// [`kill_children`]: #method.kill_children
-    /// [`send_child`]: #method.send_child
-    /// [`stop_child`]: #method.stop_child
-    /// [`kill_child`]: #method.kill_child
-    /// [`System`]: system/struct.System.html
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`Child`]: children/struct.Child.html
+    /// [`send_children`]: /broadcast/struct.Broadcast.html#method.send_children
+    /// [`stop_children`]: /broadcast/struct.Broadcast.html#method.stop_children
+    /// [`kill_children`]: /broadcast/struct.Broadcast.html#method.kill_children
+    /// [`send_child`]: /broadcast/struct.Broadcast.html#method.send_child
+    /// [`stop_child`]: /broadcast/struct.Broadcast.html#method.stop_child
+    /// [`kill_child`]: /broadcast/struct.Broadcast.html#method.kill_child
+    /// [`System`]: /system/struct.System.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`Child`]: /children/struct.Child.html
     pub(crate) fn register(&mut self, child: &Self) {
         self.children.insert(child.id.clone(), child.sender.clone());
     }
@@ -167,11 +167,11 @@ impl Broadcast {
     /// * `id` - The [`BastionId`] identifying the child that
     ///     should be unregistered.
     ///
-    /// [`BastionId`]: context/struct.BastionId.html
-    /// [`System`]: system/struct.System.html
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`Child`]: children/struct.Child.html
+    /// [`BastionId`]: /context/struct.BastionId.html
+    /// [`System`]: /system/struct.System.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`Child`]: /children/struct.Child.html
     pub(crate) fn unregister(&mut self, id: &BastionId) {
         self.children.remove(id);
     }
@@ -182,7 +182,7 @@ impl Broadcast {
     /// when resetting (because others [`Supervisor`]s change
     /// their `Broadcast` but this one can't).
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
     pub(crate) fn clear_children(&mut self) {
         self.children.clear();
     }
@@ -196,8 +196,8 @@ impl Broadcast {
     /// * `id` - The [`BastionId`] identifying the child that
     ///     should stop.
     ///
-    /// [`BastionId`]: context/struct.BastionId.html
-    /// [unregisters]: #method.unregister
+    /// [`BastionId`]: /context/struct.BastionId.html
+    /// [unregisters]: /broadcast/struct.Broadcast.html#method.unregister
     pub(crate) fn stop_child(&mut self, id: &BastionId) {
         let msg = BastionMessage::stop();
         self.send_child(id, msg);
@@ -208,7 +208,7 @@ impl Broadcast {
     /// Sends a message to all registered children telling
     /// them to stop, and then [unregisters] them.
     ///
-    /// [unregisters]: #method.clear_children
+    /// [unregisters]: /broadcast/struct.Broadcast.html#method.clear_children
     pub(crate) fn stop_children(&mut self) {
         let msg = BastionMessage::stop();
         self.send_children(msg);
@@ -225,8 +225,8 @@ impl Broadcast {
     /// * `id` - The [`BastionId`] identifying the child that
     ///     should get killed.
     ///
-    /// [`BastionId`]: context/struct.BastionId.html
-    /// [unregisters]: #method.unregister
+    /// [`BastionId`]: /context/struct.BastionId.html
+    /// [unregisters]: /broadcast/struct.Broadcast.html#method.unregister
     pub(crate) fn kill_child(&mut self, id: &BastionId) {
         let msg = BastionMessage::kill();
         self.send_child(id, msg);
@@ -237,7 +237,7 @@ impl Broadcast {
     /// Sends a message to all registered children telling
     /// them to kill themselves, and then [unregisters] them.
     ///
-    /// [unregisters]: #method.clear_children
+    /// [unregisters]: /broadcast/struct.Broadcast.html#method.clear_children
     pub(crate) fn kill_children(&mut self) {
         let msg = BastionMessage::kill();
         self.send_children(msg);
@@ -277,7 +277,7 @@ impl Broadcast {
     ///
     /// * `msg` - The message that should be sent.
     ///
-    /// [`BastionId`]: context/struct.BastionId.html
+    /// [`BastionId`]: /context/struct.BastionId.html
     pub(crate) fn send_child(&self, id: &BastionId, msg: BastionMessage) {
         // FIXME: Err if None?
         if let Some(child) = self.children.get(id) {
@@ -317,8 +317,8 @@ impl Parent {
     /// the [`System`] to indicate that it doesn't have a
     /// parent.
     ///
-    /// [`Parent::None`]: #variant.None
-    /// [`System`]: system/struct.System.html
+    /// [`Parent::None`]: /broadcast/enum.Parent.html#variant.None
+    /// [`System`]: /system/struct.System.html
     pub(crate) fn none() -> Self {
         Parent::None
     }
@@ -327,10 +327,10 @@ impl Parent {
     /// [`Supervisor`]s created via [`Bastion::supervisor`]
     /// and, thus, directly supervised by the [`System`].
     ///
-    /// [`Parent::System`]: #variant.System
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Bastion::supervisor`]: struct.Bastion.html#method.supervisor
-    /// [`System`]: system/struct.System.html
+    /// [`Parent::System`]: /broadcast/enum.Parent.html#variant.System
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Bastion::supervisor`]: /struct.Bastion.html#method.supervisor
+    /// [`System`]: /system/struct.System.html
     pub(crate) fn system() -> Self {
         Parent::System
     }
@@ -345,13 +345,13 @@ impl Parent {
     /// * `supervisor` - A [`SupervisorRef`] referencing the
     ///     supervisor supervising the element.
     ///
-    /// [`Parent::Supervisor`]: #variant.Supervisor
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Supervisor::supervisor`]: supervisor/struct.Supervisor.html#method.supervisor
-    /// [`Supervisor::supervisor_ref`]: supervisor/struct.Supervisor.html#method.supervisor
-    /// [`SupervisorRef::supervisor`]: supervisor/struct.SupervisorRef.html#method.supervisor
-    /// [`Children`]: children/struct.Children.html
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
+    /// [`Parent::Supervisor`]: /broadcast/enum.Parent.html#variant.Supervisor
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Supervisor::supervisor`]: /supervisor/struct.Supervisor.html#method.supervisor
+    /// [`Supervisor::supervisor_ref`]: /supervisor/struct.Supervisor.html#method.supervisor
+    /// [`SupervisorRef::supervisor`]: /supervisor/struct.SupervisorRef.html#method.supervisor
+    /// [`Children`]: /children/struct.Children.html
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
     pub(crate) fn supervisor(supervisor: SupervisorRef) -> Self {
         Parent::Supervisor(supervisor)
     }
@@ -364,9 +364,9 @@ impl Parent {
     /// * `children` - A [`ChildrenRef`] referencing the
     ///     children group the `Child` belongs to.
     ///
-    /// [`Parent::Children`]: #variant.Children
-    /// [`Child`]: children/struct.Child.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`Parent::Children`]: /broadcast/enum.Parent.html#variant.Children
+    /// [`Child`]: /children/struct.Child.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
     pub(crate) fn children(children: ChildrenRef) -> Self {
         Parent::Children(children)
     }
@@ -374,8 +374,8 @@ impl Parent {
     /// Consumes the `Parent`, returning a [`SupervisorRef`] if
     /// it is a [`Parent::Supervisor`] or `None` otherwise.
     ///
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
-    /// [`Parent::Supervisor`]: #variant.Supervisor
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
+    /// [`Parent::Supervisor`]: /broadcast/enum.Parent.html#variant.Supervisor
     pub(crate) fn into_supervisor(self) -> Option<SupervisorRef> {
         if let Parent::Supervisor(supervisor) = self {
             Some(supervisor)
@@ -387,8 +387,8 @@ impl Parent {
     /// Consumes the `Parent`, returning a [`ChildrenRef`] if
     /// it is a [`Parent::Children`] or `None` otherwise.
     ///
-    /// [`ChildrenRef`]: supervisor/struct.ChildrenRef.html
-    /// [`Parent::Children`]: #variant.Children
+    /// [`ChildrenRef`]: /supervisor/struct.ChildrenRef.html
+    /// [`Parent::Children`]: /broadcast/enum.Parent.html#variant.Children
     pub(crate) fn into_children(self) -> Option<ChildrenRef> {
         if let Parent::Children(children) = self {
             Some(children)

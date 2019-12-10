@@ -36,8 +36,8 @@ use std::sync::Arc;
 /// # }
 /// ```
 ///
-/// [`Supervisor`]: supervisor/struct.Supervisor.html
-/// [`Children`]: children/struct.Children.html
+/// [`Supervisor`]: /supervisor/struct.Supervisor.html
+/// [`Children`]: /children/struct.Children.html
 pub struct Callbacks {
     before_start: Option<Arc<dyn Fn() + Send + Sync>>,
     before_restart: Option<Arc<dyn Fn() + Send + Sync>>,
@@ -80,8 +80,8 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`Supervisor::with_callbacks`]: supervisor/struct.Supervisor.html#method.with_callbacks
-    /// [`Children::with_callbacks`]: children/struct.Children.html#method.with_callbacks
+    /// [`Supervisor::with_callbacks`]: /supervisor/struct.Supervisor.html#method.with_callbacks
+    /// [`Children::with_callbacks`]: /children/struct.Children.html#method.with_callbacks
     pub fn new() -> Self {
         Callbacks::default()
     }
@@ -137,9 +137,9 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_after_restart`]: #method.with_after_start
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`with_after_restart`]: /callbacks/struct.Callbacks.html#method.with_after_start
     pub fn with_before_start<C>(mut self, before_start: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -200,9 +200,9 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_after_stop`]: #method.with_after_stop
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`with_after_stop`]: /callbacks/struct.Callbacks.html#method.with_after_stop
     pub fn with_before_restart<C>(mut self, before_restart: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -263,9 +263,9 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_before_start`]: #method.with_before_start
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`with_before_start`]: /callbacks/struct.Callbacks.html#method.with_before_start
     pub fn with_after_restart<C>(mut self, after_restart: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -328,9 +328,9 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_before_restart`]: #method.with_before_restart
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`with_before_restart`]: /callbacks/struct.Callbacks.html#method.with_before_restart
     pub fn with_after_stop<C>(mut self, after_stop: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -355,7 +355,7 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`with_before_start`]: #method.with_before_start
+    /// [`with_before_start`]: /callbacks/struct.Callbacks.html#method.with_before_start
     pub fn has_before_start(&self) -> bool {
         self.before_start.is_some()
     }
@@ -375,7 +375,7 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`with_before_restart`]: #method.with_before_restart
+    /// [`with_before_restart`]: /callbacks/struct.Callbacks.html#method.with_before_restart
     pub fn has_before_restart(&self) -> bool {
         self.before_restart.is_some()
     }
@@ -395,7 +395,7 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`with_after_restart`]: #method.with_after_restart
+    /// [`with_after_restart`]: /callbacks/struct.Callbacks.html#method.with_after_restart
     pub fn has_after_restart(&self) -> bool {
         self.after_restart.is_some()
     }
@@ -415,7 +415,7 @@ impl Callbacks {
     /// # }
     /// ```
     ///
-    /// [`with_after_stop`]: #method.with_after_stop
+    /// [`with_after_stop`]: /callbacks/struct.Callbacks.html#method.with_after_stop
     pub fn has_after_stop(&self) -> bool {
         self.after_stop.is_some()
     }

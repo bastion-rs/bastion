@@ -102,9 +102,9 @@ pub struct Sender(oneshot::Sender<Msg>);
 /// ```
 ///
 /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-/// [`ChildRef::ask`]: ../children/struct.ChildRef.html#method.ask
-/// [`Msg`]: message/struct.Msg.html
-/// [`msg!`]: macro.msg.html
+/// [`ChildRef::ask`]: /children/struct.ChildRef.html#method.ask
+/// [`Msg`]: /message/struct.Msg.html
+/// [`msg!`]: /macro.msg.html
 pub struct Answer(Receiver<Msg>);
 
 #[derive(Debug)]
@@ -159,9 +159,9 @@ pub struct Answer(Receiver<Msg>);
 /// # }
 /// ```
 ///
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
-/// [`msg!`]: macro.msg.html
+/// [`BastionContext::recv`]: /context/struct.BastionContext.html#method.recv
+/// [`BastionContext::try_recv`]: /context/struct.BastionContext.html#method.try_recv
+/// [`msg!`]: /macro.msg.html
 pub struct Msg(MsgInner);
 
 #[derive(Debug)]
@@ -170,26 +170,26 @@ enum MsgInner {
     /// and [`SupervisorRef::broadcast`] and allows using
     /// [`Msg::try_clone`] and [`Msg::downcast_ref`].
     ///
-    /// [`Msg::broadcast`]: struct.Msg.html#method.broadcast
-    /// [`ChildrenRef::broadcast`]: children/struct.ChildrenRef.html#method.broadcast
-    /// [`SupervisorRef::broadcast`]: supervisor/struct.SupervisorRef.html#method.broadcast
-    /// [`Msg::try_clone`]: struct.Msg.html#method.try_clone
-    /// [`Msg::downcast_ref`]: struct.Msg.html#method.downcast_ref
+    /// [`Msg::broadcast`]: /message/struct.Msg.html#method.broadcast
+    /// [`ChildrenRef::broadcast`]: /children/struct.ChildrenRef.html#method.broadcast
+    /// [`SupervisorRef::broadcast`]: /supervisor/struct.SupervisorRef.html#method.broadcast
+    /// [`Msg::try_clone`]: /message/struct.Msg.html#method.try_clone
+    /// [`Msg::downcast_ref`]: /message/struct.Msg.html#method.downcast_ref
     Broadcast(Arc<dyn Any + Send + Sync + 'static>),
     /// Created through [`Msg::tell`] by [`ChildRef::tell`] and
     /// allows using [`Msg::downcast`].
     ///
-    /// [`Msg::tell`]: struct.Msg.html#method.tell
-    /// [`ChildRef::tell`]: child/struct.ChildRef.html#method.tell
-    /// [`Msg::downcast`]: struct.Msg.html#method.downcast
+    /// [`Msg::tell`]: /message/struct.Msg.html#method.tell
+    /// [`ChildRef::tell`]: /children/struct.ChildRef.html#method.tell
+    /// [`Msg::downcast`]: /message/struct.Msg.html#method.downcast
     Tell(Box<dyn Any + Send + Sync + 'static>),
     /// Created through [`Msg::ask`] by [`ChildRef::ask`] and
     /// allows using [`Msg::downcast`] and [`Msg::take_sender`].
     ///
-    /// [`Msg::ask`]: struct.Msg.html#method.ask
-    /// [`ChildRef::ask`]: child/struct.ChildRef.html#method.ask
-    /// [`Msg::downcast`]: struct.Msg.html#method.downcast
-    /// [`Msg::take_sender`]: struct.Msg.html#method.take_sender
+    /// [`Msg::ask`]: /message/struct.Msg.html#method.ask
+    /// [`ChildRef::ask`]: /children/struct.ChildRef.html#method.ask
+    /// [`Msg::downcast`]: /message/struct.Msg.html#method.downcast
+    /// [`Msg::take_sender`]: /message/struct.Msg.html#method.take_sender
     Ask {
         msg: Box<dyn Any + Send + Sync + 'static>,
         sender: Option<Sender>,
@@ -542,9 +542,9 @@ impl Future for Answer {
 /// # }
 /// ```
 ///
-/// [`Msg`]: children/struct.Msg.html
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
+/// [`Msg`]: /message/struct.Msg.html
+/// [`BastionContext::recv`]: /context/struct.BastionContext.html#method.recv
+/// [`BastionContext::try_recv`]: /context/struct.BastionContext.html#method.try_recv
 macro_rules! msg {
     ($msg:expr, $($tokens:tt)+) => {
         msg!(@internal $msg, (), (), (), $($tokens)+)

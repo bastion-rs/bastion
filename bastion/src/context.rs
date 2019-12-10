@@ -94,6 +94,11 @@ pub struct BastionId(Uuid);
 ///     # Bastion::block_until_stopped();
 /// # }
 /// ```
+///
+/// [`exec`]: /context/struct.BastionContext.html#method.exec
+/// [`ChildRef`]: /children/struct.ChildRef.html
+/// [`ChildrenRef`]: /children/struct.ChildRef.html
+/// [`SupervisorRef`]: /supervisor/struct.Supervisor.html
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
@@ -166,7 +171,7 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
+    /// [`ChildRef`]: /children/struct.ChildRef.html
     pub fn current(&self) -> &ChildRef {
         &self.child
     }
@@ -200,7 +205,7 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
     pub fn parent(&self) -> &ChildrenRef {
         &self.children
     }
@@ -256,8 +261,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
-    /// [`Bastion::children`]: struct.Bastion.html#method.children
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
+    /// [`Bastion::children`]: /struct.Bastion.html#method.children
     pub fn supervisor(&self) -> Option<&SupervisorRef> {
         self.supervisor.as_ref()
     }
@@ -297,8 +302,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`recv`]: #method.recv
-    /// [`Msg`]: children/struct.Msg.html
+    /// [`recv`]: /context/struct.BastionContext.html#method.recv
+    /// [`Msg`]: /message/struct.Msg.html
     pub async fn try_recv(&self) -> Option<Msg> {
         debug!("BastionContext({}): Trying to receive message.", self.id);
         // TODO: Err(Error)
@@ -348,8 +353,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`try_recv`]: #method.try_recv
-    /// [`Msg`]: children/struct.Msg.html
+    /// [`try_recv`]: /context/struct.BastionContext.html#method.try_recv
+    /// [`Msg`]: /message/struct.Msg.html
     pub async fn recv(&self) -> Result<Msg, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {

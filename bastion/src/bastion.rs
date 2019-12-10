@@ -165,8 +165,8 @@ impl Bastion {
     /// }
     /// ```
     ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init_with`]: #method.init_with
+    /// [`Config`]: /struct.Config.html
+    /// [`Bastion::init_with`]: /struct.Bastion.html#method.init_with
     pub fn init() {
         let config = Config::default();
         Bastion::init_with(config)
@@ -202,8 +202,8 @@ impl Bastion {
     /// }
     /// ```
     ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init`]: #method.init
+    /// [`Config`]: /struct.Config.html
+    /// [`Bastion::init`]: /struct.Bastion.html#method.init
     pub fn init_with(config: Config) {
         debug!("Bastion: Initializing with config: {:?}", config);
         if config.backtraces().is_hide() {
@@ -248,8 +248,8 @@ impl Bastion {
     /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`SupervisorRef`]: /supervisor/struct.SupervisorRef.html
     pub fn supervisor<S>(init: S) -> Result<SupervisorRef, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -318,8 +318,8 @@ impl Bastion {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`ChildrenRef`]: /children/struct.ChildrenRef.html
     pub fn children<C>(init: C) -> Result<ChildrenRef, ()>
     where
         C: FnOnce(Children) -> Children,
@@ -505,8 +505,8 @@ impl Bastion {
     /// }
     /// ```
     ///
-    /// [`Bastion::stop()`]: #method.stop
-    /// [`Bastion::kill()`]: #method.kill
+    /// [`Bastion::stop()`]: /struct.Bastion.html#method.stop
+    /// [`Bastion::kill()`]: /struct.Bastion.html#method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
         loop {

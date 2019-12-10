@@ -67,9 +67,9 @@ struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 /// # }
 /// ```
 ///
-/// [`with_redundancy`]: #method.with_redundancy
-/// [`with_exec`]: #method.with_exec
-/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
+/// [`with_redundancy`]: /children/struct.Children.html#method.with_redundancy
+/// [`with_exec`]: /children/struct.Children.htm#method.with_exec
+/// [`SupervisionStrategy`]: /supervisor/enum.SupervisionStrategy.html
 pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
@@ -289,6 +289,9 @@ impl Children {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
+    ///
+    /// [`BastionContext`]: /context/struct.BastionContext.html
+    /// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
         I: Fn(BastionContext) -> F + Send + Sync + 'static,
@@ -329,7 +332,7 @@ impl Children {
     /// # }
     /// ```
     ///
-    /// [`with_exec`]: #method.with_exec
+    /// [`with_exec`]: /children/struct.Children.html#method.with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         trace!(
             "Children({}): Setting redundancy: {}",
@@ -387,7 +390,7 @@ impl Children {
     /// # }
     /// ```
     ///
-    /// [`Callbacks`]: struct.Callbacks.html
+    /// [`Callbacks`]: /struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         trace!(
             "Children({}): Setting callbacks: {:?}",
@@ -660,7 +663,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
+    /// [`ChildRef`]: /children/struct.ChildRef.html
     pub fn elems(&self) -> &[ChildRef] {
         &self.children
     }
@@ -716,7 +719,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     ///
-    /// [`elems`]: #method.elems
+    /// [`elems`]: /children/struct.ChildrenRef.html#method.elems
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
         debug!(
             "ChildrenRef({}): Broadcasting message: {:?}",
@@ -1061,7 +1064,7 @@ impl ChildRef {
     /// Sends a message to the child this `ChildRef` is referencing,
     /// allowing it to answer.
     ///
-    /// This method returns [`Answer`](../message/struct.Answer.html) if it succeeded, or `Err(msg)`
+    /// This method returns [`Answer`] if it succeeded, or `Err(msg)`
     /// otherwise.
     ///
     /// # Arguments
@@ -1133,7 +1136,7 @@ impl ChildRef {
     /// # }
     /// ```
     ///
-    /// [`Answer`]: message/struct.Answer.html
+    /// [`Answer`]: /message/struct.Answer.html
     pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg);
