@@ -420,12 +420,44 @@ impl Callbacks {
         self.after_stop.is_some()
     }
 
+    /// Calls the callback defined using [`with_before_start`] if any.
+    ///
+    /// This must get called before the [`Supervisor`] or [`Children`]
+    /// is launched if:
+    /// - it was never called before
+    /// - or the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it was already
+    ///     stopped or killed
+    ///
+    /// This will get called by [`after_restart`] if no callback was
+    /// defined using [`with_after_restart`].
+    ///
+    /// [`with_before_start`]: /callbacks/struct.Callbacks.html#method.with_before_start
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`after_restart`]: /callbacks/struct.Callbacks.html#method.after_restart
+    /// [`with_after_restart`]: /callbacks/struct.Callbacks.html#method.with_after_restart
     pub(crate) fn before_start(&self) {
         if let Some(before_start) = &self.before_start {
             before_start()
         }
     }
 
+    /// Calls the callback defined using [`with_before_restart`] if any.
+    ///
+    /// This must get called before the [`Supervisor`] or [`Children`] is
+    /// reset if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed
+    ///
+    /// This will call [`after_stop`] if no callback was defined using
+    /// [`with_before_restart`].
+    ///
+    /// [`with_before_restart`]: /callbacks/struct.Callbacks.html#method.with_before_restart
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`after_stop`]: /callbacks/struct.Callbacks.html#method.after_stop
     pub(crate) fn before_restart(&self) {
         if let Some(before_restart) = &self.before_restart {
             before_restart()
@@ -434,6 +466,21 @@ impl Callbacks {
         }
     }
 
+    /// Calls the callback defined using [`with_after_restart`] if any.
+    ///
+    /// This must get called before the [`Supervisor`] or [`Children`] is
+    /// launched if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to restart it and it wasn't already
+    ///     stopped or killed
+    ///
+    /// This will call [`before_start`] if no callback was defined using
+    /// [`with_after_restart`].
+    ///
+    /// [`with_after_restart`]: /callbacks/struct.Callbacks.html#method.with_after_restart
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`before_start`]: /callbacks/struct.Callbacks.html#method.before_start
     pub(crate) fn after_restart(&self) {
         if let Some(after_restart) = &self.after_restart {
             after_restart()
@@ -442,6 +489,24 @@ impl Callbacks {
         }
     }
 
+    /// Calls the callback defined using [`with_after_stop`] if any.
+    ///
+    /// This must get called before the [`Supervisor`] or [`Children`] is
+    /// stopped or killed if:
+    /// - the supervisor of the supervised element using this callback
+    ///     (or the system) decided to stop (not restart nor kill) it and
+    ///     it wasn't already stopped or killed
+    /// - or the supervisor or children group using this callback stopped
+    ///     or killed itself or was stopped or killed by a reference to it
+    ///
+    /// This will get called by [`before_restart`] if no callback was
+    /// defined using [`with_before_restart`].
+    ///
+    /// [`with_after_stop`]: /callbacks/struct.Callbacks.html#method.with_after_stop
+    /// [`Supervisor`]: /supervisor/struct.Supervisor.html
+    /// [`Children`]: /children/struct.Children.html
+    /// [`before_restart`]: /callbacks/struct.Callbacks.html#method.before_restart
+    /// [`with_before_restart`]: /callbacks/struct.Callbacks.html#method.with_before_restart
     pub(crate) fn after_stop(&self) {
         if let Some(after_stop) = &self.after_stop {
             after_stop()
