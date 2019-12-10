@@ -166,8 +166,30 @@ pub struct Msg(MsgInner);
 
 #[derive(Debug)]
 enum MsgInner {
+    /// Created through [`Msg::broadcast`] by [`ChildrenRef::broadcast`]
+    /// and [`SupervisorRef::broadcast`] and allows using
+    /// [`Msg::try_clone`] and [`Msg::downcast_ref`].
+    ///
+    /// [`Msg::broadcast`]: struct.Msg.html#method.broadcast
+    /// [`ChildrenRef::broadcast`]: children/struct.ChildrenRef.html#method.broadcast
+    /// [`SupervisorRef::broadcast`]: supervisor/struct.SupervisorRef.html#method.broadcast
+    /// [`Msg::try_clone`]: struct.Msg.html#method.try_clone
+    /// [`Msg::downcast_ref`]: struct.Msg.html#method.downcast_ref
     Broadcast(Arc<dyn Any + Send + Sync + 'static>),
+    /// Created through [`Msg::tell`] by [`ChildRef::tell`] and
+    /// allows using [`Msg::downcast`].
+    ///
+    /// [`Msg::tell`]: struct.Msg.html#method.tell
+    /// [`ChildRef::tell`]: child/struct.ChildRef.html#method.tell
+    /// [`Msg::downcast`]: struct.Msg.html#method.downcast
     Tell(Box<dyn Any + Send + Sync + 'static>),
+    /// Created through [`Msg::ask`] by [`ChildRef::ask`] and
+    /// allows using [`Msg::downcast`] and [`Msg::take_sender`].
+    ///
+    /// [`Msg::ask`]: struct.Msg.html#method.ask
+    /// [`ChildRef::ask`]: child/struct.ChildRef.html#method.ask
+    /// [`Msg::downcast`]: struct.Msg.html#method.downcast
+    /// [`Msg::take_sender`]: struct.Msg.html#method.take_sender
     Ask {
         msg: Box<dyn Any + Send + Sync + 'static>,
         sender: Option<Sender>,
@@ -204,17 +226,17 @@ impl Sender {
 }
 
 impl Msg {
-    pub(crate) fn broadcast<M: Message>(msg: M) -> Self {
+    fn broadcast<M: Message>(msg: M) -> Self {
         let inner = MsgInner::Broadcast(Arc::new(msg));
         Msg(inner)
     }
 
-    pub(crate) fn tell<M: Message>(msg: M) -> Self {
+    fn tell<M: Message>(msg: M) -> Self {
         let inner = MsgInner::Tell(Box::new(msg));
         Msg(inner)
     }
 
-    pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
+    fn ask<M: Message>(msg: M) -> (Self, Answer) {
         let msg = Box::new(msg);
         let (sender, recver) = oneshot::channel();
         let sender = Sender(sender);
