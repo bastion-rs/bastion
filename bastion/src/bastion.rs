@@ -1,9 +1,11 @@
 use crate::broadcast::{Broadcast, Parent};
 use crate::children::{Children, ChildrenRef};
 use crate::config::Config;
+use crate::context::BastionContext;
 use crate::message::{BastionMessage, Message};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
+use core::future::Future;
 use std::fmt::{self, Debug, Formatter};
 use std::thread;
 
@@ -326,6 +328,51 @@ impl Bastion {
     {
         debug!("Bastion: Creating children group.");
         SYSTEM.supervisor().children(init)
+    }
+
+    /// Creates a new [`Children`] which will have the given closure
+    /// as action and then sends it to the system's default supervisor.
+    ///
+    /// This method returns a [`ChildrenRef`] referencing the newly created children
+    /// if the creation was successful, otherwise returns an `Err(())`.
+    ///
+    /// Internally this method uses the [`Bastion::children`] and [`Children::with_exec`] methods
+    /// to create a new children.
+    ///
+    /// # Arguments
+    /// * `action` - The closure which gets executed by the child.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// let children_ref: ChildrenRef = Bastion::spawn(|ctx: BastionContext| {
+    ///     async move {
+    ///         // ...
+    ///         Ok(())
+    ///     }
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Children::with_exec`]: children/struct.Children.html#method.with_exec
+    /// [`Bastion::children`]: #method.children
+    /// [`Children`]: children/struct.Children.html
+    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
+    pub fn spawn<I, F>(action: I) -> Result<ChildrenRef, ()>
+    where
+        I: Fn(BastionContext) -> F + Send + Sync + 'static,
+        F: Future<Output = Result<(), ()>> + Send + 'static,
+    {
+        Bastion::children(|ch| ch.with_redundancy(1).with_exec(action))
     }
 
     /// Sends a message to the system which will then send it to all
