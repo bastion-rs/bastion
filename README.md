@@ -115,6 +115,7 @@ You can see architecture of the framework [HERE](https://github.com/bastion-rs/b
 If you are using Bastion open a PR so we can include it in our showcase.
 * [SkyNet](https://github.com/vertexclique/skynet) (a Discord bot which is resending deleted messages)
     * Skynet is running since 0.1.3 release of Bastion on the cloud and haven't killed yet.
+* In AWS Lambdas we have used Bastion to enable retry mechanism and try different parsing strategies for data to be processed.
 
 ## License
 
