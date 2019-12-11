@@ -372,7 +372,7 @@ impl Bastion {
         I: Fn(BastionContext) -> F + Send + Sync + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
-        Bastion::children(|ch| ch.with_exec(action))
+        Bastion::children(|ch| ch.with_redundancy(1).with_exec(action))
     }
 
     /// Sends a message to the system which will then send it to all
