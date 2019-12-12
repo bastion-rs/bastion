@@ -33,6 +33,7 @@
 mod macros;
 
 pub mod allocator;
+pub mod blocking;
 pub mod distributor;
 pub mod load_balancer;
 pub mod placement;
@@ -40,11 +41,13 @@ pub mod pool;
 pub mod run;
 pub mod run_queue;
 pub mod sleepers;
+pub mod utils;
 pub mod worker;
 
 ///
 /// Prelude of Bastion Executor
 pub mod prelude {
+    pub use crate::blocking::*;
     pub use crate::pool::*;
     pub use crate::run::*;
 }

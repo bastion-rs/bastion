@@ -22,7 +22,7 @@ impl LoadBalancer {
     /// AMQL sampling thread for run queue load balancing.
     pub fn amql_generation() {
         thread::Builder::new()
-            .name("load-balancer-thread".to_string())
+            .name("bastion-load-balancer-thread".to_string())
             .spawn(move || {
                 loop {
                     if let Ok(mut stats) = load_balancer::stats().try_write() {

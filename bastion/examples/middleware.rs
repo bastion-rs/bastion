@@ -73,7 +73,7 @@ fn main() {
                     round_robin %= workers.elems().len();
 
                     // Distribute tcp streams
-                    workers.elems()[round_robin]
+                    let _ = workers.elems()[round_robin]
                         .ask(stream.unwrap())
                         .unwrap()
                         .await;
