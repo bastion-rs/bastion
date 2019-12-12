@@ -141,7 +141,7 @@ More interaction and more ideas are better!
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 
-A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](.github/CONTRIBUTING.md) on GitHub.
+A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](https://github.com/bastion-rs/.github/blob/master/CONTRIBUTING.md) on GitHub.
 
 ---
 <sup><sub>* Currently, we are working on distributed properties and protocol[.](https://spoti.fi/2OaEsj9)</sub></sup>
