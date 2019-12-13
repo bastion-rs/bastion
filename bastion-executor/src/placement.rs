@@ -214,26 +214,31 @@ mod windows {
 
         // Set core affinity for current thread.
         unsafe {
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR);
+            #[cfg(target_pointer_width = "32")]
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR as u32);
+            #[cfg(target_pointer_width = "64")]
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR as u64);
         }
     }
 
     fn get_affinity_mask() -> Option<u64> {
-        #[cfg(target_pointer_width = "64")]
-        let mut process_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut process_mask: u32 = 0;
-        #[cfg(target_pointer_width = "64")]
-        let mut system_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut system_mask: u32 = 0;
+        let mut process_mask: usize = 0;
+        let mut system_mask: usize = 0;
 
         let res = unsafe {
-            GetProcessAffinityMask(
-                GetCurrentProcess(),
-                &mut process_mask as PDWORD_PTR,
-                &mut system_mask as PDWORD_PTR,
-            )
+            // Good luck with other architectures.
+            // Since Windows is already like a cartoon:
+            // Tinky winky, dipsy, laa laa, po.
+            #[cfg(target_pointer_width = "32")]
+            let mut pm = process_mask as u32;
+            #[cfg(target_pointer_width = "64")]
+            let mut pm = process_mask as u64;
+            #[cfg(target_pointer_width = "32")]
+            let mut sm = system_mask as u32;
+            #[cfg(target_pointer_width = "64")]
+            let mut sm = system_mask as u64;
+
+            GetProcessAffinityMask(GetCurrentProcess(), &mut pm, &mut sm)
         };
 
         // Successfully retrieved affinity mask
