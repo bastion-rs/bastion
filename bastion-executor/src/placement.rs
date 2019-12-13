@@ -185,7 +185,7 @@ mod windows {
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
-    use winapi::shared::basetsd::{DWORD_PTR, PDWORD_PTR};
+    use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
 
     use super::CoreId;
 
@@ -215,30 +215,42 @@ mod windows {
         // Set core affinity for current thread.
         unsafe {
             #[cfg(target_pointer_width = "32")]
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR as u32);
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD32);
             #[cfg(target_pointer_width = "64")]
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR as u64);
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD64);
         }
     }
 
     fn get_affinity_mask() -> Option<u64> {
-        let mut process_mask: usize = 0;
-        let mut system_mask: usize = 0;
+        #[cfg(target_pointer_width = "64")]
+        let mut process_mask: u64 = 0;
+        #[cfg(target_pointer_width = "32")]
+        let mut process_mask: u32 = 0;
+        #[cfg(target_pointer_width = "64")]
+        let mut system_mask: u64 = 0;
+        #[cfg(target_pointer_width = "32")]
+        let mut system_mask: u32 = 0;
 
         let res = unsafe {
             // Good luck with other architectures.
             // Since Windows is already like a cartoon:
             // Tinky winky, dipsy, laa laa, po.
-            #[cfg(target_pointer_width = "32")]
-            let mut pm = process_mask as u32;
-            #[cfg(target_pointer_width = "64")]
-            let mut pm = process_mask as u64;
-            #[cfg(target_pointer_width = "32")]
-            let mut sm = system_mask as u32;
-            #[cfg(target_pointer_width = "64")]
-            let mut sm = system_mask as u64;
 
-            GetProcessAffinityMask(GetCurrentProcess(), &mut pm, &mut sm)
+            #[cfg(target_pointer_width = "32")]
+            let r = GetProcessAffinityMask(
+                GetCurrentProcess(),
+                &mut process_mask as PDWORD32,
+                &mut system_mask as PDWORD32,
+            );
+
+            #[cfg(target_pointer_width = "64")]
+            let r = GetProcessAffinityMask(
+                GetCurrentProcess(),
+                &mut process_mask as PDWORD64,
+                &mut system_mask as PDWORD64,
+            );
+
+            r
         };
 
         // Successfully retrieved affinity mask
