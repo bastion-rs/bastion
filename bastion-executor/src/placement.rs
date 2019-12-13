@@ -185,7 +185,7 @@ mod windows {
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
-    use winapi::basetsd::{DWORD_PTR, PDWORD_PTR};
+    use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
 
     use super::CoreId;
 
@@ -214,7 +214,10 @@ mod windows {
 
         // Set core affinity for current thread.
         unsafe {
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR);
+            #[cfg(target_pointer_width = "32")]
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD32);
+            #[cfg(target_pointer_width = "64")]
+            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD64);
         }
     }
 
@@ -229,11 +232,25 @@ mod windows {
         let mut system_mask: u32 = 0;
 
         let res = unsafe {
-            GetProcessAffinityMask(
+            // Good luck with other architectures.
+            // Since Windows is already like a cartoon:
+            // Tinky winky, dipsy, laa laa, po.
+
+            #[cfg(target_pointer_width = "32")]
+            let r = GetProcessAffinityMask(
                 GetCurrentProcess(),
-                &mut process_mask as PDWORD_PTR,
-                &mut system_mask as PDWORD_PTR,
-            )
+                &mut process_mask as PDWORD32,
+                &mut system_mask as PDWORD32,
+            );
+
+            #[cfg(target_pointer_width = "64")]
+            let r = GetProcessAffinityMask(
+                GetCurrentProcess(),
+                &mut process_mask as PDWORD64,
+                &mut system_mask as PDWORD64,
+            );
+
+            r
         };
 
         // Successfully retrieved affinity mask

@@ -41,7 +41,7 @@ allocator-suite = { version = "^0.1", optional = true, default-features = false 
 jemallocator = { version = "^0.3", optional = true, default-features = false }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = "^0.2.8"
+winapi = { version = "^0.3.8", features = ["basetsd"] }
 kernel32-sys = "^0.2.2"
 
 [dev-dependencies]
