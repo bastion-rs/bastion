@@ -11,6 +11,9 @@ documentation = "https://docs.rs/bastion"
 readme = "README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
+exclude = [
+	"scripts/*",
+]
 
 [badges]
 travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
@@ -21,6 +24,7 @@ unstable = ["numanji", "allocator-suite", "jemallocator"]
 
 [dependencies]
 crossbeam-utils = "0.6"
+crossbeam-channel = "0.4"
 crossbeam-epoch = "0.7"
 fxhash = "0.2"
 lazy_static = "1.4"
@@ -42,3 +46,4 @@ kernel32-sys = "^0.2.2"
 
 [dev-dependencies]
 proptest = "^0.9"
+futures = "0.3.1"
