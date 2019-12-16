@@ -17,7 +17,7 @@ travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-crossbeam-utils = "0.6"
+crossbeam-utils = "0.7"
 pin-utils = "0.1.0-alpha.4"
 
 [dev-dependencies]
