@@ -23,7 +23,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["numanji", "allocator-suite", "jemallocator"]
 
 [dependencies]
-crossbeam-utils = "0.6"
+crossbeam-utils = "0.7"
 crossbeam-channel = "0.4"
 crossbeam-epoch = "0.8"
 fxhash = "0.2"
