@@ -43,7 +43,7 @@ fn main() {
                                 let response = escape(&compressed);
                                 // println!("Response: {}", response);
                                 stream.write(response.as_bytes()).unwrap();
-                                answer!(stream);
+                                answer!(ctx, stream);
                             };
                             _: _ => ();
                         }
@@ -59,7 +59,7 @@ fn main() {
     //
     // Server entrypoint
     Bastion::children(|children: Children| {
-        children.with_exec(move |_ctx: BastionContext| {
+        children.with_exec(move |ctx: BastionContext| {
             let workers = workers.clone();
             async move {
                 println!("Server is starting!");
@@ -73,8 +73,8 @@ fn main() {
                     round_robin %= workers.elems().len();
 
                     // Distribute tcp streams
-                    let _ = workers.elems()[round_robin]
-                        .ask(stream.unwrap())
+                    let _ = ctx
+                        .ask(&workers.elems()[round_robin].addr(), stream.unwrap())
                         .unwrap()
                         .await;
                 }

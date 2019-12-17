@@ -147,7 +147,7 @@ fn sp_sp_ch(children: Children, children_ref: ChildrenRef) -> Children {
             // This will send a message to "sp.ch", making it fault and making
             // "sp" restart "sp.ch" and "sp.sp" (because its supervision strategy
             // is "one-for-one")...
-            children_ref.elems()[0].tell(()).ok();
+            children_ref.elems()[0].tell_anonymously(()).ok();
         });
 
     children

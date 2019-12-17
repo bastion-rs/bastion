@@ -1,8 +1,10 @@
 use crate::broadcast::{Broadcast, Parent};
 use crate::children::{Children, ChildrenRef};
 use crate::config::Config;
-use crate::context::BastionContext;
+use crate::context::{BastionContext, BastionId};
+use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Message};
+use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
 use core::future::Future;
@@ -115,13 +117,13 @@ use std::thread;
 ///     let child = &elems[0];
 ///
 ///     // ...to then "tell" it messages...
-///     child.tell("A message containing data.").expect("Couldn't send the message.");
+///     child.tell_anonymously("A message containing data.").expect("Couldn't send the message.");
 ///
 ///     // ...or "ask" it messages...
-///     let answer: Answer = child.ask("A message containing data.").expect("Couldn't send the message.");
+///     let answer: Answer = child.ask_anonymously("A message containing data.").expect("Couldn't send the message.");
 ///     # async {
 ///     // ...until the child eventually answers back...
-///     let answer: Result<Msg, ()> = answer.await;
+///     let answer: Result<SignedMessage, ()> = answer.await;
 ///     # };
 ///
 ///     // ...and then even stop or kill it...
@@ -258,7 +260,7 @@ impl Bastion {
     {
         debug!("Bastion: Creating supervisor.");
         let parent = Parent::system();
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Supervisor(BastionId::new()));
 
         debug!("Bastion: Initializing Supervisor({}).", bcast.id());
         let supervisor = Supervisor::new(bcast);
@@ -268,8 +270,9 @@ impl Bastion {
 
         debug!("Bastion: Deploying Supervisor({}).", supervisor.id());
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        trace!("Bastion: Sending message: {:?}", msg);
-        SYSTEM.sender().unbounded_send(msg).map_err(|_| ())?;
+        let envelope = Envelope::new(msg, SYSTEM.path().clone(), SYSTEM.sender().clone());
+        trace!("Bastion: Sending envelope: {:?}", envelope);
+        SYSTEM.sender().unbounded_send(envelope).map_err(|_| ())?;
 
         Ok(supervisor_ref)
     }
@@ -303,7 +306,7 @@ impl Bastion {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // Send and receive messages...
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///             // ...and return `Ok(())` or `Err(())` when you are done...
     ///             Ok(())
     ///
@@ -423,11 +426,12 @@ impl Bastion {
     pub fn broadcast<M: Message>(msg: M) -> Result<(), M> {
         debug!("Bastion: Broadcasting message: {:?}", msg);
         let msg = BastionMessage::broadcast(msg);
-        trace!("Bastion: Sending message: {:?}", msg);
+        let envelope = Envelope::from_dead_letters(msg);
+        trace!("Bastion: Sending envelope: {:?}", envelope);
         // FIXME: panics?
         SYSTEM
             .sender()
-            .unbounded_send(msg)
+            .unbounded_send(envelope)
             .map_err(|err| err.into_inner().into_msg().unwrap())
     }
 
@@ -456,9 +460,10 @@ impl Bastion {
     pub fn start() {
         debug!("Bastion: Starting.");
         let msg = BastionMessage::start();
-        trace!("Bastion: Sending message: {:?}", msg);
+        let envelope = Envelope::from_dead_letters(msg);
+        trace!("Bastion: Sending envelope: {:?}", envelope);
         // FIXME: Err(Error)
-        SYSTEM.sender().unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(envelope).ok();
     }
 
     /// Sends a message to the system to tell it to stop
@@ -486,9 +491,10 @@ impl Bastion {
     pub fn stop() {
         debug!("Bastion: Stopping.");
         let msg = BastionMessage::stop();
-        trace!("Bastion: Sending message: {:?}", msg);
+        let envelope = Envelope::from_dead_letters(msg);
+        trace!("Bastion: Sending envelope: {:?}", envelope);
         // FIXME: Err(Error)
-        SYSTEM.sender().unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(envelope).ok();
     }
 
     /// Sends a message to the system to tell it to kill every
@@ -515,9 +521,10 @@ impl Bastion {
     pub fn kill() {
         debug!("Bastion: Killing.");
         let msg = BastionMessage::kill();
-        trace!("Bastion: Sending message: {:?}", msg);
+        let envelope = Envelope::from_dead_letters(msg);
+        trace!("Bastion: Sending envelope: {:?}", envelope);
         // FIXME: Err(Error)
-        SYSTEM.sender().unbounded_send(msg).ok();
+        SYSTEM.sender().unbounded_send(envelope).ok();
 
         // FIXME: panics
         let mut system = SYSTEM.handle().lock().wait().unwrap();

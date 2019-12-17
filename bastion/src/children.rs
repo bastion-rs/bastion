@@ -4,7 +4,9 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::envelope::{Envelope, RefAddr};
 use crate::message::{Answer, BastionMessage, Message};
+use crate::path::{BastionPath, BastionPathElement};
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -18,6 +20,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 struct Init(Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
@@ -49,7 +52,7 @@ struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
 ///             // Send and receive messages...
-///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
 ///             // ...and return `Ok(())` or `Err(())` when you are done...
 ///             Ok(())
 ///
@@ -83,7 +86,7 @@ pub struct Children {
     // Messages that were received before the group was
     // started. Those will be "replayed" once a start message
     // is received.
-    pre_start_msgs: Vec<BastionMessage>,
+    pre_start_msgs: Vec<Envelope>,
     started: bool,
 }
 
@@ -93,6 +96,7 @@ pub struct Children {
 pub struct ChildrenRef {
     id: BastionId,
     sender: Sender,
+    path: Arc<BastionPath>,
     children: Vec<ChildRef>,
 }
 
@@ -109,7 +113,7 @@ pub(crate) struct Child {
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
-    pre_start_msgs: Vec<BastionMessage>,
+    pre_start_msgs: Vec<Envelope>,
     started: bool,
 }
 
@@ -119,6 +123,7 @@ pub(crate) struct Child {
 pub struct ChildRef {
     id: BastionId,
     sender: Sender,
+    path: Arc<BastionPath>,
 }
 
 impl Init {
@@ -233,16 +238,17 @@ impl Children {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
+        let path = self.bcast.path().clone();
 
         let mut children = Vec::with_capacity(self.launched.len());
         for (id, (sender, _)) in &self.launched {
             trace!("Children({}): Creating new ChildRef({}).", self.id(), id);
             // TODO: clone or ref?
-            let child = ChildRef::new(id.clone(), sender.clone());
+            let child = ChildRef::new(id.clone(), sender.clone(), path.clone());
             children.push(child);
         }
 
-        ChildrenRef::new(id, sender, children)
+        ChildrenRef::new(id, sender, path, children)
     }
 
     /// Sets the closure taking a [`BastionContext`] and returning a
@@ -273,7 +279,7 @@ impl Children {
     ///     children.with_exec(|ctx| {
     ///         async move {
     ///             // Send and receive messages...
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///             // ...and return `Ok(())` or `Err(())` when you are done...
     ///             Ok(())
     ///
@@ -441,36 +447,60 @@ impl Children {
         self.bcast.faulted();
     }
 
-    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
-        match msg {
-            BastionMessage::Start => unreachable!(),
-            BastionMessage::Stop => {
+    async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
+        match env {
+            Envelope {
+                msg: BastionMessage::Start,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stop,
+                ..
+            } => {
                 self.stop().await;
                 self.stopped();
 
                 return Err(());
             }
-            BastionMessage::Kill => {
+            Envelope {
+                msg: BastionMessage::Kill,
+                ..
+            } => {
                 self.kill().await;
                 self.stopped();
 
                 return Err(());
             }
             // FIXME
-            BastionMessage::Deploy(_) => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Deploy(_),
+                ..
+            } => unimplemented!(),
             // FIXME
-            BastionMessage::Prune { .. } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Prune { .. },
+                ..
+            } => unimplemented!(),
             // FIXME
-            BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(ref message) => {
+            Envelope {
+                msg: BastionMessage::SuperviseWith(_),
+                ..
+            } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Message(ref message),
+                ..
+            } => {
                 debug!(
                     "Children({}): Broadcasting a message: {:?}",
                     self.id(),
                     message
                 );
-                self.bcast.send_children(msg);
+                self.bcast.send_children(env);
             }
-            BastionMessage::Stopped { id } => {
+            Envelope {
+                msg: BastionMessage::Stopped { id },
+                ..
+            } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
                     debug!("Children({}): Child({}) stopped.", self.id(), id);
@@ -480,7 +510,10 @@ impl Children {
                     return Err(());
                 }
             }
-            BastionMessage::Faulted { id } => {
+            Envelope {
+                msg: BastionMessage::Faulted { id },
+                ..
+            } => {
                 // FIXME: Err if false?
                 if self.launched.contains_key(&id) {
                     warn!("Children({}): Child({}) faulted.", self.id(), id);
@@ -504,7 +537,10 @@ impl Children {
 
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
-                Poll::Ready(Some(BastionMessage::Start)) => {
+                Poll::Ready(Some(Envelope {
+                    msg: BastionMessage::Start,
+                    ..
+                })) => {
                     trace!(
                         "Children({}): Received a new message (started=false): {:?}",
                         self.id(),
@@ -514,7 +550,9 @@ impl Children {
                     self.started = true;
 
                     let msg = BastionMessage::start();
-                    self.bcast.send_children(msg);
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_children(env);
 
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
@@ -561,12 +599,13 @@ impl Children {
         debug!("Children({}): Launching elements.", self.id());
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
-            let bcast = Broadcast::new(parent);
+            let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
 
             // TODO: clone or ref?
             let id = bcast.id().clone();
             let sender = bcast.sender().clone();
-            let child_ref = ChildRef::new(id.clone(), sender.clone());
+            let path = bcast.path().clone();
+            let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
 
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
@@ -601,10 +640,11 @@ impl Children {
 }
 
 impl ChildrenRef {
-    fn new(id: BastionId, sender: Sender, children: Vec<ChildRef>) -> Self {
+    fn new(id: BastionId, sender: Sender, path: Arc<BastionPath>, children: Vec<ChildRef>) -> Self {
         ChildrenRef {
             id,
             sender,
+            path,
             children,
         }
     }
@@ -723,8 +763,9 @@ impl ChildrenRef {
             msg
         );
         let msg = BastionMessage::broadcast(msg);
+        let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
-        self.send(msg).map_err(|err| err.into_msg().unwrap())
+        self.send(env).map_err(|err| err.into_msg().unwrap())
     }
 
     /// Sends a message to the children group this `ChildrenRef`
@@ -753,7 +794,8 @@ impl ChildrenRef {
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Stopping.", self.id());
         let msg = BastionMessage::stop();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
     /// Sends a message to the children group this `ChildrenRef`
@@ -782,14 +824,23 @@ impl ChildrenRef {
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
-    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        trace!("ChildrenRef({}): Sending message: {:?}", self.id(), msg);
+    pub(crate) fn send(&self, env: Envelope) -> Result<(), Envelope> {
+        trace!("ChildrenRef({}): Sending message: {:?}", self.id(), env);
         self.sender
-            .unbounded_send(msg)
+            .unbounded_send(env)
             .map_err(|err| err.into_inner())
+    }
+
+    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+        &self.path
+    }
+
+    pub(crate) fn sender(&self) -> &Sender {
+        &self.sender
     }
 }
 
@@ -813,6 +864,8 @@ impl Child {
         let id = self.bcast.id().clone();
         // FIXME: panics?
         let parent = self.bcast.parent().clone().into_children().unwrap();
+        let path = self.bcast.path().clone();
+        let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
         ProcStack::default().with_after_panic(move || {
@@ -821,8 +874,9 @@ impl Child {
             warn!("Child({}): Panicked.", id);
 
             let msg = BastionMessage::faulted(id);
+            let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
-            parent.send(msg).ok();
+            parent.send(env).ok();
         })
     }
 
@@ -840,34 +894,61 @@ impl Child {
         self.bcast.faulted();
     }
 
-    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
-        match msg {
-            BastionMessage::Start => unreachable!(),
-            BastionMessage::Stop => {
+    async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
+        match env {
+            Envelope {
+                msg: BastionMessage::Start,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stop,
+                ..
+            } => {
                 self.stopped();
 
                 return Err(());
             }
-            BastionMessage::Kill => {
+            Envelope {
+                msg: BastionMessage::Kill,
+                ..
+            } => {
                 self.stopped();
 
                 return Err(());
             }
             // FIXME
-            BastionMessage::Deploy(_) => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Deploy(_),
+                ..
+            } => unimplemented!(),
             // FIXME
-            BastionMessage::Prune { .. } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Prune { .. },
+                ..
+            } => unimplemented!(),
             // FIXME
-            BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(msg) => {
+            Envelope {
+                msg: BastionMessage::SuperviseWith(_),
+                ..
+            } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Message(msg),
+                sign,
+            } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
                 let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
-                state.push_msg(msg);
+                state.push_msg(msg, sign);
             }
             // FIXME
-            BastionMessage::Stopped { .. } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Stopped { .. },
+                ..
+            } => unimplemented!(),
             // FIXME
-            BastionMessage::Faulted { .. } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Faulted { .. },
+                ..
+            } => unimplemented!(),
         }
 
         Ok(())
@@ -878,7 +959,10 @@ impl Child {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
-                Poll::Ready(Some(BastionMessage::Start)) => {
+                Poll::Ready(Some(Envelope {
+                    msg: BastionMessage::Start,
+                    ..
+                })) => {
                     trace!(
                         "Child({}): Received a new message (started=false): {:?}",
                         self.id(),
@@ -964,8 +1048,8 @@ impl Child {
 }
 
 impl ChildRef {
-    fn new(id: BastionId, sender: Sender) -> ChildRef {
-        ChildRef { id, sender }
+    fn new(id: BastionId, sender: Sender, path: Arc<BastionPath>) -> ChildRef {
+        ChildRef { id, sender, path }
     }
 
     /// Returns the identifier of the children group element this
@@ -1002,6 +1086,8 @@ impl ChildRef {
     }
 
     /// Sends a message to the child this `ChildRef` is referencing.
+    /// This message is intended to be used outside of Bastion context when
+    /// there is no way for receiver to identify message sender
     ///
     /// This method returns `()` if it succeeded, or `Err(msg)`
     /// otherwise.
@@ -1043,22 +1129,25 @@ impl ChildRef {
     ///
     ///     # let child_ref = &children_ref.elems()[0];
     /// // Later, the message is "told" to the child...
-    /// child_ref.tell(TELL_MSG).expect("Couldn't send the message.");
+    /// child_ref.tell_anonymously(TELL_MSG).expect("Couldn't send the message.");
     ///     #
     ///     # Bastion::start();
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    pub fn tell<M: Message>(&self, msg: M) -> Result<(), M> {
+    pub fn tell_anonymously<M: Message>(&self, msg: M) -> Result<(), M> {
         debug!("ChildRef({}): Telling message: {:?}", self.id(), msg);
         let msg = BastionMessage::tell(msg);
+        let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
-        self.send(msg).map_err(|msg| msg.into_msg().unwrap())
+        self.send(env).map_err(|env| env.into_msg().unwrap())
     }
 
     /// Sends a message to the child this `ChildRef` is referencing,
     /// allowing it to answer.
+    /// This message is intended to be used outside of Bastion context when
+    /// there is no way for receiver to identify message sender
     ///
     /// This method returns [`Answer`](../message/struct.Answer.html) if it succeeded, or `Err(msg)`
     /// otherwise.
@@ -1091,7 +1180,7 @@ impl ChildRef {
     ///                     // Handle the message...
     ///
     ///                     // ...and eventually answer to it...
-    ///                     answer!(ANSWER_MSG);
+    ///                     answer!(ctx, ANSWER_MSG);
     ///                 };
     ///                 // This won't happen because this example
     ///                 // only "asks" a `&'static str`...
@@ -1108,7 +1197,7 @@ impl ChildRef {
     ///             # let child_ref = children_ref.elems()[0].clone();
     ///             # async move {
     /// // Later, the message is "asked" to the child...
-    /// let answer: Answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
+    /// let answer: Answer = child_ref.ask_anonymously(ASK_MSG).expect("Couldn't send the message.");
     ///
     /// // ...and the child's answer is received...
     /// msg! { answer.await.expect("Couldn't receive the answer."),
@@ -1133,11 +1222,12 @@ impl ChildRef {
     /// ```
     ///
     /// [`Answer`]: message/struct.Answer.html
-    pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
+    pub fn ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg);
+        let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
-        self.send(msg).map_err(|msg| msg.into_msg().unwrap())?;
+        self.send(env).map_err(|env| env.into_msg().unwrap())?;
 
         Ok(answer)
     }
@@ -1168,7 +1258,8 @@ impl ChildRef {
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Stopping.", self.id);
         let msg = BastionMessage::stop();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
     /// Sends a message to the child this `ChildRef` is referencing
@@ -1197,14 +1288,28 @@ impl ChildRef {
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
-    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        trace!("ChildRef({}): Sending message: {:?}", self.id(), msg);
+    /// Returns [`RefAddr`] for the child
+    pub fn addr(&self) -> RefAddr {
+        RefAddr::new(self.path.clone(), self.sender.clone())
+    }
+
+    pub(crate) fn send(&self, env: Envelope) -> Result<(), Envelope> {
+        trace!("ChildRef({}): Sending message: {:?}", self.id(), env);
         self.sender
-            .unbounded_send(msg)
+            .unbounded_send(env)
             .map_err(|err| err.into_inner())
+    }
+
+    pub(crate) fn sender(&self) -> &Sender {
+        &self.sender
+    }
+
+    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+        &self.path
     }
 }
 

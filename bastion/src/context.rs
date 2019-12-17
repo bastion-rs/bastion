@@ -3,7 +3,8 @@
 //! messages, parent and supervisor.
 
 use crate::children::{ChildRef, ChildrenRef};
-use crate::message::Msg;
+use crate::envelope::{Envelope, RefAddr, SignedMessage};
+use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
@@ -11,7 +12,8 @@ use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
-pub(crate) const NIL_ID: BastionId = BastionId(Uuid::nil());
+/// Identifier for a root supervisor and dead-letters children.
+pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 /// An identifier used by supervisors, children groups and
@@ -80,9 +82,9 @@ pub struct BastionId(Uuid);
 ///             // (which users can't get a reference to).
 ///
 ///             // Try to receive a message...
-///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
 ///             // Wait for a message to be received...
-///             let msg: Msg = ctx.recv().await?;
+///             let msg: SignedMessage = ctx.recv().await?;
 ///
 ///             Ok(())
 ///         }
@@ -104,7 +106,7 @@ pub struct BastionContext {
 
 #[derive(Debug)]
 pub(crate) struct ContextState {
-    msgs: VecDeque<Msg>,
+    msgs: VecDeque<SignedMessage>,
 }
 
 impl BastionId {
@@ -264,8 +266,8 @@ impl BastionContext {
     /// If you need to wait (always asynchronously) until at
     /// least one message can be retrieved, use [`recv`] instead.
     ///
-    /// This method returns [`Msg`] if a message was available, or
-    /// `None otherwise.
+    /// This method returns [`SignedMessage`] if a message was available, or
+    /// `None` otherwise.
     ///
     /// # Example
     ///
@@ -278,7 +280,7 @@ impl BastionContext {
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///             // If a message was received by the element, `opt_msg` will
     ///             // be `Some(Msg)`, otherwise it will be `None`.
     ///
@@ -294,8 +296,8 @@ impl BastionContext {
     /// ```
     ///
     /// [`recv`]: #method.recv
-    /// [`Msg`]: children/struct.Msg.html
-    pub async fn try_recv(&self) -> Option<Msg> {
+    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    pub async fn try_recv(&self) -> Option<SignedMessage> {
         debug!("BastionContext({}): Trying to receive message.", self.id);
         // TODO: Err(Error)
         let mut state = self.state.clone().lock_async().await.ok()?;
@@ -316,7 +318,7 @@ impl BastionContext {
     /// If you don't need to wait until at least one message
     /// can be retrieved, use [`try_recv`] instead.
     ///
-    /// This method returns [`Msg`] if it succeeded, or `Err(())`
+    /// This method returns [`SignedMessage`] if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Example
@@ -331,7 +333,7 @@ impl BastionContext {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // This will block until a message has been received...
-    ///             let msg: Msg = ctx.recv().await?;
+    ///             let msg: SignedMessage = ctx.recv().await?;
     ///
     ///             Ok(())
     ///         }
@@ -345,8 +347,8 @@ impl BastionContext {
     /// ```
     ///
     /// [`try_recv`]: #method.try_recv
-    /// [`Msg`]: children/struct.Msg.html
-    pub async fn recv(&self) -> Result<Msg, ()> {
+    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
             // TODO: Err(Error)
@@ -362,6 +364,185 @@ impl BastionContext {
             pending!();
         }
     }
+
+    /// Returns [`RefAddr`] of the current `BastionContext`
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             ctx.tell(&ctx.signature(), "Hello to myself");
+    ///
+    ///             # Bastion::stop();
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`RefAddr`]: /prelude/struct.Answer.html
+    pub fn signature(&self) -> RefAddr {
+        RefAddr::new(
+            self.current().path().clone(),
+            self.current().sender().clone(),
+        )
+    }
+
+    /// Sends a message to the specified [`RefAddr`]
+    ///
+    /// # Arguments
+    ///
+    /// * `to` – the [`RefAddr`] to send the message to
+    /// * `msg` – The actual message to send
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // Wait for a message to be received...
+    ///             let smsg: SignedMessage = ctx.recv().await?;
+    ///             // Obtain address of this message sender...
+    ///             let sender_addr = smsg.signature();
+    ///             // And send something back
+    ///             ctx.tell(&sender_addr, "Ack").expect("Unable to acknowledge");
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`RefAddr`]: ../prelude/struct.RefAddr.html
+    pub fn tell<M: Message>(&self, to: &RefAddr, msg: M) -> Result<(), M> {
+        debug!(
+            "{:?}: Telling message: {:?} to: {:?}",
+            self.current().path(),
+            msg,
+            to.path()
+        );
+        let msg = BastionMessage::tell(msg);
+        let env = Envelope::new_with_sign(msg, self.signature());
+        // FIXME: panics?
+        to.sender()
+            .unbounded_send(env)
+            .map_err(|err| err.into_inner().into_msg().unwrap())
+    }
+
+    /// Sends a message from behalf of current context to the addr,
+    /// allowing to addr owner answer.
+    ///
+    /// This method returns [`Answer`] if it succeeded, or `Err(msg)`
+    /// otherwise.
+    ///
+    /// # Argument
+    ///
+    /// * `msg` - The message to send.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    /// // The message that will be "asked"...
+    /// const ASK_MSG: &'static str = "A message containing data (ask).";
+    /// // The message the will be "answered"...
+    /// const ANSWER_MSG: &'static str = "A message containing data (answer).";
+    ///
+    ///     # let children_ref =
+    /// // Create a new child...
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message asked...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str =!> {
+    ///                     assert_eq!(msg, ASK_MSG);
+    ///                     // Handle the message...
+    ///
+    ///                     // ...and eventually answer to it...
+    ///                     answer!(ctx, ANSWER_MSG);
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "asks" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(move |ctx: BastionContext| {
+    ///             # let child_ref = children_ref.elems()[0].clone();
+    ///             # async move {
+    /// // Later, the message is "asked" to the child...
+    /// let answer: Answer = ctx.ask(&child_ref.addr(), ASK_MSG).expect("Couldn't send the message.");
+    ///
+    /// // ...and the child's answer is received...
+    /// msg! { answer.await.expect("Couldn't receive the answer."),
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, ANSWER_MSG);
+    ///         // Handle the answer...
+    ///     };
+    ///     // This won't happen because this example
+    ///     // only answers a `&'static str`...
+    ///     _: _ => ();
+    /// }
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Answer`]: /message/struct.Answer.html
+    pub fn ask<M: Message>(&self, to: &RefAddr, msg: M) -> Result<Answer, M> {
+        debug!(
+            "{:?}: Asking message: {:?} to: {:?}",
+            self.current().path(),
+            msg,
+            to
+        );
+        let (msg, answer) = BastionMessage::ask(msg);
+        let env = Envelope::new_with_sign(msg, self.signature());
+        // FIXME: panics?
+        to.sender()
+            .unbounded_send(env)
+            .map_err(|err| err.into_inner().into_msg().unwrap())?;
+
+        Ok(answer)
+    }
 }
 
 impl ContextState {
@@ -371,8 +552,8 @@ impl ContextState {
         ContextState { msgs }
     }
 
-    pub(crate) fn push_msg(&mut self, msg: Msg) {
-        self.msgs.push_back(msg)
+    pub(crate) fn push_msg(&mut self, msg: Msg, sign: RefAddr) {
+        self.msgs.push_back(SignedMessage::new(msg, sign))
     }
 }
 
