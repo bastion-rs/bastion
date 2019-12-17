@@ -1,6 +1,9 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
-use crate::context::{BastionId, NIL_ID};
+use crate::children::ChildrenRef;
+use crate::context::{BastionContext, BastionId, NIL_ID};
+use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment};
+use crate::path::{BastionPath, BastionPathElement};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use bastion_executor::pool;
 use futures::prelude::*;
@@ -10,11 +13,14 @@ use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::Qutex;
+use std::sync::Arc;
 use std::task::Poll;
 
 pub(crate) struct GlobalSystem {
     sender: Sender,
     supervisor: SupervisorRef,
+    dead_letters: ChildrenRef,
+    path: Arc<BastionPath>,
     handle: Qutex<Option<RecoverableHandle<()>>>,
 }
 
@@ -29,18 +35,26 @@ struct System {
     // TODO: set limit
     restart: FxHashSet<BastionId>,
     waiting: FuturesUnordered<RecoverableHandle<Supervisor>>,
-    pre_start_msgs: Vec<BastionMessage>,
+    pre_start_msgs: Vec<Envelope>,
     started: bool,
 }
 
 impl GlobalSystem {
-    fn new(sender: Sender, supervisor: SupervisorRef, handle: RecoverableHandle<()>) -> Self {
+    fn new(
+        sender: Sender,
+        supervisor: SupervisorRef,
+        dead_letters: ChildrenRef,
+        handle: RecoverableHandle<()>,
+    ) -> Self {
         let handle = Some(handle);
         let handle = Qutex::new(handle);
+        let path = Arc::new(BastionPath::root());
 
         GlobalSystem {
             sender,
             supervisor,
+            dead_letters,
+            path,
             handle,
         }
     }
@@ -53,8 +67,16 @@ impl GlobalSystem {
         &self.supervisor
     }
 
+    pub(crate) fn dead_letters(&self) -> &ChildrenRef {
+        &self.dead_letters
+    }
+
     pub(crate) fn handle(&self) -> Qutex<Option<RecoverableHandle<()>>> {
         self.handle.clone()
+    }
+
+    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+        &self.path
     }
 }
 
@@ -62,7 +84,7 @@ impl System {
     fn init() -> GlobalSystem {
         info!("System: Initializing.");
         let parent = Parent::none();
-        let bcast = Broadcast::with_id(parent, NIL_ID);
+        let bcast = Broadcast::new_root(parent);
         let launched = FxHashMap::default();
         let restart = FxHashSet::default();
         let waiting = FuturesUnordered::new();
@@ -82,24 +104,45 @@ impl System {
 
         debug!("System: Creating the system supervisor.");
         let parent = Parent::system();
-        let bcast = Broadcast::with_id(parent, NIL_ID);
+        let bcast = Broadcast::new(parent, BastionPathElement::Supervisor(NIL_ID));
 
         let supervisor = Supervisor::system(bcast);
         let supervisor_ref = supervisor.as_ref();
 
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        system.bcast.send_self(msg);
+        let env = Envelope::new(
+            msg,
+            system.bcast.path().clone(),
+            system.bcast.sender().clone(),
+        );
+        system.bcast.send_self(env);
 
         debug!("System: Launching.");
         let stack = system.stack();
         let handle = pool::spawn(system.run(), stack);
 
-        GlobalSystem::new(sender, supervisor_ref, handle)
+        let dead_letters_ref =
+            Self::spawn_dead_letters(&supervisor_ref).expect("Can't spawn dead letters");
+
+        GlobalSystem::new(sender, supervisor_ref, dead_letters_ref, handle)
     }
 
     fn stack(&self) -> ProcStack {
         // FIXME: with_id
         ProcStack::default()
+    }
+
+    fn spawn_dead_letters(root_sv: &SupervisorRef) -> Result<ChildrenRef, ()> {
+        root_sv.children_with_id(NIL_ID, |children| {
+            children.with_exec(|ctx: BastionContext| {
+                async move {
+                    loop {
+                        let smsg = ctx.recv().await?;
+                        debug!("Received dead letter: {:?}", smsg);
+                    }
+                }
+            })
+        })
     }
 
     // TODO: set a limit?
@@ -111,7 +154,10 @@ impl System {
         let bcast = if supervisor.id() == &NIL_ID {
             None
         } else {
-            Some(Broadcast::new(parent))
+            Some(Broadcast::new(
+                parent,
+                BastionPathElement::Supervisor(BastionId::new()),
+            ))
         };
 
         supervisor.reset(bcast).await;
@@ -175,10 +221,16 @@ impl System {
         }
     }
 
-    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
-        match msg {
-            BastionMessage::Start => unreachable!(),
-            BastionMessage::Stop => {
+    async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
+        match env {
+            Envelope {
+                msg: BastionMessage::Start,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stop,
+                ..
+            } => {
                 info!("System: Stopping.");
                 for supervisor in self.stop().await {
                     supervisor.callbacks().after_stop();
@@ -186,13 +238,19 @@ impl System {
 
                 return Err(());
             }
-            BastionMessage::Kill => {
+            Envelope {
+                msg: BastionMessage::Kill,
+                ..
+            } => {
                 info!("System: Killing.");
                 self.kill().await;
 
                 return Err(());
             }
-            BastionMessage::Deploy(deployment) => match deployment {
+            Envelope {
+                msg: BastionMessage::Deploy(deployment),
+                ..
+            } => match deployment {
                 Deployment::Supervisor(supervisor) => {
                     debug!("System: Deploying Supervisor({}).", supervisor.id());
                     supervisor.callbacks().before_start();
@@ -200,7 +258,12 @@ impl System {
                     self.bcast.register(supervisor.bcast());
                     if self.started {
                         let msg = BastionMessage::start();
-                        self.bcast.send_child(supervisor.id(), msg);
+                        let envelope = Envelope::new(
+                            msg,
+                            self.bcast.path().clone(),
+                            self.bcast.sender().clone(),
+                        );
+                        self.bcast.send_child(supervisor.id(), envelope);
                     }
 
                     info!("System: Launching Supervisor({}).", supervisor.id());
@@ -211,7 +274,10 @@ impl System {
                 // FIXME
                 Deployment::Children(_) => unimplemented!(),
             },
-            BastionMessage::Prune { id } => {
+            Envelope {
+                msg: BastionMessage::Prune { id },
+                ..
+            } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {
                     // TODO: stop or kill?
@@ -221,12 +287,21 @@ impl System {
                 }
             }
             // FIXME
-            BastionMessage::SuperviseWith(_) => unimplemented!(),
-            BastionMessage::Message(ref message) => {
+            Envelope {
+                msg: BastionMessage::SuperviseWith(_),
+                ..
+            } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Message(ref message),
+                ..
+            } => {
                 debug!("System: Broadcasting a message: {:?}", message);
-                self.bcast.send_children(msg);
+                self.bcast.send_children(env);
             }
-            BastionMessage::Stopped { id } => {
+            Envelope {
+                msg: BastionMessage::Stopped { id },
+                ..
+            } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {
                     info!("System: Supervisor({}) stopped.", id);
@@ -234,7 +309,10 @@ impl System {
                     self.restart.remove(&id);
                 }
             }
-            BastionMessage::Faulted { id } => {
+            Envelope {
+                msg: BastionMessage::Faulted { id },
+                ..
+            } => {
                 // TODO: Err if None?
                 if let Some(launched) = self.launched.remove(&id) {
                     warn!("System: Supervisor({}) faulted.", id);
@@ -270,7 +348,10 @@ impl System {
 
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
-                Poll::Ready(Some(BastionMessage::Start)) => {
+                Poll::Ready(Some(Envelope {
+                    msg: BastionMessage::Start,
+                    ..
+                })) => {
                     trace!(
                         "System: Received a new message (started=false): {:?}",
                         BastionMessage::Start
@@ -279,7 +360,9 @@ impl System {
                     self.started = true;
 
                     let msg = BastionMessage::start();
-                    self.bcast.send_children(msg);
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_children(env);
 
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();

@@ -23,13 +23,12 @@ proptest! {
                     async move {
                         let message: &'static str = Box::leak(message.into_boxed_str());
                         let answer = ctx
-                            .current()
-                            .ask(message)
+                            .ask(&ctx.current().addr(), message)
                             .expect("Couldn't send the message.");
 
                         msg! { ctx.recv().await?,
                             msg: &'static str =!> {
-                                let _ = answer!(msg);
+                                let _ = answer!(ctx, msg);
                             };
                             _: _ => ();
                         }

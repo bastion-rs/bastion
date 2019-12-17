@@ -109,16 +109,16 @@ fn main() {
 
     // ...to then "tell" it messages...
     child
-        .tell("A message containing data.")
+        .tell_anonymously("A message containing data.")
         .expect("Couldn't send the message.");
 
     // ...or "ask" it messages...
     let answer: Answer = child
-        .ask("A message containing data.")
+        .ask_anonymously("A message containing data.")
         .expect("Couldn't send the message.");
     let _ = async {
         // ...until the child eventually answers back...
-        let _answer: Result<Msg, ()> = answer.await;
+        let _answer: Result<SignedMessage, ()> = answer.await;
     };
 
     // ...and then even stop or kill it...

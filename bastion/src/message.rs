@@ -8,6 +8,7 @@
 //!
 use crate::children::Children;
 use crate::context::BastionId;
+use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use futures::channel::oneshot::{self, Receiver};
 use std::any::{type_name, Any};
@@ -31,7 +32,7 @@ impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
 #[derive(Debug)]
 #[doc(hidden)]
-pub struct Sender(oneshot::Sender<Msg>);
+pub struct AnswerSender(oneshot::Sender<SignedMessage>);
 
 #[derive(Debug)]
 /// A [`Future`] returned when successfully "asking" a
@@ -64,7 +65,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 ///                     // Handle the message...
 ///
 ///                     // ...and eventually answer to it...
-///                     answer!(ANSWER_MSG);
+///                     answer!(ctx, ANSWER_MSG);
 ///                 };
 ///                 // This won't happen because this example
 ///                 // only "asks" a `&'static str`...
@@ -81,7 +82,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 ///             # let child_ref = children_ref.elems()[0].clone();
 ///             # async move {
 /// // Later, the message is "asked" to the child...
-/// let answer: Answer = child_ref.ask(ASK_MSG).expect("Couldn't send the message.");
+/// let answer: Answer = ctx.ask(&child_ref.addr(), ASK_MSG).expect("Couldn't send the message.");
 ///
 /// // ...and the child's answer is received...
 /// msg! { answer.await.expect("Couldn't receive the answer."),
@@ -109,7 +110,7 @@ pub struct Sender(oneshot::Sender<Msg>);
 /// [`ChildRef::ask`]: ../children/struct.ChildRef.html#method.ask
 /// [`Msg`]: message/struct.Msg.html
 /// [`msg!`]: macro.msg.html
-pub struct Answer(Receiver<Msg>);
+pub struct Answer(Receiver<SignedMessage>);
 
 #[derive(Debug)]
 /// A message returned by [`BastionContext::recv`] or
@@ -127,7 +128,7 @@ pub struct Answer(Receiver<Msg>);
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
 ///             loop {
-///                 let msg: Msg = ctx.recv().await?;
+///                 let msg: SignedMessage = ctx.recv().await?;
 ///                 msg! { msg,
 ///                     // We match a broadcasted `&'static str`s...
 ///                     ref msg: &'static str => {
@@ -140,6 +141,10 @@ pub struct Answer(Receiver<Msg>);
 ///                     msg: &'static str => {
 ///                         assert_eq!(msg, "A message containing data.");
 ///                         // Handle the message...
+///
+///                         // get message signature
+///                         let sign = signature!();
+///                         ctx.tell(&sign, "A message containing reply").unwrap();
 ///                     };
 ///                     // We match a `&'static str`s "asked" to this child...
 ///                     msg: &'static str =!> {
@@ -147,7 +152,7 @@ pub struct Answer(Receiver<Msg>);
 ///                         // Handle the message...
 ///
 ///                         // ...and eventually answer to it...
-///                         answer!("An answer message containing data.");
+///                         answer!(ctx, "An answer message containing data.");
 ///                     };
 ///                     // We match a message that wasn't previously matched...
 ///                     _: _ => ();
@@ -174,7 +179,7 @@ enum MsgInner {
     Tell(Box<dyn Any + Send + Sync + 'static>),
     Ask {
         msg: Box<dyn Any + Send + Sync + 'static>,
-        sender: Option<Sender>,
+        sender: Option<AnswerSender>,
     },
 }
 
@@ -197,13 +202,17 @@ pub(crate) enum Deployment {
     Children(Children),
 }
 
-impl Sender {
+impl AnswerSender {
+    // FIXME: we can't let manipulating Signature in a public API
+    // but now it's being called only by a macro so we are trusting it
     #[doc(hidden)]
-    pub fn send<M: Message>(self, msg: M) -> Result<(), M> {
+    pub fn send<M: Message>(self, msg: M, sign: RefAddr) -> Result<(), M> {
         debug!("{:?}: Sending answer: {:?}", self, msg);
         let msg = Msg::tell(msg);
         trace!("{:?}: Sending message: {:?}", self, msg);
-        self.0.send(msg).map_err(|msg| msg.try_unwrap().unwrap())
+        self.0
+            .send(SignedMessage::new(msg, sign))
+            .map_err(|smsg| smsg.msg.try_unwrap().unwrap())
     }
 }
 
@@ -221,7 +230,7 @@ impl Msg {
     pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
         let msg = Box::new(msg);
         let (sender, recver) = oneshot::channel();
-        let sender = Sender(sender);
+        let sender = AnswerSender(sender);
         let answer = Answer(recver);
 
         let sender = Some(sender);
@@ -258,7 +267,7 @@ impl Msg {
     }
 
     #[doc(hidden)]
-    pub fn take_sender(&mut self) -> Option<Sender> {
+    pub fn take_sender(&mut self) -> Option<AnswerSender> {
         debug!("{:?}: Taking sender.", self);
         if let MsgInner::Ask { sender, .. } = &mut self.0 {
             sender.take()
@@ -432,7 +441,7 @@ impl BastionMessage {
 }
 
 impl Future for Answer {
-    type Output = Result<Msg, ()>;
+    type Output = Result<SignedMessage, ()>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         debug!("{:?}: Polling.", self);
@@ -483,8 +492,8 @@ impl Future for Answer {
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
-///             # ctx.current().tell(TELL_MSG).unwrap();
-///             # ctx.current().ask(ASK_MSG).unwrap();
+///             # ctx.tell(&ctx.current().addr(), TELL_MSG).unwrap();
+///             # ctx.ask(&ctx.current().addr(), ASK_MSG).unwrap();
 ///             #
 ///             loop {
 ///                 msg! { ctx.recv().await?,
@@ -505,7 +514,7 @@ impl Future for Answer {
 ///                         // Handle the message...
 ///
 ///                         // ...and eventually answer to it...
-///                         answer!("An answer to the message.");
+///                         answer!(ctx, "An answer to the message.");
 ///                     };
 ///                     // We are only broadcasting, "telling" and "asking" a
 ///                     // `&'static str` in this example, so we know that this won't
@@ -602,7 +611,16 @@ macro_rules! msg {
         ($($avar:ident, $aty:ty, $ahandle:expr,)*),
         $var:ident: _ => $handle:expr;
     ) => { {
-        let mut $var = $msg;
+        let mut signed = $msg;
+
+        let (mut $var, sign) = signed.extract();
+
+        macro_rules! signature {
+            () => {
+                sign
+            };
+        }
+
         let sender = $var.take_sender();
         if $var.is_broadcast() {
             if false {
@@ -619,9 +637,13 @@ macro_rules! msg {
             }
         } else if sender.is_some() {
             let sender = sender.unwrap();
+
             macro_rules! answer {
-                ($answer:expr) => {
-                    sender.send($answer)
+                ($ctx:expr, $answer:expr) => {
+                    {
+                        let sign = $ctx.signature();
+                        sender.send($answer, sign)
+                    }
                 };
             }
 

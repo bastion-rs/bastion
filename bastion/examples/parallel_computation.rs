@@ -30,7 +30,7 @@ fn main() {
                             msg: u64 =!> {
                                 let data: u64 = msg.wrapping_mul(2);
                                 println!("Child doubled the value of {} and gave {}", msg, data); // true
-                                let _ = answer!(data);
+                                let _ = answer!(ctx, data);
                             };
                             _: _ => ();
                         }
@@ -46,7 +46,7 @@ fn main() {
     //
     // Mapper that generates work.
     Bastion::children(|children: Children| {
-        children.with_exec(move |_ctx: BastionContext| {
+        children.with_exec(move |ctx: BastionContext| {
             let workers = workers.clone();
             async move {
                 println!("Mapper started!");
@@ -58,7 +58,7 @@ fn main() {
                 for id_worker_pair in workers.elems().iter().enumerate() {
                     let data = cycle(id_worker_pair.0 as u64, 5);
 
-                    let computed: Answer = id_worker_pair.1.ask(data).unwrap();
+                    let computed: Answer = ctx.ask(&id_worker_pair.1.addr(), data).unwrap();
                     msg! { computed.await?,
                         msg: u64 => {
                             // Handle the answer...

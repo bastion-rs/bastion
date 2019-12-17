@@ -32,14 +32,13 @@ fn main() {
                 println!("try_recv.is_some() == {}", try_recv.is_some()); // false
 
                 let answer = ctx
-                    .current()
-                    .ask("Hello World!")
+                    .ask(&ctx.current().addr(), "Hello World!")
                     .expect("Couldn't send the message.");
 
                 msg! { ctx.recv().await?,
                     msg: &'static str =!> {
                         println!(r#"msg == "Hello World!" => {}"#, msg == "Hello World!"); // true
-                        let _ = answer!("Goodbye!");
+                        let _ = answer!(ctx, "Goodbye!");
                     };
                     // This won't happen because this example
                     // only "asks" a `&'static str`...

@@ -5,7 +5,9 @@ use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
 use crate::children::{Children, ChildrenRef};
 use crate::context::BastionId;
+use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
+use crate::path::{BastionPath, BastionPathElement};
 use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
@@ -15,6 +17,7 @@ use lightproc::prelude::*;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
 use std::ops::RangeFrom;
+use std::sync::Arc;
 use std::task::Poll;
 
 #[derive(Debug)]
@@ -80,7 +83,7 @@ pub struct Supervisor {
     // Messages that were received before the supervisor was
     // started. Those will be "replayed" once a start message
     // is received.
-    pre_start_msgs: Vec<BastionMessage>,
+    pre_start_msgs: Vec<Envelope>,
     started: bool,
 }
 
@@ -92,6 +95,7 @@ pub struct Supervisor {
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
+    path: Arc<BastionPath>,
 }
 
 #[derive(Debug, Clone)]
@@ -268,8 +272,9 @@ impl Supervisor {
         // TODO: clone or ref?
         let id = self.bcast.id().clone();
         let sender = self.bcast.sender().clone();
+        let path = self.bcast.path().clone();
 
-        SupervisorRef::new(id, sender)
+        SupervisorRef::new(id, sender, path)
     }
 
     /// Creates a new supervisor, passes it through the specified
@@ -314,7 +319,7 @@ impl Supervisor {
     {
         debug!("Supervisor({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.as_ref());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Supervisor(BastionId::new()));
 
         debug!(
             "Supervisor({}): Initializing Supervisor({}).",
@@ -331,7 +336,8 @@ impl Supervisor {
             supervisor.id()
         );
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        self.bcast.send_self(msg);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_self(env);
 
         self
     }
@@ -379,7 +385,7 @@ impl Supervisor {
     {
         debug!("Supervisor({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.as_ref());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Supervisor(BastionId::new()));
 
         debug!(
             "Supervisor({}): Initializing Supervisor({}).",
@@ -397,7 +403,8 @@ impl Supervisor {
             supervisor.id()
         );
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        self.bcast.send_self(msg);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_self(env);
 
         supervisor_ref
     }
@@ -427,7 +434,7 @@ impl Supervisor {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // Send and receive messages...
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///
     ///             // ...and return `Ok(())` or `Err(())` when you are done...
     ///             Ok(())
@@ -453,7 +460,7 @@ impl Supervisor {
     {
         debug!("Supervisor({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.as_ref());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Children(BastionId::new()));
 
         debug!(
             "Supervisor({}): Initializing Children({}).",
@@ -472,7 +479,8 @@ impl Supervisor {
             children.id()
         );
         let msg = BastionMessage::deploy_children(children);
-        self.bcast.send_self(msg);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_self(env);
 
         self
     }
@@ -502,7 +510,7 @@ impl Supervisor {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // Send and receive messages...
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///
     ///             // ...and return `Ok(())` or `Err(())` when you are done...
     ///             Ok(())
@@ -529,7 +537,7 @@ impl Supervisor {
     {
         debug!("Supervisor({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.as_ref());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Children(BastionId::new()));
 
         debug!(
             "Supervisor({}): Initializing Children({}).",
@@ -549,7 +557,8 @@ impl Supervisor {
             children.id()
         );
         let msg = BastionMessage::deploy_children(children);
-        self.bcast.send_self(msg);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_self(env);
 
         children_ref
     }
@@ -677,7 +686,11 @@ impl Supervisor {
                 supervised.callbacks().before_restart();
             }
 
-            let bcast = Broadcast::new(parent.clone());
+            let bcast = Broadcast::new(
+                parent.clone(),
+                supervised.elem().clone().with_id(BastionId::new()),
+            );
+
             reset.push(async move {
                 debug!(
                     "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
@@ -708,7 +721,9 @@ impl Supervisor {
             self.bcast.register(supervised.bcast());
             if self.started {
                 let msg = BastionMessage::start();
-                self.bcast.send_child(supervised.id(), msg);
+                let env =
+                    Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                self.bcast.send_child(supervised.id(), env);
             }
 
             debug!(
@@ -831,7 +846,8 @@ impl Supervisor {
                 self.bcast.unregister(supervised.id());
 
                 let parent = Parent::supervisor(self.as_ref());
-                let bcast = Broadcast::new(parent);
+                let bcast =
+                    Broadcast::new(parent, supervised.elem().clone().with_id(BastionId::new()));
                 let id = bcast.id().clone();
                 debug!(
                     "Supervisor({}): Resetting Supervised({}) to Supervised({}).",
@@ -846,7 +862,9 @@ impl Supervisor {
                 self.bcast.register(supervised.bcast());
                 if self.started {
                     let msg = BastionMessage::start();
-                    self.bcast.send_child(&id, msg);
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_child(&id, env);
                 }
 
                 debug!(
@@ -876,22 +894,34 @@ impl Supervisor {
         Ok(())
     }
 
-    async fn handle(&mut self, msg: BastionMessage) -> Result<(), ()> {
-        match msg {
-            BastionMessage::Start => unreachable!(),
-            BastionMessage::Stop => {
+    async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
+        match env {
+            Envelope {
+                msg: BastionMessage::Start,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stop,
+                ..
+            } => {
                 self.stop(0..).await;
                 self.stopped();
 
                 return Err(());
             }
-            BastionMessage::Kill => {
+            Envelope {
+                msg: BastionMessage::Kill,
+                ..
+            } => {
                 self.kill(0..).await;
                 self.stopped();
 
                 return Err(());
             }
-            BastionMessage::Deploy(deployment) => {
+            Envelope {
+                msg: BastionMessage::Deploy(deployment),
+                ..
+            } => {
                 let supervised = match deployment {
                     Deployment::Supervisor(supervisor) => {
                         debug!(
@@ -916,7 +946,9 @@ impl Supervisor {
                 self.bcast.register(supervised.bcast());
                 if self.started {
                     let msg = BastionMessage::start();
-                    self.bcast.send_child(supervised.id(), msg);
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_child(supervised.id(), env);
                 }
 
                 debug!(
@@ -931,8 +963,14 @@ impl Supervisor {
                 self.order.push(id);
             }
             // FIXME
-            BastionMessage::Prune { .. } => unimplemented!(),
-            BastionMessage::SuperviseWith(strategy) => {
+            Envelope {
+                msg: BastionMessage::Prune { .. },
+                ..
+            } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::SuperviseWith(strategy),
+                ..
+            } => {
                 debug!(
                     "Supervisor({}): Setting strategy: {:?}",
                     self.id(),
@@ -940,15 +978,21 @@ impl Supervisor {
                 );
                 self.strategy = strategy;
             }
-            BastionMessage::Message(ref message) => {
+            Envelope {
+                msg: BastionMessage::Message(ref message),
+                ..
+            } => {
                 debug!(
                     "Supervisor({}): Broadcasting a message: {:?}",
                     self.id(),
                     message
                 );
-                self.bcast.send_children(msg);
+                self.bcast.send_children(env);
             }
-            BastionMessage::Stopped { id } => {
+            Envelope {
+                msg: BastionMessage::Stopped { id },
+                ..
+            } => {
                 // FIXME: Err if None?
                 if let Some((_, launched)) = self.launched.remove(&id) {
                     debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
@@ -961,7 +1005,10 @@ impl Supervisor {
                     self.stopped.insert(id, supervised);
                 }
             }
-            BastionMessage::Faulted { id } => {
+            Envelope {
+                msg: BastionMessage::Faulted { id },
+                ..
+            } => {
                 if self.launched.contains_key(&id) {
                     warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
                 }
@@ -984,7 +1031,10 @@ impl Supervisor {
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
-                Poll::Ready(Some(BastionMessage::Start)) => {
+                Poll::Ready(Some(Envelope {
+                    msg: BastionMessage::Start,
+                    ..
+                })) => {
                     trace!(
                         "Supervisor({}): Received a new message (started=false): {:?}",
                         self.id(),
@@ -994,7 +1044,9 @@ impl Supervisor {
                     self.started = true;
 
                     let msg = BastionMessage::start();
-                    self.bcast.send_children(msg);
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_children(env);
 
                     let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
                     self.pre_start_msgs.shrink_to_fit();
@@ -1045,8 +1097,8 @@ impl Supervisor {
 }
 
 impl SupervisorRef {
-    pub(crate) fn new(id: BastionId, sender: Sender) -> Self {
-        SupervisorRef { id, sender }
+    pub(crate) fn new(id: BastionId, sender: Sender, path: Arc<BastionPath>) -> Self {
+        SupervisorRef { id, sender, path }
     }
 
     /// Returns the identifier of the supervisor this `SupervisorRef`
@@ -1120,7 +1172,7 @@ impl SupervisorRef {
     {
         debug!("SupervisorRef({}): Creating supervisor.", self.id());
         let parent = Parent::supervisor(self.clone());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Supervisor(BastionId::new()));
 
         debug!(
             "SupervisorRef({}): Initializing Supervisor({}).",
@@ -1138,7 +1190,8 @@ impl SupervisorRef {
             supervisor.id()
         );
         let msg = BastionMessage::deploy_supervisor(supervisor);
-        self.send(msg).map_err(|_| ())?;
+        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        self.send(env).map_err(|_| ())?;
 
         Ok(supervisor_ref)
     }
@@ -1169,7 +1222,7 @@ impl SupervisorRef {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // Send and receive messages...
-    ///             let opt_msg: Option<Msg> = ctx.try_recv().await;
+    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
     ///
     ///             // ...and return `Ok(())` or `Err(())` when you are done...
     ///             Ok(())
@@ -1191,9 +1244,16 @@ impl SupervisorRef {
     where
         C: FnOnce(Children) -> Children,
     {
+        self.children_with_id(BastionId::new(), init)
+    }
+
+    pub(crate) fn children_with_id<C>(&self, id: BastionId, init: C) -> Result<ChildrenRef, ()>
+    where
+        C: FnOnce(Children) -> Children,
+    {
         debug!("SupervisorRef({}): Creating children group.", self.id());
         let parent = Parent::supervisor(self.clone());
-        let bcast = Broadcast::new(parent);
+        let bcast = Broadcast::new(parent, BastionPathElement::Children(id));
 
         debug!(
             "SupervisorRef({}): Initializing Children({}).",
@@ -1213,7 +1273,8 @@ impl SupervisorRef {
             children.id()
         );
         let msg = BastionMessage::deploy_children(children);
-        self.send(msg).map_err(|_| ())?;
+        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        self.send(env).map_err(|_| ())?;
 
         Ok(children_ref)
     }
@@ -1276,7 +1337,8 @@ impl SupervisorRef {
             strategy
         );
         let msg = BastionMessage::supervise_with(strategy);
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
     /// Sends a message to the supervisor this `SupervisorRef`
@@ -1334,8 +1396,9 @@ impl SupervisorRef {
             msg
         );
         let msg = BastionMessage::broadcast(msg);
+        let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
-        self.send(msg).map_err(|msg| msg.into_msg().unwrap())
+        self.send(env).map_err(|env| env.into_msg().unwrap())
     }
 
     /// Sends a message to the supervisor this `SupervisorRef`
@@ -1364,7 +1427,8 @@ impl SupervisorRef {
     pub fn stop(&self) -> Result<(), ()> {
         debug!("SupervisorRef({}): Stopping.", self.id());
         let msg = BastionMessage::stop();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
     /// Sends a message to the supervisor this `SupervisorRef`
@@ -1393,14 +1457,19 @@ impl SupervisorRef {
     pub fn kill(&self) -> Result<(), ()> {
         debug!("SupervisorRef({}): Killing.", self.id());
         let msg = BastionMessage::kill();
-        self.send(msg).map_err(|_| ())
+        let env = Envelope::from_dead_letters(msg);
+        self.send(env).map_err(|_| ())
     }
 
-    pub(crate) fn send(&self, msg: BastionMessage) -> Result<(), BastionMessage> {
-        trace!("SupervisorRef({}): Sending message: {:?}", self.id(), msg);
+    pub(crate) fn send(&self, env: Envelope) -> Result<(), Envelope> {
+        trace!("SupervisorRef({}): Sending message: {:?}", self.id(), env);
         self.sender
-            .unbounded_send(msg)
+            .unbounded_send(env)
             .map_err(|err| err.into_inner())
+    }
+
+    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+        &self.path
     }
 }
 
@@ -1455,6 +1524,16 @@ impl Supervised {
         match self {
             Supervised::Supervisor(supervisor) => supervisor.bcast(),
             Supervised::Children(children) => children.bcast(),
+        }
+    }
+
+    pub(crate) fn elem(&self) -> &BastionPathElement {
+        match self {
+            // FIXME
+            Supervised::Supervisor(supervisor) => {
+                supervisor.bcast().path().elem().as_ref().unwrap()
+            }
+            Supervised::Children(children) => children.bcast().path().elem().as_ref().unwrap(),
         }
     }
 

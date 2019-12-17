@@ -73,7 +73,9 @@ mod system;
 
 pub mod children;
 pub mod context;
+pub mod envelope;
 pub mod message;
+pub mod path;
 pub mod supervisor;
 
 ///
@@ -83,8 +85,10 @@ pub mod prelude {
     pub use crate::callbacks::Callbacks;
     pub use crate::children::{ChildRef, Children, ChildrenRef};
     pub use crate::config::Config;
-    pub use crate::context::{BastionContext, BastionId};
-    pub use crate::message::{Answer, Message, Msg, Sender};
+    pub use crate::context::{BastionContext, BastionId, NIL_ID};
+    pub use crate::envelope::{RefAddr, SignedMessage};
+    pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
+    pub use crate::path::{BastionPath, BastionPathElement};
     pub use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
 }
