@@ -20,9 +20,8 @@ proptest! {
                 .with_exec(|_ctx: BastionContext| {
                     async move {
                         loop {}
-                        Ok(())
                     }
                 })
-        });
+        }).expect("Coudn't spawn children.");
     }
 }

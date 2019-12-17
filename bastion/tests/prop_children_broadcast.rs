@@ -19,7 +19,7 @@ proptest! {
                     async move {
                         msg! { ctx.recv().await?,
                             ref _msg: &'static str => {
-                                ;
+                                ();
                             };
                             // This won't happen because this example
                             // only "asks" a `&'static str`...

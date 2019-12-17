@@ -43,7 +43,7 @@ fn main() {
                                 let response = escape(&compressed);
                                 // println!("Response: {}", response);
                                 stream.write(response.as_bytes()).unwrap();
-                                answer!(ctx, stream);
+                                answer!(ctx, stream).expect("Couldn't send an answer.");
                             };
                             _: _ => ();
                         }
@@ -76,7 +76,7 @@ fn main() {
                     let _ = ctx
                         .ask(&workers.elems()[round_robin].addr(), stream.unwrap())
                         .unwrap()
-                        .await;
+                        .await?;
                 }
 
                 // Send a signal to system that computation is finished.
