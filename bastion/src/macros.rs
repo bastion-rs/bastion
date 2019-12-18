@@ -89,3 +89,114 @@ macro_rules! child {
         children!(1, $callbacks, $ctx, $msg => $code)
     };
 }
+
+/// This macro creates a new supervisor with the given strategy and the given callbacks.
+/// Children can be specified by using the `children` / `child` macro.
+/// You can provide as many children groups as you want. Supervised supervisors are currently not
+/// supported.
+///
+/// # Example
+/// ```
+/// # use bastion::prelude::*;
+/// # fn main() {
+/// let sp = supervisor! { SupervisionStrategy::OneForAll,
+///     children! { 100,
+///         ctx, msg => {
+///             // action for the children here
+///         }
+///     },
+///     child! {
+///         ctx, msg => {
+///             // action for the one child here
+///         }
+///     }
+/// };
+/// # }
+/// ```
+#[macro_export]
+macro_rules! supervisor {
+    ($strategy:expr, $callbacks:expr, $($children:expr), *) => {
+        {
+            macro_rules! children {
+                ($count:expr, $ctx:ident, $msg:ident => $code:block) => {
+                    |children: $crate::children::Children| {
+                        children
+                            .with_redundancy($count)
+                            .with_callbacks($crate::Callbacks::default())
+                            .with_exec(|ctx: $crate::context::BastionContext| {
+                                async move {
+                                    let $ctx = ctx;
+                                    loop {
+                                        let $msg = $ctx.recv().await?;
+                                        $code;
+                                    }
+                                }
+                            })
+                    }
+                };
+
+                ($count:expr, $callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
+                    |children: $crate::children::Children| {
+                        children
+                            .with_redundancy($count)
+                            .with_callbacks($callbacks)
+                            .with_exec(|ctx: $crate::context::BastionContext| {
+                                async move {
+                                    let $ctx = ctx;
+                                    loop {
+                                        let $msg = $ctx.recv().await?;
+                                        $code;
+                                    }
+                                }
+                            })
+                    }
+                };
+            }
+
+            macro_rules! child {
+                ($ctx:ident, $msg:ident => $code:block) => {
+                    |children: $crate::children::Children| {
+                        children
+                            .with_redundancy(1)
+                            .with_callbacks($crate::Callbacks::default())
+                            .with_exec(|ctx: $crate::context::BastionContext| {
+                                async move {
+                                    let $ctx = ctx;
+                                    loop {
+                                        let $msg = $ctx.recv().await?;
+                                        $code;
+                                    }
+                                }
+                            })
+                    }
+                };
+                ($callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
+                    |children: $crate::children::Children| {
+                        children
+                            .with_redundancy(1)
+                            .with_callbacks($callbacks)
+                            .with_exec(|ctx: $crate::context::BastionContext| {
+                                async move {
+                                    let $ctx = ctx;
+                                    loop {
+                                        let $msg = $ctx.recv().await?;
+                                        $code;
+                                    }
+                                }
+                            })
+                    }
+                };
+            }
+
+
+            $crate::Bastion::supervisor(|sp| {
+                let sp = sp.with_strategy($strategy);
+                let sp = sp.with_callbacks($callbacks);
+                $(
+                let sp = sp.children($children);
+                )*
+                sp
+            });
+        }
+    };
+}
