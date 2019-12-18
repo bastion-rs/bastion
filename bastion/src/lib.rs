@@ -97,5 +97,5 @@ pub mod prelude {
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
     pub use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
-    pub use crate::{child, children};
+    pub use crate::{child, children, supervisor};
 }

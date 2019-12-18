@@ -99,7 +99,7 @@ macro_rules! child {
 /// ```
 /// # use bastion::prelude::*;
 /// # fn main() {
-/// let sp = supervisor! { SupervisionStrategy::OneForAll,
+/// let sp = supervisor! { SupervisionStrategy::OneForAll, Callbacks::default(),
 ///     children! { 100,
 ///         ctx, msg => {
 ///             // action for the children here
