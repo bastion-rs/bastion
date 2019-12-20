@@ -54,25 +54,27 @@
 use std::collections::VecDeque;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
 use std::time::Duration;
+use std::{env, thread};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use lazy_static::lazy_static;
 
-use crate::utils;
+use crate::{load_balancer, placement, utils};
 use lightproc::lightproc::LightProc;
 use lightproc::proc_stack::ProcStack;
 use lightproc::recoverable_handle::RecoverableHandle;
 use std::future::Future;
 use std::io::ErrorKind;
-use std::iter::Iterator;
+use std::iter::{Cycle, Iterator, Repeat};
+
+use crate::placement::CoreId;
 
 use std::sync::Mutex;
 
-/// Low watermark value, defines the bare minimum of the pool.
-/// Spawns initial thread set.
-const LOW_WATERMARK: u64 = 2;
+/// If low watermark isn't configured this is the default scaler value.
+/// This value is used for the heuristics of the scaler
+const DEFAULT_LOW_WATERMARK: u64 = 2;
 
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
@@ -102,10 +104,12 @@ struct Pool {
 lazy_static! {
     /// Blocking pool with static starting thread count.
     static ref POOL: Pool = {
-        for _ in 0..LOW_WATERMARK {
+        for _ in 0..*low_watermark() {
             thread::Builder::new()
                 .name("bastion-blocking-driver".to_string())
                 .spawn(|| {
+                    self::affinity_pinner();
+
                     for task in &POOL.receiver {
                         task.run();
                     }
@@ -137,13 +141,15 @@ lazy_static! {
         Pool { sender, receiver }
     };
 
+    static ref ROUND_ROBIN_PIN: Mutex<CoreId> = Mutex::new(CoreId { id: 0 });
+
     /// Sliding window for pool task frequency calculation
     static ref FREQ_QUEUE: Mutex<VecDeque<u64>> = {
         Mutex::new(VecDeque::with_capacity(FREQUENCY_QUEUE_SIZE.saturating_add(1)))
     };
 
     /// Dynamic pool thread count variable
-    static ref POOL_SIZE: Mutex<u64> = Mutex::new(LOW_WATERMARK);
+    static ref POOL_SIZE: Mutex<u64> = Mutex::new(*low_watermark());
 }
 
 /// Exponentially Weighted Moving Average calculation
@@ -216,8 +222,9 @@ fn scale_pool() {
         // "Scale by" amount can be seen as "how much load is coming".
         // "Scale" amount is "how many threads we should spawn".
         let scale_by: f64 = curr_ema_frequency - prev_ema_frequency;
-        let scale = num_cpus::get()
-            .min(((LOW_WATERMARK as f64 * scale_by) + LOW_WATERMARK as f64) as usize);
+        let scale = num_cpus::get().min(
+            ((DEFAULT_LOW_WATERMARK as f64 * scale_by) + DEFAULT_LOW_WATERMARK as f64) as usize,
+        );
 
         // It is time to scale the pool!
         (0..scale).for_each(|_| {
@@ -230,7 +237,7 @@ fn scale_pool() {
         // If we fall to this case, scheduler is congested by longhauling tasks.
         // For unblock the flow we should add up some threads to the pool, but not that many to
         // stagger the program's operation.
-        (0..LOW_WATERMARK).for_each(|_| {
+        (0..DEFAULT_LOW_WATERMARK).for_each(|_| {
             create_blocking_thread();
         });
     }
@@ -263,6 +270,8 @@ fn create_blocking_thread() {
     let _ = thread::Builder::new()
         .name("bastion-blocking-driver-dynamic".to_string())
         .spawn(move || {
+            self::affinity_pinner();
+
             let wait_limit = Duration::from_millis(rand_sleep_ms);
 
             // Adjust the pool size counter before and after spawn
@@ -320,4 +329,33 @@ where
     let (task, handle) = LightProc::recoverable(future, schedule, stack);
     task.schedule();
     handle
+}
+
+///
+/// Low watermark value, defines the bare minimum of the pool.
+/// Spawns initial thread set.
+/// Can be configurable with env var `BASTION_BLOCKING_THREADS` at runtime.
+#[inline]
+pub fn low_watermark() -> &'static u64 {
+    lazy_static! {
+        static ref LOW_WATERMARK: u64 = {
+            env::var_os("BASTION_BLOCKING_THREADS")
+                .map(|x| x.to_str().unwrap().parse::<u64>().unwrap())
+                .unwrap_or(DEFAULT_LOW_WATERMARK)
+        };
+    }
+
+    &*LOW_WATERMARK
+}
+
+///
+/// Affinity pinner for blocking pool
+/// Pinning isn't going to be enabled for single core systems.
+#[inline]
+pub fn affinity_pinner() {
+    if 1 != *load_balancer::core_retrieval() {
+        let mut core = ROUND_ROBIN_PIN.lock().unwrap();
+        placement::set_for_current(*core);
+        core.id = (core.id + 1) % *load_balancer::core_retrieval();
+    }
 }
