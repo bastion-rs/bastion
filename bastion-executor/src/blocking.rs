@@ -55,7 +55,7 @@ use std::collections::VecDeque;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use std::{env, iter, thread};
+use std::{env, thread};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use lazy_static::lazy_static;
@@ -69,7 +69,7 @@ use std::io::ErrorKind;
 use std::iter::{Cycle, Iterator, Repeat};
 
 use crate::placement::CoreId;
-use std::slice::Iter;
+
 use std::sync::Mutex;
 
 /// If low watermark isn't configured this is the default scaler value.
