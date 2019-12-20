@@ -29,8 +29,8 @@
 <tr>
   <td>Build Status</td>
   <td>
-    <a href="https://actions-badge.atrox.dev/bastion-rs/bastion/goto">
-    <img alt="Build Status" src="https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fbastion-rs%2Fbastion%2Fbadge&style=flat" />
+    <a href="https://github.com/bastion-rs/bastion/actions">
+    <img alt="Build Status" src="https://github.com/bastion-rs/bastion/workflows/CI/badge.svg" />
     </a>
   </td>
 </tr>
