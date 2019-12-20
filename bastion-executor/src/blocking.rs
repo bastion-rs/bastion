@@ -73,7 +73,7 @@ use std::slice::Iter;
 use std::sync::Mutex;
 
 /// If low watermark isn't configured this is the default scaler value.
-/// This value is used for heuristic of the scaler
+/// This value is used for the heuristics of the scaler
 const DEFAULT_LOW_WATERMARK: u64 = 2;
 
 /// Pool managers interval time (milliseconds).
