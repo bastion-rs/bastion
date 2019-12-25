@@ -540,7 +540,11 @@ impl BastionContext {
         // FIXME: panics?
         to.sender()
             .unbounded_send(env)
-            .map_err(|err| err.into_inner().into_msg().unwrap())?;
+            .map_err(|err| {
+                println!("=== error");
+                error!("Unable to ask: {:?}", err);
+                err.into_inner().into_msg().unwrap()
+            })?;
 
         Ok(answer)
     }

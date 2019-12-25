@@ -1,6 +1,6 @@
 //!
 //! Children are a group of child supervised under a supervisor
-use crate::broadcast::{Broadcast, Parent, Sender};
+use crate::broadcast::{Broadcast, Parent, Receiver, Sender};
 use crate::callbacks::Callbacks;
 use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
@@ -71,7 +71,8 @@ use std::task::Poll;
 pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
-    launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    launched: FxHashMap<BastionId, (Sender, RecoverableHandle<(Sender, Receiver)>)>,
+    killed: Vec<(BastionId, Option<(Sender, Receiver)>)>,
     // The closure returning the future that will be used by
     // every element of the group.
     init: Init,
@@ -90,6 +91,7 @@ impl Children {
     pub(crate) fn new(bcast: Broadcast) -> Self {
         debug!("Children({}): Initializing.", bcast.id());
         let launched = FxHashMap::default();
+        let killed = vec![];
         let init = Init::default();
         let redundancy = 1;
         let callbacks = Callbacks::new();
@@ -99,6 +101,7 @@ impl Children {
         Children {
             bcast,
             launched,
+            killed,
             init,
             redundancy,
             callbacks,
@@ -113,16 +116,12 @@ impl Children {
         ProcStack::default()
     }
 
-    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
-        debug!(
-            "Children({}): Resetting to Children({}).",
-            self.id(),
-            bcast.id()
-        );
+    pub(crate) async fn reset(&mut self) {
+        debug!("Children({}): Resetting.", self.id(),);
         // TODO: stop or kill?
         self.kill().await;
 
-        self.bcast = bcast;
+        self.bcast.clear_children();
         self.started = false;
 
         trace!(
@@ -132,7 +131,6 @@ impl Children {
         );
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
-
         self.launch_elems();
     }
 
@@ -363,17 +361,21 @@ impl Children {
         self.bcast.kill_children();
 
         let mut children = FuturesOrdered::new();
-        for (_, (_, launched)) in self.launched.drain() {
+        for (id, (_, mut launched)) in self.launched.drain() {
+            warn!("Cancelling launched proc");
             launched.cancel();
-
-            children.push(launched);
+            warn!("Adding to killed children list");
+            children.push(launched.map(|ch| dbg!((id, ch))));
         }
 
-        children
-            .for_each_concurrent(None, |_| async {
+        let killed = children
+            .inspect(|_| {
                 trace!("Children({}): Unknown child stopped.", self.id());
             })
+            .collect::<Vec<(BastionId, Option<(Sender, Receiver)>)>>()
             .await;
+        warn!("awaited");
+        self.killed.extend(killed);
     }
 
     fn stopped(&mut self) {
@@ -538,7 +540,21 @@ impl Children {
         debug!("Children({}): Launching elements.", self.id());
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
-            let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
+
+            let bcast = match self.killed.pop() {
+                Some((id, Some(channel))) => {
+                    warn!("respawned child with id: {} and existing channel", id);
+                    Broadcast::new_with_channel(parent, BastionPathElement::Child(id), channel)
+                },
+                Some((id, None)) => {
+                    warn!("respawned child with id: {}", id);
+                    Broadcast::new(parent, BastionPathElement::Child(id))
+                },
+                None => {
+                    warn!("spawned a new child");
+                    Broadcast::new(parent, BastionPathElement::Child(BastionId::new()))
+                }
+            };
 
             // TODO: clone or ref?
             let id = bcast.id().clone();

@@ -168,17 +168,7 @@ impl System {
         warn!("System: Recovering Supervisor({}).", supervisor.id());
         supervisor.callbacks().before_restart();
 
-        let parent = Parent::system();
-        let bcast = if supervisor.id() == &NIL_ID {
-            None
-        } else {
-            Some(Broadcast::new(
-                parent,
-                BastionPathElement::Supervisor(BastionId::new()),
-            ))
-        };
-
-        supervisor.reset(bcast).await;
+        supervisor.reset().await;
         supervisor.callbacks().after_restart();
 
         self.bcast.register(supervisor.bcast());
@@ -219,7 +209,7 @@ impl System {
             launched.cancel();
         }
 
-        for (_, launched) in self.launched.drain() {
+        for (_, mut launched) in self.launched.drain() {
             launched.cancel();
 
             self.waiting.push(launched);

@@ -50,7 +50,10 @@ impl Parent {
 
 impl Broadcast {
     pub(crate) fn new(parent: Parent, element: BastionPathElement) -> Self {
-        let (sender, recver) = mpsc::unbounded();
+        Self::new_with_channel(parent, element, mpsc::unbounded())
+    }
+
+    pub(crate) fn new_with_channel(parent: Parent, element: BastionPathElement, channel: (Sender, Receiver)) -> Self {
         let children = FxHashMap::default();
 
         let parent_path: BastionPath = match &parent {
@@ -67,8 +70,8 @@ impl Broadcast {
 
         Broadcast {
             parent,
-            sender,
-            recver,
+            sender: channel.0,
+            recver: channel.1,
             path,
             children,
         }
@@ -90,6 +93,10 @@ impl Broadcast {
             path,
             children,
         }
+    }
+
+    pub(crate) fn extract_channel(self) -> (Sender, Receiver) {
+        (self.sender, self.recver)
     }
 
     pub(crate) fn id(&self) -> &BastionId {
@@ -186,9 +193,11 @@ impl Broadcast {
     pub(crate) fn send_children(&self, env: Envelope) {
         for child in self.children.values() {
             // FIXME: Err(Error) if None
-            if let Some(env) = env.try_clone() {
+            if let Some(s_env) = env.try_clone() {
                 // FIXME: handle errors
-                child.unbounded_send(env).ok();
+                child.unbounded_send(s_env).map_err(|e| {
+                    error!("Unable to send_children: {:?} {:?}", env, e);
+                }).ok();
             }
         }
     }

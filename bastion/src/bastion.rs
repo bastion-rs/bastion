@@ -530,7 +530,7 @@ impl Bastion {
 
         // FIXME: panics
         let mut system = SYSTEM.handle().lock().wait().unwrap();
-        if let Some(system) = system.take() {
+        if let Some(mut system) = system.take() {
             debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }

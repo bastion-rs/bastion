@@ -20,8 +20,8 @@ impl<R> RecoverableHandle<R> {
     /// If the proc has already completed, calling this method will have no effect.
     ///
     /// When a proc is cancelled, its future cannot be polled again and will be dropped instead.
-    pub fn cancel(&self) {
-        self.0.cancel()
+    pub fn cancel(&mut self) {
+        self.0.cancel();
     }
 
     /// Returns a reference to the stack stored inside the proc.
@@ -36,7 +36,9 @@ impl<R> Future for RecoverableHandle<R> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match Pin::new(&mut self.0).poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => {
+                Poll::Ready(None)
+            },
             Poll::Ready(Some(Ok(val))) => Poll::Ready(Some(val)),
             Poll::Ready(Some(Err(_))) => {
                 if let Some(after_panic_cb) = self.0.stack().after_panic.clone() {

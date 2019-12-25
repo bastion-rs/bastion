@@ -1,6 +1,6 @@
 //!
 //! Child is a element of Children group executing user-defined computation
-use crate::broadcast::Broadcast;
+use crate::broadcast::{Broadcast, Sender, Receiver};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
@@ -9,12 +9,12 @@ use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use lightproc::prelude::*;
-use lightproc::proc_state::EmptyProcState;
 use qutex::Qutex;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::panic::AssertUnwindSafe;
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
@@ -70,23 +70,17 @@ impl Child {
 
     fn stack(&self) -> ProcStack {
         trace!("Child({}): Creating ProcStack.", self.id());
-        let id = self.bcast.id().clone();
-        // FIXME: panics?
-        let parent = self.bcast.parent().clone().into_children().unwrap();
-        let path = self.bcast.path().clone();
-        let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
-        ProcStack::default().with_after_panic(move |_state: &mut EmptyProcState| {
+        ProcStack::default()/*.with_after_panic(move |_state: &mut EmptyProcState| {
             // FIXME: clones
             let id = id.clone();
             warn!("Child({}): Panicked.", id);
-
             let msg = BastionMessage::faulted(id);
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
             parent.send(env).ok();
-        })
+        })*/
     }
 
     pub(crate) fn id(&self) -> &BastionId {
@@ -163,9 +157,11 @@ impl Child {
         Ok(())
     }
 
-    async fn run(mut self) {
+    // FIXME: return receiver with unhandled pre_start_msgs
+    async fn run(mut self) -> (Sender, Receiver) {
         debug!("Child({}): Launched.", self.id());
-        loop {
+        
+        loop {            
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(Envelope {
@@ -190,7 +186,7 @@ impl Child {
                     for msg in msgs {
                         trace!("Child({}): Replaying message: {:?}", self.id(), msg);
                         if self.handle(msg).await.is_err() {
-                            return;
+                            return self.bcast.extract_channel();
                         }
                     }
 
@@ -212,8 +208,9 @@ impl Child {
                         self.id(),
                         msg
                     );
+
                     if self.handle(msg).await.is_err() {
-                        return;
+                        return self.bcast.extract_channel();
                     }
 
                     continue;
@@ -231,18 +228,33 @@ impl Child {
                 continue;
             }
 
-            match poll!(&mut self.exec) {
-                Poll::Ready(Ok(())) => {
-                    debug!(
-                        "Child({}): The future finished executing successfully.",
-                        self.id()
-                    );
-                    return self.stopped();
-                }
-                Poll::Ready(Err(())) => {
-                    warn!("Child({}): The future returned an error.", self.id());
-                    return self.faulted();
-                }
+            // TODO:
+            // move panics handling from proc_stack to this match but before check how this would affect panic handling in proc_handle
+            // 
+            // WARNING: breaks after_panic callback (it's not truggered) but do we need it anymore?
+            match poll!(AssertUnwindSafe(&mut self.exec).catch_unwind()) {
+                Poll::Ready(Ok(future_result)) => {
+                    match future_result {
+                        Ok(()) => {
+                            debug!(
+                                "Child({}): The future finished executing successfully.",
+                                self.id()
+                            );
+                            self.stopped();
+                            return self.bcast.extract_channel();
+                        },
+                        Err(()) => {
+                            warn!("Child({}): The future returned an error.", self.id());
+                            self.faulted();
+                            return self.bcast.extract_channel();
+                        },
+                    }
+                },
+                Poll::Ready(Err(_)) => {
+                    warn!("Child({}): The future panicked.", self.id());
+                    self.faulted();
+                    return self.bcast.extract_channel();
+                },
                 Poll::Pending => (),
             }
 
@@ -250,7 +262,7 @@ impl Child {
         }
     }
 
-    pub(crate) fn launch(self) -> RecoverableHandle<()> {
+    pub(crate) fn launch(self) -> RecoverableHandle<(Sender, Receiver)> {
         let stack = self.stack();
         pool::spawn(self.run(), stack)
     }

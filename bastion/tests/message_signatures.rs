@@ -1,12 +1,10 @@
 extern crate bastion;
 
-use bastion::prelude::*;
-use std::panic;
+mod helpers;
 
-fn init_start() {
-    Bastion::init();
-    Bastion::start();
-}
+use bastion::prelude::*;
+use helpers::*;
+use std::panic;
 
 fn spawn_responders() -> ChildrenRef {
     Bastion::children(|children: Children| {

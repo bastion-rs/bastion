@@ -16,7 +16,6 @@ use futures::{pending, poll};
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use log::Level;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::ops::Range;
@@ -235,31 +234,16 @@ impl Supervisor {
         ProcStack::default()
     }
 
-    pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
-        if log_enabled!(Level::Debug) {
-            if let Some(bcast) = &bcast {
-                debug!(
-                    "Supervisor({}): Resetting to Supervisor({}).",
-                    self.id(),
-                    bcast.id()
-                );
-            } else {
-                debug!(
-                    "Supervisor({}): Resetting to Supervisor({}).",
-                    self.id(),
-                    self.id()
-                );
-            }
-        }
+    pub(crate) async fn reset(&mut self) {
+        debug!(
+            "Supervisor({}): Resetting.",
+            self.id(),
+        );
 
         // TODO: stop or kill?
         self.kill(0..self.order.len()).await;
 
-        if let Some(bcast) = bcast {
-            self.bcast = bcast;
-        } else {
-            self.bcast.clear_children();
-        }
+        self.bcast.clear_children();
 
         debug!(
             "Supervisor({}): Removing {} pre-start messages.",
@@ -789,7 +773,7 @@ impl Supervisor {
 
         let restart_strategy = self.restart_strategy.clone();
         let supervisor_id = &self.id().clone();
-        let parent = Parent::supervisor(self.as_ref());
+
         let mut reset = FuturesOrdered::new();
         for id in self.order.drain(range) {
             let (killed, supervised) = if let Some(supervised) = self.stopped.remove(&id) {
@@ -804,11 +788,6 @@ impl Supervisor {
             if killed {
                 supervised.callbacks().before_restart();
             }
-
-            let bcast = Broadcast::new(
-                parent.clone(),
-                supervised.elem().clone().with_id(BastionId::new()),
-            );
 
             let actor_restarts_count = match tracked_actors.get(&id.clone()) {
                 Some(count) => *count + 1,
@@ -839,7 +818,7 @@ impl Supervisor {
                         .await;
 
                     // FIXME: panics?
-                    let supervised = supervised.reset(bcast).await.unwrap();
+                    let supervised = supervised.reset().await.unwrap();
                     // FIXME: might not keep order
                     if killed {
                         supervised.callbacks().after_restart();
@@ -981,8 +960,40 @@ impl Supervisor {
         );
         match self.strategy {
             SupervisionStrategy::OneForOne => {
+<<<<<<< HEAD
                 let (start, _, _) = self.launched.get(&id).ok_or(())?;
                 let start = *start;
+=======
+                let (order, launched, _) = self.launched.remove(&id).ok_or(())?;
+                // TODO: add a "waiting" list and poll from it instead of awaiting
+                // FIXME: panics?
+                let supervised = launched.await.unwrap();
+                supervised.callbacks().before_restart();
+
+                self.bcast.unregister(supervised.id());
+
+                let parent = Parent::supervisor(self.as_ref());
+                let bcast =
+                    Broadcast::new(parent, supervised.elem().clone().with_id(BastionId::new()));
+                let id = bcast.id().clone();
+                debug!(
+                    "Supervisor({}): Resetting Supervised({}) to Supervised({}).",
+                    self.id(),
+                    supervised.id(),
+                    bcast.id()
+                );
+                // FIXME: panics?
+                let supervised = supervised.reset().await.unwrap();
+                supervised.callbacks().after_restart();
+
+                self.bcast.register(supervised.bcast());
+                if self.started {
+                    let msg = BastionMessage::start();
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_child(&id, env);
+                }
+>>>>>>> Preserve BastionId for a respawned Child, wip: transfer Receiver to a respawned Child
 
                 self.restart(start..start + 1).await;
             }
@@ -1598,24 +1609,23 @@ impl Supervised {
         ProcStack::default()
     }
 
-    fn reset(self, bcast: Broadcast) -> RecoverableHandle<Self> {
+    fn reset(self) -> RecoverableHandle<Self> {
         debug!(
-            "Supervised({}): Resetting to Supervised({}).",
+            "Supervised({}): Resetting.",
             self.id(),
-            bcast.id()
         );
         let stack = self.stack();
         match self {
             Supervised::Supervisor(mut supervisor) => pool::spawn(
                 async {
-                    supervisor.reset(Some(bcast)).await;
+                    supervisor.reset().await;
                     Supervised::Supervisor(supervisor)
                 },
                 stack,
             ),
             Supervised::Children(mut children) => pool::spawn(
                 async {
-                    children.reset(bcast).await;
+                    children.reset().await;
                     Supervised::Children(children)
                 },
                 stack,

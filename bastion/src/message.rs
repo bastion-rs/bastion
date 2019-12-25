@@ -445,7 +445,10 @@ impl Future for Answer {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
         debug!("{:?}: Polling.", self);
-        Pin::new(&mut self.get_mut().0).poll(ctx).map_err(|_| ())
+        Pin::new(&mut self.get_mut().0).poll(ctx).map_err(|e| {
+            // FIXME: revert logging
+            error!("Failed to get answer: {:?}", e);
+        })
     }
 }
 
