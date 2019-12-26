@@ -1,4 +1,4 @@
-use crate::children::ChildrenRef;
+use crate::children_ref::ChildrenRef;
 use crate::context::BastionId;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;

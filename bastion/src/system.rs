@@ -1,5 +1,5 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
-use crate::children::ChildrenRef;
+use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, NIL_ID};
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment};

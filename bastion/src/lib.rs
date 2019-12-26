@@ -68,10 +68,13 @@ pub use self::config::Config;
 mod bastion;
 mod broadcast;
 mod callbacks;
+mod child;
 mod config;
 mod system;
 
+pub mod child_ref;
 pub mod children;
+pub mod children_ref;
 pub mod context;
 pub mod envelope;
 pub mod message;
@@ -83,7 +86,9 @@ pub mod supervisor;
 pub mod prelude {
     pub use crate::bastion::Bastion;
     pub use crate::callbacks::Callbacks;
-    pub use crate::children::{ChildRef, Children, ChildrenRef};
+    pub use crate::child_ref::ChildRef;
+    pub use crate::children::Children;
+    pub use crate::children_ref::ChildrenRef;
     pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId, NIL_ID};
     pub use crate::envelope::{RefAddr, SignedMessage};

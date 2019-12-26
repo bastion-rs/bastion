@@ -2,7 +2,8 @@
 //! A context allows a child's future to access its received
 //! messages, parent and supervisor.
 
-use crate::children::{ChildRef, ChildrenRef};
+use crate::child_ref::ChildRef;
+use crate::children_ref::ChildrenRef;
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
