@@ -31,21 +31,95 @@
 /// ```
 #[macro_export]
 macro_rules! children {
-    ($count:expr, $ctx:ident, $msg:ident => $code:block) => {
-        children!($count, $crate::Callbacks::default(), $ctx, $msg => $code)
+    ($($keys:ident: $vals:expr,)*) => {
+        children!(@sort,
+            1,
+            $crate::Callbacks::default(),
+            |_| {},
+            ,
+            $($keys: $vals,)*
+        )
     };
 
-    ($count:expr, $callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
-        $crate::Bastion::children(|children: $crate::children::Children| {
-            children
-                .with_redundancy($count)
-                .with_callbacks($callbacks)
+    (@sort,
+     $_:expr, $cbs:expr, $action:expr, $($sp:expr)?,
+     redundancy: $red:expr,
+     $($keys:ident: $vals:expr,)*) => {
+        children!(@sort,
+            $red,
+            $cbs,
+            $action,
+            $($sp)?,
+            $($keys: $vals,)*
+        )
+    };
+
+    (@sort,
+     $red:expr, $_:expr, $action:expr, $($sp:expr)?,
+     callbacks: $cbs:expr,
+     $($keys:ident: $vals:expr,)*) => {
+        children!(@sort,
+            $red,
+            $cbs,
+            $action,
+            $($sp)?,
+            $($keys: $vals,)*
+        )
+    };
+
+    (@sort,
+     $red:expr, $cbs:expr, $action:expr, $($_:expr)?,
+     supervisor: $sp:ident,
+     $($keys:ident: $vals:expr,)*) => {
+        children!(@sort,
+            $red,
+            $cbs,
+            $action,
+            $($sp)?,
+            $($keys: $vals,)*
+        )
+    };
+
+    (@sort,
+     $red:expr, $cbs:expr, $action:expr, $($sp:expr)?,
+     action: $_:expr,
+     $($keys:ident: $vals:expr,)*) => {
+        children!(@sort,
+            $red,
+            $cbs,
+            $action,
+            $($sp)?,
+            $($keys: $vals,)*
+        )
+    };
+
+    (@sort, $red:expr, $cbs:expr, $action:expr, ,) => {
+        $crate::Bastion::children(|ch| {
+            ch
+                .with_callbacks($cbs)
+                .with_redundancy($red)
                 .with_exec(|ctx: $crate::context::BastionContext| {
                     async move {
-                        let $ctx = ctx;
+                        let ctx = ctx;
                         loop {
-                            let $msg = $ctx.recv().await?;
-                            $code;
+                            let msg = ctx.recv().await?;
+                            $action(msg);
+                        }
+                    }
+                })
+        });
+    };
+    (@sort, $red:expr, $cbs:expr, $action:expr, $sp:expr,) => {
+        $sp.children(|ch| {
+            ch
+                .with_callbacks($cbs)
+                .with_redundancy($red)
+                .with_exec(|ctx: $crate::context::BastionContext| {
+                    async move {
+                        let ctx = ctx;
+                        loop {
+                            let msg = ctx.recv().await?;
+                            $action(msg);
                         }
                     }
                 })
@@ -99,104 +173,49 @@ macro_rules! child {
 /// ```
 /// # use bastion::prelude::*;
 /// # fn main() {
-/// let sp = supervisor! { SupervisionStrategy::OneForAll, Callbacks::default(),
-///     children! { 100,
-///         ctx, msg => {
-///             // action for the children here
-///         }
-///     },
-///     child! {
-///         ctx, msg => {
-///             // action for the one child here
-///         }
-///     }
+/// let sp = supervisor! {
+///     callbacks: Callbacks::default(),
+///     strategy: SupervisionStrategy::OneForAll,
 /// };
 /// # }
 /// ```
 #[macro_export]
 macro_rules! supervisor {
-    ($strategy:expr, $callbacks:expr, $($children:expr), *) => {
-        {
-            macro_rules! children {
-                ($count:expr, $ctx:ident, $msg:ident => $code:block) => {
-                    |children: $crate::children::Children| {
-                        children
-                            .with_redundancy($count)
-                            .with_callbacks($crate::Callbacks::default())
-                            .with_exec(|ctx: $crate::context::BastionContext| {
-                                async move {
-                                    let $ctx = ctx;
-                                    loop {
-                                        let $msg = $ctx.recv().await?;
-                                        $code;
-                                    }
-                                }
-                            })
-                    }
-                };
+    ($($keys:ident: $vals:expr,)*) => {
+        supervisor!(@sort,
+            $crate::supervisor::SupervisionStrategy::OneForAll,
+            $crate::Callbacks::default(),
+            $($keys: $vals,)*
+        )
+    };
 
-                ($count:expr, $callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
-                    |children: $crate::children::Children| {
-                        children
-                            .with_redundancy($count)
-                            .with_callbacks($callbacks)
-                            .with_exec(|ctx: $crate::context::BastionContext| {
-                                async move {
-                                    let $ctx = ctx;
-                                    loop {
-                                        let $msg = $ctx.recv().await?;
-                                        $code;
-                                    }
-                                }
-                            })
-                    }
-                };
-            }
+    (@sort,
+    $strat:expr, $_:expr,
+    callbacks: $cbs:expr,
+    $($keys:ident: $vals:expr,)*) => {
+        supervisor!(@sort,
+            $strat,
+            $cbs,
+            $($keys: $vals),*
+        )
+    };
 
-            macro_rules! child {
-                ($ctx:ident, $msg:ident => $code:block) => {
-                    |children: $crate::children::Children| {
-                        children
-                            .with_redundancy(1)
-                            .with_callbacks($crate::Callbacks::default())
-                            .with_exec(|ctx: $crate::context::BastionContext| {
-                                async move {
-                                    let $ctx = ctx;
-                                    loop {
-                                        let $msg = $ctx.recv().await?;
-                                        $code;
-                                    }
-                                }
-                            })
-                    }
-                };
-                ($callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
-                    |children: $crate::children::Children| {
-                        children
-                            .with_redundancy(1)
-                            .with_callbacks($callbacks)
-                            .with_exec(|ctx: $crate::context::BastionContext| {
-                                async move {
-                                    let $ctx = ctx;
-                                    loop {
-                                        let $msg = $ctx.recv().await?;
-                                        $code;
-                                    }
-                                }
-                            })
-                    }
-                };
-            }
+    (@sort,
+    $_:expr, $cbs:expr,
+    strategy: $strat:expr,
+    $($keys:ident: $vals:expr,)*) => {
+        supervisor!(@sort,
+            $strat,
+            $cbs,
+            $($keys: $vals),*
+        )
+    };
 
-
-            $crate::Bastion::supervisor(|sp| {
-                let sp = sp.with_strategy($strategy);
-                let sp = sp.with_callbacks($callbacks);
-                $(
-                let sp = sp.children($children);
-                )*
-                sp
-            });
-        }
+    (@sort, $strat:expr, $cbs:expr,) => {
+        $crate::Bastion::supervisor(|sp| {
+            sp
+                .with_callbacks($cbs)
+                .with_strategy($strat)
+        });
     };
 }
