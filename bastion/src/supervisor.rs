@@ -3,7 +3,8 @@
 //! or other supervisor trees under themselves.
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
-use crate::children::{Children, ChildrenRef};
+use crate::children::Children;
+use crate::children_ref::ChildrenRef;
 use crate::context::BastionId;
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
