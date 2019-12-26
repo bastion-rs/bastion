@@ -41,8 +41,9 @@ pub mod pool;
 pub mod run;
 pub mod run_queue;
 pub mod sleepers;
-pub mod utils;
 pub mod worker;
+
+mod utils;
 
 ///
 /// Prelude of Bastion Executor

@@ -66,7 +66,7 @@ use lightproc::proc_stack::ProcStack;
 use lightproc::recoverable_handle::RecoverableHandle;
 use std::future::Future;
 use std::io::ErrorKind;
-use std::iter::{Cycle, Iterator, Repeat};
+use std::iter::Iterator;
 
 use crate::placement::CoreId;
 
