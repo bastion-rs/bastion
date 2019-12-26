@@ -233,14 +233,6 @@ impl Parent {
         }
     }
 
-    pub(crate) fn into_children(self) -> Option<ChildrenRef> {
-        if let Parent::Children(children) = self {
-            Some(children)
-        } else {
-            None
-        }
-    }
-
     fn send(&self, env: Envelope) -> Result<(), Envelope> {
         match self {
             // FIXME
