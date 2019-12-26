@@ -36,7 +36,8 @@ use std::sync::Arc;
 /// ```
 pub struct RefAddr {
     path: Arc<BastionPath>,
-    sender: Sender,
+    // FIXME: remove pub(crate), only needed for a temporary Broadcast::extract_channel
+    pub(crate) sender: Sender,
 }
 
 impl RefAddr {

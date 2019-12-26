@@ -3,6 +3,7 @@ use crate::context::BastionId;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::{BastionPath, BastionPathElement};
+use crate::ref_addr::RefAddr;
 use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -17,9 +18,8 @@ pub(crate) type Receiver = UnboundedReceiver<Envelope>;
 
 #[derive(Debug)]
 pub(crate) struct Broadcast {
-    sender: Sender,
     recver: Receiver,
-    path: Arc<BastionPath>, // Arc is needed because we put path to Envelope
+    addr: RefAddr,
     parent: Parent,
     children: FxHashMap<BastionId, Sender>,
 }
@@ -71,12 +71,12 @@ impl Broadcast {
             .append(element)
             .expect("Can't append path in Broadcast::new");
         let path = Arc::new(path);
+        let addr = RefAddr::new(path, channel.0);
 
         Broadcast {
             parent,
-            sender: channel.0,
+            addr,
             recver: channel.1,
-            path,
             children,
         }
     }
@@ -89,30 +89,30 @@ impl Broadcast {
         let children = FxHashMap::default();
         let path = BastionPath::root();
         let path = Arc::new(path);
+        let addr = RefAddr::new(path, sender);
 
         Broadcast {
             parent,
-            sender,
+            addr,
             recver,
-            path,
             children,
         }
     }
 
     pub(crate) fn extract_channel(self) -> (Sender, Receiver) {
-        (self.sender, self.recver)
+        (self.addr.sender, self.recver)
     }
 
     pub(crate) fn id(&self) -> &BastionId {
-        self.path.id()
+        self.addr.path().id()
     }
 
     pub(crate) fn sender(&self) -> &Sender {
-        &self.sender
+        &self.addr.sender
     }
 
     pub(crate) fn path(&self) -> &Arc<BastionPath> {
-        &self.path
+        &self.addr.path()
     }
 
     pub(crate) fn parent(&self) -> &Parent {
@@ -121,7 +121,7 @@ impl Broadcast {
 
     pub(crate) fn register(&mut self, child: &Self) {
         self.children
-            .insert(child.id().clone(), child.sender.clone());
+            .insert(child.id().clone(), child.addr.sender.clone());
     }
 
     pub(crate) fn unregister(&mut self, id: &BastionId) {
@@ -134,7 +134,7 @@ impl Broadcast {
 
     pub(crate) fn stop_child(&mut self, id: &BastionId) {
         let msg = BastionMessage::stop();
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         self.send_child(id, env);
 
         self.unregister(id);
@@ -142,7 +142,7 @@ impl Broadcast {
 
     pub(crate) fn stop_children(&mut self) {
         let msg = BastionMessage::stop();
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         self.send_children(env);
 
         self.clear_children();
@@ -150,7 +150,7 @@ impl Broadcast {
 
     pub(crate) fn kill_child(&mut self, id: &BastionId) {
         let msg = BastionMessage::kill();
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         self.send_child(id, env);
 
         self.unregister(id);
@@ -158,7 +158,7 @@ impl Broadcast {
 
     pub(crate) fn kill_children(&mut self) {
         let msg = BastionMessage::kill();
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         self.send_children(env);
 
         self.clear_children();
@@ -168,7 +168,7 @@ impl Broadcast {
         self.stop_children();
 
         let msg = BastionMessage::stopped(self.id().clone());
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         // FIXME: Err(msg)
         self.send_parent(env).ok();
     }
@@ -177,7 +177,7 @@ impl Broadcast {
         self.kill_children();
 
         let msg = BastionMessage::faulted(self.id().clone());
-        let env = Envelope::new(msg, self.path.clone(), self.sender.clone());
+        let env = Envelope::new(msg, self.addr.path().clone(), self.addr.sender.clone());
         // FIXME: Err(msg)
         self.send_parent(env).ok();
     }
@@ -211,7 +211,7 @@ impl Broadcast {
 
     pub(crate) fn send_self(&self, env: Envelope) {
         // FIXME: handle errors
-        self.sender.unbounded_send(env).ok();
+        self.addr.sender.unbounded_send(env).ok();
     }
 }
 
