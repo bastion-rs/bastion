@@ -545,11 +545,11 @@ impl Children {
                 Some((id, Some(channel))) => {
                     warn!("respawned child with id: {} and existing channel", id);
                     Broadcast::new_with_channel(parent, BastionPathElement::Child(id), channel)
-                },
+                }
                 Some((id, None)) => {
                     warn!("respawned child with id: {}", id);
                     Broadcast::new(parent, BastionPathElement::Child(id))
-                },
+                }
                 None => {
                     warn!("spawned a new child");
                     Broadcast::new(parent, BastionPathElement::Child(BastionId::new()))

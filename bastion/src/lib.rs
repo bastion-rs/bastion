@@ -80,6 +80,7 @@ pub mod context;
 pub mod envelope;
 pub mod message;
 pub mod path;
+pub mod ref_addr;
 pub mod supervisor;
 
 ///
@@ -92,10 +93,11 @@ pub mod prelude {
     pub use crate::children_ref::ChildrenRef;
     pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId, NIL_ID};
-    pub use crate::envelope::{RefAddr, SignedMessage};
+    pub use crate::envelope::SignedMessage;
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
+    pub use crate::ref_addr::RefAddr;
     pub use crate::supervisor::{
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,

@@ -36,9 +36,7 @@ impl<R> Future for RecoverableHandle<R> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match Pin::new(&mut self.0).poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => {
-                Poll::Ready(None)
-            },
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(Ok(val))) => Poll::Ready(Some(val)),
             Poll::Ready(Some(Err(_))) => {
                 if let Some(after_panic_cb) = self.0.stack().after_panic.clone() {

@@ -1,6 +1,6 @@
 //!
 //! Child is a element of Children group executing user-defined computation
-use crate::broadcast::{Broadcast, Sender, Receiver};
+use crate::broadcast::{Broadcast, Receiver, Sender};
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
@@ -12,9 +12,9 @@ use lightproc::prelude::*;
 use qutex::Qutex;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::panic::AssertUnwindSafe;
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
@@ -160,8 +160,8 @@ impl Child {
     // FIXME: return receiver with unhandled pre_start_msgs
     async fn run(mut self) -> (Sender, Receiver) {
         debug!("Child({}): Launched.", self.id());
-        
-        loop {            
+
+        loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(Envelope {
@@ -230,31 +230,29 @@ impl Child {
 
             // TODO:
             // move panics handling from proc_stack to this match but before check how this would affect panic handling in proc_handle
-            // 
+            //
             // WARNING: breaks after_panic callback (it's not truggered) but do we need it anymore?
             match poll!(AssertUnwindSafe(&mut self.exec).catch_unwind()) {
-                Poll::Ready(Ok(future_result)) => {
-                    match future_result {
-                        Ok(()) => {
-                            debug!(
-                                "Child({}): The future finished executing successfully.",
-                                self.id()
-                            );
-                            self.stopped();
-                            return self.bcast.extract_channel();
-                        },
-                        Err(()) => {
-                            warn!("Child({}): The future returned an error.", self.id());
-                            self.faulted();
-                            return self.bcast.extract_channel();
-                        },
+                Poll::Ready(Ok(future_result)) => match future_result {
+                    Ok(()) => {
+                        debug!(
+                            "Child({}): The future finished executing successfully.",
+                            self.id()
+                        );
+                        self.stopped();
+                        return self.bcast.extract_channel();
+                    }
+                    Err(()) => {
+                        warn!("Child({}): The future returned an error.", self.id());
+                        self.faulted();
+                        return self.bcast.extract_channel();
                     }
                 },
                 Poll::Ready(Err(_)) => {
                     warn!("Child({}): The future panicked.", self.id());
                     self.faulted();
                     return self.bcast.extract_channel();
-                },
+                }
                 Poll::Pending => (),
             }
 

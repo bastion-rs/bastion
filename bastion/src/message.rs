@@ -8,7 +8,8 @@
 //!
 use crate::children::Children;
 use crate::context::BastionId;
-use crate::envelope::{RefAddr, SignedMessage};
+use crate::envelope::SignedMessage;
+use crate::ref_addr::RefAddr;
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use futures::channel::oneshot::{self, Receiver};
 use std::any::{type_name, Any};

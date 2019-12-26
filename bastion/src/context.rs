@@ -4,8 +4,9 @@
 
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
-use crate::envelope::{Envelope, RefAddr, SignedMessage};
+use crate::envelope::{Envelope, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
+use crate::ref_addr::RefAddr;
 use crate::supervisor::SupervisorRef;
 use futures::pending;
 use qutex::{Guard, Qutex};
@@ -538,13 +539,11 @@ impl BastionContext {
         let (msg, answer) = BastionMessage::ask(msg);
         let env = Envelope::new_with_sign(msg, self.signature());
         // FIXME: panics?
-        to.sender()
-            .unbounded_send(env)
-            .map_err(|err| {
-                println!("=== error");
-                error!("Unable to ask: {:?}", err);
-                err.into_inner().into_msg().unwrap()
-            })?;
+        to.sender().unbounded_send(env).map_err(|err| {
+            println!("=== error");
+            error!("Unable to ask: {:?}", err);
+            err.into_inner().into_msg().unwrap()
+        })?;
 
         Ok(answer)
     }

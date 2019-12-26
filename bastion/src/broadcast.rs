@@ -53,7 +53,11 @@ impl Broadcast {
         Self::new_with_channel(parent, element, mpsc::unbounded())
     }
 
-    pub(crate) fn new_with_channel(parent: Parent, element: BastionPathElement, channel: (Sender, Receiver)) -> Self {
+    pub(crate) fn new_with_channel(
+        parent: Parent,
+        element: BastionPathElement,
+        channel: (Sender, Receiver),
+    ) -> Self {
         let children = FxHashMap::default();
 
         let parent_path: BastionPath = match &parent {
@@ -195,9 +199,12 @@ impl Broadcast {
             // FIXME: Err(Error) if None
             if let Some(s_env) = env.try_clone() {
                 // FIXME: handle errors
-                child.unbounded_send(s_env).map_err(|e| {
-                    error!("Unable to send_children: {:?} {:?}", env, e);
-                }).ok();
+                child
+                    .unbounded_send(s_env)
+                    .map_err(|e| {
+                        error!("Unable to send_children: {:?} {:?}", env, e);
+                    })
+                    .ok();
             }
         }
     }

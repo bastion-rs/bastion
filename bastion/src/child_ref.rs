@@ -2,9 +2,10 @@
 //! Allows users to communicate with Child through the mailboxes.
 use crate::broadcast::Sender;
 use crate::context::BastionId;
-use crate::envelope::{Envelope, RefAddr};
+use crate::envelope::Envelope;
 use crate::message::{Answer, BastionMessage, Message};
 use crate::path::BastionPath;
+use crate::ref_addr::RefAddr;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::sync::Arc;
