@@ -8,11 +8,13 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
+use bastion_executor::blocking;
 use bastion_executor::run::run;
 use core::future::Future;
 use lightproc::proc_stack::ProcStack;
 use std::fmt::{self, Debug, Formatter};
 use std::thread;
+use std::time::Duration;
 
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level
@@ -568,19 +570,25 @@ impl Bastion {
         debug!("Bastion: Blocking until system is stopped.");
         run(
             async {
-                loop {
-                    // FIXME: panics
-                    let system = SYSTEM.handle().lock().wait().unwrap();
-                    if system.is_none() {
-                        debug!("Bastion: Unblocking because system is stopped.");
-                        return;
-                    }
+                blocking::spawn_blocking(
+                    async {
+                        loop {
+                            // FIXME: panics
+                            let system = SYSTEM.handle().lock().wait().unwrap();
+                            if system.is_none() {
+                                debug!("Bastion: Unblocking because system is stopped.");
+                                return;
+                            }
 
-                    // thread::yield_now();
-                }
+                            thread::sleep(Duration::from_millis(100));
+                        }
+                    },
+                    ProcStack::default(),
+                )
+                .await
             },
             ProcStack::default(),
-        )
+        );
     }
 }
 
