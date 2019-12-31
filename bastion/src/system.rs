@@ -13,8 +13,12 @@ use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::Qutex;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::task::Poll;
+
+lazy_static! {
+    pub(crate) static ref SYSTEM: GlobalSystem = System::init();
+}
 
 pub(crate) struct GlobalSystem {
     sender: Sender,
@@ -22,10 +26,8 @@ pub(crate) struct GlobalSystem {
     dead_letters: ChildrenRef,
     path: Arc<BastionPath>,
     handle: Qutex<Option<RecoverableHandle<()>>>,
-}
-
-lazy_static! {
-    pub(crate) static ref SYSTEM: GlobalSystem = System::init();
+    stopped: Mutex<bool>,
+    sync: Condvar,
 }
 
 #[derive(Debug)]
@@ -49,6 +51,8 @@ impl GlobalSystem {
         let handle = Some(handle);
         let handle = Qutex::new(handle);
         let path = Arc::new(BastionPath::root());
+        let stopped = Mutex::new(false);
+        let sync = Condvar::new();
 
         GlobalSystem {
             sender,
@@ -56,6 +60,8 @@ impl GlobalSystem {
             dead_letters,
             path,
             handle,
+            stopped,
+            sync,
         }
     }
 
@@ -77,6 +83,25 @@ impl GlobalSystem {
 
     pub(crate) fn path(&self) -> &Arc<BastionPath> {
         &self.path
+    }
+
+    pub(crate) fn stopped_notify(&self) {
+        // FIXME: panics
+        *self.stopped.lock().unwrap() = false;
+        self.sync.notify_all();
+    }
+
+    pub(crate) fn wait_until_stopped(&self) {
+        // FIXME: panics
+        let mut stopped = self.stopped.lock().unwrap();
+        loop {
+            if *stopped {
+                return;
+            }
+
+            // FIXME: panics
+            stopped = self.sync.wait(stopped).unwrap();
+        }
     }
 }
 
@@ -376,6 +401,8 @@ impl System {
                             let mut system = SYSTEM.handle().lock_async().await.unwrap();
                             *system = None;
 
+                            SYSTEM.stopped_notify();
+
                             return;
                         }
                     }
@@ -390,6 +417,8 @@ impl System {
                         // FIXME: panics?
                         let mut system = SYSTEM.handle().lock_async().await.unwrap();
                         *system = None;
+
+                        SYSTEM.stopped_notify();
 
                         return;
                     }

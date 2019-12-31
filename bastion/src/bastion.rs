@@ -537,6 +537,8 @@ impl Bastion {
             debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }
+
+        SYSTEM.stopped_notify();
     }
 
     /// Blocks the current thread until the system is stopped
@@ -568,27 +570,7 @@ impl Bastion {
     /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
-        run(
-            async {
-                blocking::spawn_blocking(
-                    async {
-                        loop {
-                            // FIXME: panics
-                            let system = SYSTEM.handle().lock().wait().unwrap();
-                            if system.is_none() {
-                                debug!("Bastion: Unblocking because system is stopped.");
-                                return;
-                            }
-
-                            thread::sleep(Duration::from_millis(100));
-                        }
-                    },
-                    ProcStack::default(),
-                )
-                .await
-            },
-            ProcStack::default(),
-        );
+        SYSTEM.wait_until_stopped();
     }
 }
 
