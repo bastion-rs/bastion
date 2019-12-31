@@ -8,13 +8,10 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
-use bastion_executor::blocking;
-use bastion_executor::run::run;
+
 use core::future::Future;
-use lightproc::proc_stack::ProcStack;
+
 use std::fmt::{self, Debug, Formatter};
-use std::thread;
-use std::time::Duration;
 
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level
@@ -538,7 +535,7 @@ impl Bastion {
             system.cancel();
         }
 
-        SYSTEM.stopped_notify();
+        SYSTEM.notify_stopped();
     }
 
     /// Blocks the current thread until the system is stopped

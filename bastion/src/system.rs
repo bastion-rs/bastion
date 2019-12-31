@@ -26,8 +26,8 @@ pub(crate) struct GlobalSystem {
     dead_letters: ChildrenRef,
     path: Arc<BastionPath>,
     handle: Qutex<Option<RecoverableHandle<()>>>,
-    stopped: Mutex<bool>,
-    sync: Condvar,
+    running: Mutex<bool>,
+    stopping_cvar: Condvar,
 }
 
 #[derive(Debug)]
@@ -51,8 +51,8 @@ impl GlobalSystem {
         let handle = Some(handle);
         let handle = Qutex::new(handle);
         let path = Arc::new(BastionPath::root());
-        let stopped = Mutex::new(false);
-        let sync = Condvar::new();
+        let running = Mutex::new(true);
+        let stopping_cvar = Condvar::new();
 
         GlobalSystem {
             sender,
@@ -60,8 +60,8 @@ impl GlobalSystem {
             dead_letters,
             path,
             handle,
-            stopped,
-            sync,
+            running,
+            stopping_cvar,
         }
     }
 
@@ -85,22 +85,17 @@ impl GlobalSystem {
         &self.path
     }
 
-    pub(crate) fn stopped_notify(&self) {
+    pub(crate) fn notify_stopped(&self) {
         // FIXME: panics
-        *self.stopped.lock().unwrap() = false;
-        self.sync.notify_all();
+        *self.running.lock().unwrap() = false;
+        self.stopping_cvar.notify_all();
     }
 
     pub(crate) fn wait_until_stopped(&self) {
         // FIXME: panics
-        let mut stopped = self.stopped.lock().unwrap();
-        loop {
-            if *stopped {
-                return;
-            }
-
-            // FIXME: panics
-            stopped = self.sync.wait(stopped).unwrap();
+        let mut running = self.running.lock().unwrap();
+        while *running {
+            running = self.stopping_cvar.wait(running).unwrap();
         }
     }
 }
@@ -401,7 +396,7 @@ impl System {
                             let mut system = SYSTEM.handle().lock_async().await.unwrap();
                             *system = None;
 
-                            SYSTEM.stopped_notify();
+                            SYSTEM.notify_stopped();
 
                             return;
                         }
@@ -418,7 +413,7 @@ impl System {
                         let mut system = SYSTEM.handle().lock_async().await.unwrap();
                         *system = None;
 
-                        SYSTEM.stopped_notify();
+                        SYSTEM.notify_stopped();
 
                         return;
                     }
