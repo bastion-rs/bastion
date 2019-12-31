@@ -1,8 +1,8 @@
 //! This module contains some useful macros to simply
 //! create supervisors and children groups.
 
-/// This macro creates a new children group with the given amount of workers
-/// callbacks, and a closure which should be executed when a message is received.
+/// This macro creates a new children group with the given amount of worker
+/// callbacks, and a closure that will be executed when a message is received.
 ///
 /// # Example
 ///
@@ -128,7 +128,7 @@ macro_rules! children {
 /// This macro creates a new supervisor with the given strategy and the given callbacks.
 /// Children can be specified by using the `children` / `child` macro.
 /// You can provide as many children groups as you want. Supervised supervisors are currently not
-/// supported.
+/// yet supported.
 ///
 /// # Example
 /// ```
@@ -181,8 +181,8 @@ macro_rules! supervisor {
     };
 }
 
-/// Spawnes a blocking task, which will be run on an extra thread pool, and
-/// returns the handle.
+/// Spawns a blocking task, which will run on the blocking thread pool,
+/// and returns the handle.
 ///
 /// # Example
 /// ```
@@ -193,7 +193,7 @@ macro_rules! supervisor {
 /// let task = blocking! {
 ///     thread::sleep(time::Duration::from_millis(3000));
 /// };
-/// bastion_executor::run::run(task, ProcStack::default());
+/// run!(task);
 /// # }
 /// ```
 #[macro_export]
@@ -202,5 +202,40 @@ macro_rules! blocking {
         bastion_executor::blocking::spawn_blocking(async move {
             $($tokens)*
         }, lightproc::proc_stack::ProcStack::default())
+    };
+}
+
+/// This macro blocks the current thread until passed
+/// future is resolved with an output (including the panic).
+///
+/// # Example
+/// ```
+/// # use bastion::prelude::*;
+/// # fn main() {
+/// let future1 = async move {
+///     123
+/// };
+///
+/// run! {
+///     let result = future1.await;
+///     assert_eq!(result, 123);
+/// };
+///
+/// let future2 = async move {
+///     10 / 2
+/// };
+///
+/// let result = run!(future2);
+/// assert_eq!(result, 5);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! run {
+    ($action:expr) => {
+        bastion_executor::run::run($action, lightproc::proc_stack::ProcStack::default())
+    };
+
+    ($($tokens:tt)*) => {
+        bastion_executor::run::run(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
     };
 }
