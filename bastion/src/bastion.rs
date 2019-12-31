@@ -8,7 +8,9 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
+use bastion_executor::run::run;
 use core::future::Future;
+use lightproc::proc_stack::ProcStack;
 use std::fmt::{self, Debug, Formatter};
 use std::thread;
 
@@ -564,16 +566,21 @@ impl Bastion {
     /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
-        loop {
-            // FIXME: panics
-            let system = SYSTEM.handle().lock().wait().unwrap();
-            if system.is_none() {
-                debug!("Bastion: Unblocking because system is stopped.");
-                return;
-            }
+        run(
+            async {
+                loop {
+                    // FIXME: panics
+                    let system = SYSTEM.handle().lock().wait().unwrap();
+                    if system.is_none() {
+                        debug!("Bastion: Unblocking because system is stopped.");
+                        return;
+                    }
 
-            thread::yield_now();
-        }
+                    // thread::yield_now();
+                }
+            },
+            ProcStack::default(),
+        )
     }
 }
 
