@@ -1,6 +1,5 @@
 //! This module contains some useful macros to simply
 //! create supervisors and children groups.
-#![allow(unused)]
 
 /// This macro creates a new children group with the given amount of workers
 /// callbacks, and a closure which should be executed when a message is received.
@@ -10,22 +9,21 @@
 /// ```
 /// # use bastion::prelude::*;
 /// # fn main() {
-/// // This creates a new children group with 100 workers
-/// // and will call the closure every time a message is received.
-/// let children_without_callbacks = children! { 100,
-///     ctx, msg => {
-///         // use ctx, and msg here
-///     }
+/// let children = children! {
+///     // the default redundancy is 1
+///     redundancy: 100,
+///     action: |msg| {
+///         // do something with the message here
+///     },
 /// };
 ///
-/// let callbacks = Callbacks::new()
-///     .with_before_start(|| println!("Children group started."))
-///     .with_after_stop(|| println!("Children group stopped."));
-/// // This creates the same children group as above, but with your own callbacks
-/// let children_with_callbacks = children! { 100, callbacks,
-///     ctx, msg => {
-///         // use ctx, and msg here
-///     }
+/// let sp = supervisor! {};
+/// let children = children! {
+///     supervisor: sp,
+///     redundancy: 10,
+///     action: |msg| {
+///         // do something with the message here
+///     },
 /// };
 /// # }
 /// ```
@@ -69,20 +67,20 @@ macro_rules! children {
 
     (@sort,
      $red:expr, $cbs:expr, $action:expr, $($_:expr)?,
-     supervisor: $sp:ident,
+     supervisor: $sp:expr,
      $($keys:ident: $vals:expr,)*) => {
         children!(@sort,
             $red,
             $cbs,
             $action,
-            $($sp)?,
+            $sp,
             $($keys: $vals,)*
         )
     };
 
     (@sort,
-     $red:expr, $cbs:expr, $action:expr, $($sp:expr)?,
-     action: $_:expr,
+     $red:expr, $cbs:expr, $_:expr, $($sp:expr)?,
+     action: $action:expr,
      $($keys:ident: $vals:expr,)*) => {
         children!(@sort,
             $red,
@@ -103,11 +101,11 @@ macro_rules! children {
                         let ctx = ctx;
                         loop {
                             let msg = ctx.recv().await?;
-                            $action(msg);
+                            ($action)(msg);
                         }
                     }
                 })
-        });
+        }).expect("failed to create children group");
     };
     (@sort, $red:expr, $cbs:expr, $action:expr, $sp:expr,) => {
         $sp.children(|ch| {
@@ -119,48 +117,11 @@ macro_rules! children {
                         let ctx = ctx;
                         loop {
                             let msg = ctx.recv().await?;
-                            $action(msg);
+                            ($action)(msg);
                         }
                     }
                 })
-        });
-    };
-}
-
-/// This macro creates a new children group with the only one worker and the given
-/// closure as action.
-///
-/// # Example
-///
-/// ```
-/// # use bastion::prelude::*;
-/// # fn main() {
-/// // This creates a new children group with 1 worker
-/// // and will call the closure every time a message is received.
-/// let children_without_callbacks = child! {
-///     ctx, msg => {
-///         // use ctx, and msg here
-///     }
-/// };
-///
-/// let callbacks = Callbacks::new()
-///     .with_before_start(|| println!("Children group started."))
-///     .with_after_stop(|| println!("Children group stopped."));
-/// // This creates the same children group as above, but with your own callbacks
-/// let children_with_callbacks = child! { callbacks,
-///     ctx, msg => {
-///         // use ctx, and msg here
-///     }
-/// };
-/// # }
-/// ```
-#[macro_export]
-macro_rules! child {
-    ($ctx:ident, $msg:ident => $code:block) => {
-        child!($crate::Callbacks::default(),  $ctx, $msg => $code)
-    };
-    ($callbacks:expr, $ctx:ident, $msg:ident => $code:block) => {
-        children!(1, $callbacks, $ctx, $msg => $code)
+        }).expect("failed to create children group");
     };
 }
 
@@ -196,7 +157,7 @@ macro_rules! supervisor {
         supervisor!(@sort,
             $strat,
             $cbs,
-            $($keys: $vals),*
+            $($keys: $vals,)*
         )
     };
 
@@ -207,7 +168,7 @@ macro_rules! supervisor {
         supervisor!(@sort,
             $strat,
             $cbs,
-            $($keys: $vals),*
+            $($keys: $vals,)*
         )
     };
 
@@ -216,6 +177,6 @@ macro_rules! supervisor {
             sp
                 .with_callbacks($cbs)
                 .with_strategy($strat)
-        });
+        }).expect("failed to create supervisor");
     };
 }
