@@ -239,3 +239,26 @@ macro_rules! run {
         bastion_executor::run::run(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
     };
 }
+
+/// Spawn a given future onto the executor from the global level.
+///
+/// # Example
+/// ```
+/// # use bastion::prelude::*;
+/// # fn main() {
+/// let handle = spawn! {
+///     panic!("test");
+/// };
+/// run!(handle);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! spawn {
+    ($action:expr) => {
+        bastion_executor::pool::spawn($action, lightproc::proc_stack::ProcStack::default())
+    };
+
+    ($($tokens:tt)*) => {
+        bastion_executor::pool::spawn(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
+    };
+}
