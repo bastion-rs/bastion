@@ -8,9 +8,10 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
+
 use core::future::Future;
+
 use std::fmt::{self, Debug, Formatter};
-use std::thread;
 
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level
@@ -533,6 +534,8 @@ impl Bastion {
             debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }
+
+        SYSTEM.notify_stopped();
     }
 
     /// Blocks the current thread until the system is stopped
@@ -564,16 +567,7 @@ impl Bastion {
     /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
-        loop {
-            // FIXME: panics
-            let system = SYSTEM.handle().lock().wait().unwrap();
-            if system.is_none() {
-                debug!("Bastion: Unblocking because system is stopped.");
-                return;
-            }
-
-            thread::yield_now();
-        }
+        SYSTEM.wait_until_stopped();
     }
 }
 
