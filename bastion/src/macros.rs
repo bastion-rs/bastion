@@ -180,3 +180,27 @@ macro_rules! supervisor {
         }).expect("failed to create supervisor");
     };
 }
+
+/// Spawnes a blocking task, which will be run on an extra thread pool, and
+/// returns the handle.
+///
+/// # Example
+/// ```
+/// # use std::{thread, time};
+/// # use lightproc::proc_stack::ProcStack;
+/// # use bastion::prelude::*;
+/// # fn main() {
+/// let task = blocking! {
+///     thread::sleep(time::Duration::from_millis(3000));
+/// };
+/// bastion_executor::run::run(task, ProcStack::default());
+/// # }
+/// ```
+#[macro_export]
+macro_rules! blocking {
+    ($($tokens:tt)*) => {
+        bastion_executor::blocking::spawn_blocking(async move {
+            $($tokens)*
+        }, lightproc::proc_stack::ProcStack::default())
+    };
+}
