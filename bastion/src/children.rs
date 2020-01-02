@@ -2,7 +2,7 @@
 //! Children are a group of child supervised under a supervisor
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
-use crate::child::{Child, Init};
+use crate::child::{ChildSpawner, Init};
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
@@ -72,9 +72,8 @@ pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
     launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
-    // The closure returning the future that will be used by
-    // every element of the group.
-    init: Init,
+    // TODO: doc
+    spawner: Box<dyn ChildSpawner>,
     redundancy: usize,
     // The callbacks called at the group's different lifecycle
     // events.
@@ -90,7 +89,7 @@ impl Children {
     pub(crate) fn new(bcast: Broadcast) -> Self {
         debug!("Children({}): Initializing.", bcast.id());
         let launched = FxHashMap::default();
-        let init = Init::default();
+        let spawner = Box::<Init>::default();
         let redundancy = 1;
         let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
@@ -99,7 +98,7 @@ impl Children {
         Children {
             bcast,
             launched,
-            init,
+            spawner,
             redundancy,
             callbacks,
             pre_start_msgs,
@@ -194,56 +193,15 @@ impl Children {
         ChildrenRef::new(id, sender, path, children)
     }
 
-    /// Sets the closure taking a [`BastionContext`] and returning a
-    /// [`Future`] that will be used by every element of this children
-    /// group.
-    ///
-    /// When a new element is started, it will be assigned a new context,
-    /// pass it to the `init` closure and poll the returned future until
-    /// it stops, panics or another element of the group stops or panics.
-    ///
-    /// The returned future's output should be `Result<(), ()>`.
-    ///
-    /// # Arguments
-    ///
-    /// * `init` - The closure taking a [`BastionContext`] and returning
-    ///     a [`Future`] that will be used by every element of this
-    ///     children group.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use bastion::prelude::*;
-    /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    /// Bastion::children(|children| {
-    ///     children.with_exec(|ctx| {
-    ///         async move {
-    ///             // Send and receive messages...
-    ///             let opt_msg: Option<SignedMessage> = ctx.try_recv().await;
-    ///             // ...and return `Ok(())` or `Err(())` when you are done...
-    ///             Ok(())
-    ///
-    ///             // Note that if `Err(())` was returned, the supervisor would
-    ///             // restart the children group.
-    ///         }
-    ///     })
-    /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
-    /// ```
+    // TODO: doc
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
         I: Fn(BastionContext) -> F + Send + Sync + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         trace!("Children({}): Setting exec closure.", self.id());
-        self.init = Init::new(init);
+        let init = Init::new(init);
+        self.spawner = Box::new(init);
         self
     }
 
@@ -557,20 +515,15 @@ impl Children {
             let state = Qutex::new(state);
 
             let ctx = BastionContext::new(id, child_ref, children, supervisor, state.clone());
-            let exec = (self.init.0)(ctx);
-
+            let id = bcast.id().clone();
             self.bcast.register(&bcast);
 
             debug!(
-                "Children({}): Initializing Child({}).",
+                "Children({}): Spawning Child({}).",
                 self.id(),
-                bcast.id()
+                id,
             );
-            let child = Child::new(exec, bcast, state);
-            debug!("Children({}): Launching Child({}).", self.id(), child.id());
-            let id = child.id().clone();
-            let launched = child.launch();
-
+            let launched = self.spawner.spawn(bcast, ctx, state);
             self.launched.insert(id, (sender, launched));
         }
     }

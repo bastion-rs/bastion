@@ -9,9 +9,12 @@ use crate::system::SYSTEM;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub(crate) struct Envelope {
-    pub(crate) msg: BastionMessage,
-    pub(crate) sign: RefAddr,
+// TODO: doc
+pub struct Envelope {
+    // TODO: priv and/or doc
+    pub msg: BastionMessage,
+    // TODO: priv and/or doc
+    pub sign: RefAddr,
 }
 
 #[derive(Debug)]

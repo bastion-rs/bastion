@@ -106,7 +106,8 @@ pub struct BastionContext {
 }
 
 #[derive(Debug)]
-pub(crate) struct ContextState {
+// TODO: doc
+pub struct ContextState {
     msgs: VecDeque<SignedMessage>,
 }
 
@@ -553,7 +554,8 @@ impl ContextState {
         ContextState { msgs }
     }
 
-    pub(crate) fn push_msg(&mut self, msg: Msg, sign: RefAddr) {
+    // TODO: doc
+    pub fn push_msg(&mut self, msg: Msg, sign: RefAddr) {
         self.msgs.push_back(SignedMessage::new(msg, sign))
     }
 }

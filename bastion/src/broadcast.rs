@@ -16,7 +16,8 @@ pub(crate) type Sender = UnboundedSender<Envelope>;
 pub(crate) type Receiver = UnboundedReceiver<Envelope>;
 
 #[derive(Debug)]
-pub(crate) struct Broadcast {
+// TODO: doc
+pub struct Broadcast {
     sender: Sender,
     recver: Receiver,
     path: Arc<BastionPath>, // Arc is needed because we put path to Envelope

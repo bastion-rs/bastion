@@ -184,21 +184,34 @@ enum MsgInner {
 }
 
 #[derive(Debug)]
-pub(crate) enum BastionMessage {
+// TODO: doc
+pub enum BastionMessage {
+    // TODO: doc
     Start,
+    // TODO: doc
     Stop,
+    // TODO: doc
     Kill,
+    // TODO: doc
     Deploy(Deployment),
+    // TODO: doc
     Prune { id: BastionId },
+    // TODO: doc
     SuperviseWith(SupervisionStrategy),
+    // TODO: doc
     Message(Msg),
+    // TODO: doc
     Stopped { id: BastionId },
+    // TODO: doc
     Faulted { id: BastionId },
 }
 
 #[derive(Debug)]
-pub(crate) enum Deployment {
+// TODO: doc
+pub enum Deployment {
+    // TODO: doc
     Supervisor(Supervisor),
+    // TODO: doc
     Children(Children),
 }
 

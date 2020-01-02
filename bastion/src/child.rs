@@ -15,11 +15,17 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
+pub(crate) struct Init(Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
+// TODO: doc
+pub trait ChildSpawner: Debug + Send + Sync {
+    // TODO: doc
+    fn spawn(&mut self, bcast: Broadcast, ctx: BastionContext, state: Qutex<ContextState>) -> RecoverableHandle<()>;
+}
+
 #[derive(Debug)]
-pub(crate) struct Child {
+struct Child {
     bcast: Broadcast,
     // The future that this child is executing.
     exec: Exec,
@@ -53,7 +59,7 @@ impl Init {
 }
 
 impl Child {
-    pub(crate) fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>) -> Self {
+    fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
         let started = false;
@@ -88,7 +94,7 @@ impl Child {
         })
     }
 
-    pub(crate) fn id(&self) -> &BastionId {
+    fn id(&self) -> &BastionId {
         self.bcast.id()
     }
 
@@ -249,9 +255,18 @@ impl Child {
         }
     }
 
-    pub(crate) fn launch(self) -> RecoverableHandle<()> {
+    fn launch(self) -> RecoverableHandle<()> {
         let stack = self.stack();
         pool::spawn(self.run(), stack)
+    }
+}
+
+impl ChildSpawner for Init {
+    fn spawn(&mut self, bcast: Broadcast, ctx: BastionContext, state: Qutex<ContextState>) -> RecoverableHandle<()> {
+        let exec = (self.0)(ctx);
+        let child = Child::new(exec, bcast, state);
+
+        child.launch()
     }
 }
 
