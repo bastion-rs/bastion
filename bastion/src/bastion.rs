@@ -8,10 +8,8 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
-
-use core::future::Future;
-
 use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
 
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level

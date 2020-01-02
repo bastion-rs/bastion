@@ -10,6 +10,7 @@ use crate::children::Children;
 use crate::context::BastionId;
 use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
+use crate::Shell;
 use futures::channel::oneshot::{self, Receiver};
 use std::any::{type_name, Any};
 use std::fmt::Debug;
@@ -27,8 +28,8 @@ use std::task::{Context, Poll};
 /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 /// [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
 /// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
-pub trait Message: Any + Send + Sync + Debug {}
-impl<T> Message for T where T: Any + Send + Sync + Debug {}
+pub trait Message: Any + Shell {}
+impl<T> Message for T where T: Any + Shell {}
 
 #[derive(Debug)]
 #[doc(hidden)]

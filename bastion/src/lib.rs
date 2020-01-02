@@ -61,6 +61,8 @@ extern crate log;
 // TODO: https://github.com/cogciprocate/qutex/pull/6
 extern crate bastion_qutex as qutex;
 
+use std::fmt::Debug;
+
 pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
 pub use self::config::Config;
@@ -81,6 +83,10 @@ pub mod envelope;
 pub mod message;
 pub mod path;
 pub mod supervisor;
+
+// TODO: doc
+pub trait Shell: Debug + Send + Sync {}
+impl<T> Shell for T where T: Debug + Send + Sync {}
 
 ///
 /// Prelude of Bastion
