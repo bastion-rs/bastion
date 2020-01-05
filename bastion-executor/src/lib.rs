@@ -21,7 +21,7 @@
 //!
 
 #![doc(
-html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png"
+    html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png"
 )]
 // Discarded lints
 #![allow(clippy::if_same_then_else)]

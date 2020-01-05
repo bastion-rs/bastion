@@ -51,7 +51,6 @@
 //! Instead, they wait a random amount between 1 and 11 seconds
 //! to even out the load.
 
-use std::{env, thread};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::io::ErrorKind;
@@ -59,6 +58,7 @@ use std::iter::Iterator;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
+use std::{env, thread};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 
@@ -68,8 +68,8 @@ use lightproc::lightproc::LightProc;
 use lightproc::proc_stack::ProcStack;
 use lightproc::recoverable_handle::RecoverableHandle;
 
-use crate::{load_balancer, placement};
 use crate::placement::CoreId;
+use crate::{load_balancer, placement};
 
 /// If low watermark isn't configured this is the default scaler value.
 /// This value is used for the heuristics of the scaler
