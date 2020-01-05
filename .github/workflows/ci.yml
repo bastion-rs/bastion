@@ -72,8 +72,9 @@ jobs:
           toolchain: stable
           default: true
           components: rustfmt
-        
+
       - name: fmt
+        working-directory: /
         run: cargo fmt --all -- --check
 
       - name: doc
