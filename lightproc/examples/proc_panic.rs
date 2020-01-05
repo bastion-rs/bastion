@@ -32,14 +32,17 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|| {
+            .with_before_start(|s: EmptyProcState| {
                 println!("Before start");
+                s
             })
-            .with_after_complete(|| {
+            .with_after_complete(|s: EmptyProcState| {
                 println!("After complete");
+                s
             })
-            .with_after_panic(|| {
+            .with_after_panic(|s: EmptyProcState| {
                 println!("After panic");
+                s
             }),
     );
 

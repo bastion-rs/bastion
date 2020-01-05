@@ -76,7 +76,7 @@ impl Child {
         let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
-        ProcStack::default().with_after_panic(move || {
+        ProcStack::default().with_after_panic(move |state: EmptyProcState| {
             // FIXME: clones
             let id = id.clone();
             warn!("Child({}): Panicked.", id);
@@ -85,6 +85,7 @@ impl Child {
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
             parent.send(env).ok();
+            state
         })
     }
 
