@@ -23,6 +23,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["numanji", "allocator-suite", "jemallocator"]
 
 [dependencies]
+bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
 crossbeam-utils = "0.7"
 crossbeam-channel = "0.4"
 crossbeam-epoch = "0.8"

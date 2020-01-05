@@ -2,6 +2,7 @@
 members = [
   "bastion",
   "bastion-executor",
+  "bastion-utils",
   "lightproc"
 ]
 
