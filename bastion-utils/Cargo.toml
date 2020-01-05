@@ -1,0 +1,19 @@
+[package]
+name = "bastion-utils"
+version = "0.3.2"
+description = "Utilities for Bastion, the highly-available, fault-tolerant, async communication oriented executor"
+authors = [
+    "Mahmut Bulut <vertexclique@gmail.com>",
+    "Patrice Billaut <pbillaut@pm.me>",
+]
+keywords = ["fault-tolerant", "runtime", "actor", "system"]
+categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+license = "Apache-2.0/MIT"
+edition = "2018"
+
+[badges]
+travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
+maintenance = { status = "actively-developed" }
