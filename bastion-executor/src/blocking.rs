@@ -52,25 +52,24 @@
 //! to even out the load.
 
 use std::collections::VecDeque;
-
+use std::future::Future;
+use std::io::ErrorKind;
+use std::iter::Iterator;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 use std::{env, thread};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
-use lazy_static::lazy_static;
 
-use crate::{load_balancer, placement, utils};
+use bastion_utils::math;
+use lazy_static::lazy_static;
 use lightproc::lightproc::LightProc;
 use lightproc::proc_stack::ProcStack;
 use lightproc::recoverable_handle::RecoverableHandle;
-use std::future::Future;
-use std::io::ErrorKind;
-use std::iter::Iterator;
 
 use crate::placement::CoreId;
-
-use std::sync::Mutex;
+use crate::{load_balancer, placement};
 
 /// If low watermark isn't configured this is the default scaler value.
 /// This value is used for the heuristics of the scaler
@@ -264,7 +263,7 @@ fn create_blocking_thread() {
     //
     // Generate a simple random number of milliseconds
     let rand_sleep_ms = 1000_u64
-        .checked_add(u64::from(utils::random(10_000)))
+        .checked_add(u64::from(math::random(10_000)))
         .expect("shouldn't overflow");
 
     let _ = thread::Builder::new()
