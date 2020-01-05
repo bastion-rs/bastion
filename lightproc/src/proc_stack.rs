@@ -182,14 +182,14 @@ impl<T> From<Box<T>> for RawState {
 impl Clone for RawState {
     fn clone(&self) -> Self {
         let layout = alloc::Layout::from_size_align(self.size, self.align).unwrap();
-        let dst = unsafe { alloc::alloc(layout) };
         unsafe {
-            ptr::copy(self.ptr, dst, self.size);
-        }
-        RawState {
-            ptr: dst,
-            size: self.size,
-            align: self.align,
+            let dst = alloc::alloc_zeroed(layout);
+            ptr::copy_nonoverlapping(self.ptr, dst, self.size);
+            RawState {
+                ptr: dst,
+                size: self.size,
+                align: self.align,
+            }
         }
     }
 }
