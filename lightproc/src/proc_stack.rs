@@ -5,10 +5,10 @@
 //!
 //! If we want to make an analogy, stack abstraction is similar to actor lifecycle abstractions
 //! in frameworks like Akka, but tailored version for Rust environment.
-use std::alloc;
+use std::any::Any;
+use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
-use std::mem;
-use std::ptr;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -24,19 +24,18 @@ use std::sync::Arc;
 ///     .with_after_complete(|s: EmptyProcState| { println!("After complete"); s })
 ///     .with_after_panic(|s: EmptyProcState| { println!("After panic"); s });
 /// ```
-#[derive(Default)]
 pub struct ProcStack {
     /// Process ID for the Lightweight Process
     ///
     /// Can be used to identify specific processes during any executor, reactor implementations.
     pub pid: AtomicUsize,
 
-    pub(crate) state: RawState,
+    pub(crate) state: Rc<RefCell<dyn State>>,
 
     /// Before start callback
     ///
     /// This callback is called before we start to inner future of the process
-    pub(crate) before_start: Option<Arc<dyn Fn(&RawState) -> RawState + Send + Sync>>,
+    pub(crate) before_start: Option<Arc<dyn Fn(Rc<RefCell<dyn State>>) + Send + Sync>>,
 
     /// After complete callback
     ///
@@ -44,13 +43,13 @@ pub struct ProcStack {
     /// Mind that, even panic occurs this callback will get executed.
     ///
     /// Eventually all panics are coming from an Error output.
-    pub(crate) after_complete: Option<Arc<dyn Fn(&RawState) -> RawState + Send + Sync>>,
+    pub(crate) after_complete: Option<Arc<dyn Fn(Rc<RefCell<dyn State>>) + Send + Sync>>,
 
     /// After panic callback
     ///
     /// This callback is only called when a panic has been occurred.
     /// Mind that [ProcHandle](proc_handle/struct.ProcHandle.html) is not using this
-    pub(crate) after_panic: Option<Arc<dyn Fn(&RawState) -> RawState + Send + Sync>>,
+    pub(crate) after_panic: Option<Arc<dyn Fn(Rc<RefCell<dyn State>>) + Send + Sync>>,
 }
 
 impl ProcStack {
@@ -67,8 +66,11 @@ impl ProcStack {
         self
     }
 
-    pub fn with_state<S>(mut self, state: Box<S>) -> Self {
-        self.state = RawState::from(state);
+    pub fn with_state<S>(mut self, state: S) -> Self
+    where
+        S: State + 'static,
+    {
+        self.state = Rc::new(RefCell::new(state));
         self
     }
 
@@ -82,7 +84,8 @@ impl ProcStack {
     /// ```
     pub fn with_before_start<C, S>(mut self, callback: C) -> Self
     where
-        C: Fn(Box<S>) -> Box<S> + Send + Sync + 'static,
+        S: State,
+        C: Fn(&mut S) + Send + Sync + 'static,
     {
         self.before_start = Some(Self::wrap_callback(callback));
         self
@@ -98,7 +101,8 @@ impl ProcStack {
     /// ```
     pub fn with_after_complete<C, S>(mut self, callback: C) -> Self
     where
-        C: Fn(Box<S>) -> Box<S> + Send + Sync + 'static,
+        S: State,
+        C: Fn(&mut S) + Send + Sync + 'static,
     {
         self.after_complete = Some(Self::wrap_callback(callback));
         self
@@ -114,7 +118,8 @@ impl ProcStack {
     /// ```
     pub fn with_after_panic<C, S>(mut self, callback: C) -> Self
     where
-        C: Fn(Box<S>) -> Box<S> + Send + Sync + 'static,
+        S: State,
+        C: Fn(&mut S) + Send + Sync + 'static,
     {
         self.after_panic = Some(Self::wrap_callback(callback));
         self
@@ -133,66 +138,36 @@ impl ProcStack {
         self.pid.load(Ordering::Acquire)
     }
 
-    fn wrap_callback<C, S>(callback: C) -> Arc<dyn Fn(&RawState) -> RawState + Send + Sync>
+    fn wrap_callback<C, S>(callback: C) -> Arc<dyn Fn(Rc<RefCell<dyn State>>) + Send + Sync>
     where
-        C: Fn(Box<S>) -> Box<S> + Send + Sync + 'static,
+        S: State,
+        C: Fn(&mut S) + Send + Sync + 'static,
     {
-        Arc::new(move |raw_state: &RawState| {
-            let state = raw_state.downcast::<S>();
-            let state = callback(state);
-            RawState::from(state)
+        Arc::new(move |state: Rc<RefCell<dyn State>>| {
+            let mut state = state.borrow_mut();
+            let state = state
+                .as_any()
+                .downcast_mut::<S>()
+                .expect("Wrong State type.");
+            callback(state);
         })
     }
 }
 
+trait AsAny {
+    fn as_any(&mut self) -> &mut dyn Any;
+}
+impl<T: Any> AsAny for T {
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+pub trait State: Any + AsAny {}
+
 pub type EmptyProcState = Box<Empty>;
 pub struct Empty;
-
-pub(crate) struct RawState {
-    ptr: *mut u8,
-    size: usize,
-    align: usize,
-}
-
-impl RawState {
-    fn downcast<T>(&self) -> Box<T> {
-        unsafe { Box::from_raw(self.ptr as *mut T) }
-    }
-}
-
-impl Default for RawState {
-    fn default() -> Self {
-        RawState::from(Box::new(Empty))
-    }
-}
-
-impl<T> From<Box<T>> for RawState {
-    fn from(val: Box<T>) -> Self {
-        let size = mem::size_of_val(val.as_ref());
-        let align = mem::align_of_val(&val);
-
-        Self {
-            ptr: Box::into_raw(val) as *mut u8,
-            size,
-            align,
-        }
-    }
-}
-
-impl Clone for RawState {
-    fn clone(&self) -> Self {
-        let layout = alloc::Layout::from_size_align(self.size, self.align).unwrap();
-        unsafe {
-            let dst = alloc::alloc_zeroed(layout);
-            ptr::copy_nonoverlapping(self.ptr, dst, self.size);
-            RawState {
-                ptr: dst,
-                size: self.size,
-                align: self.align,
-            }
-        }
-    }
-}
+impl State for Empty {}
 
 impl Debug for ProcStack {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
