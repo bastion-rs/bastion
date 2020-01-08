@@ -43,8 +43,6 @@ pub mod run_queue;
 pub mod sleepers;
 pub mod worker;
 
-mod utils;
-
 ///
 /// Prelude of Bastion Executor
 pub mod prelude {
