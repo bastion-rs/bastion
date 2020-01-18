@@ -8,7 +8,6 @@
 use super::proc_state::*;
 
 use std::fmt::{self, Debug, Formatter};
-use std::mem;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -180,7 +179,7 @@ impl ProcStack {
         S: State + Copy + 'static,
     {
         let state = self.state.clone();
-        let s = unsafe { mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&state) };
+        let s = unsafe { &*(&state as *const ProcState as *const Arc<Mutex<S>>) };
         *s.lock().unwrap()
     }
 
@@ -197,7 +196,7 @@ impl ProcStack {
         C: Fn(&mut S) + Send + Sync + 'static,
     {
         let wrapped = move |s: ProcState| {
-            let x = unsafe { mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&s) };
+            let x = unsafe { &*(&s as *const ProcState as *const Arc<Mutex<S>>) };
             let mut mg = x.lock().unwrap();
             callback(&mut *mg);
         };
@@ -205,10 +204,12 @@ impl ProcStack {
     }
 }
 
+///
+/// Default implementation for the ProcStack
 impl Default for ProcStack {
     fn default() -> Self {
         ProcStack {
-            pid: AtomicUsize::new(0xDEADBEEF),
+            pid: AtomicUsize::new(0xDEAD_BEEF),
             state: Arc::new(Mutex::new(EmptyState)),
             before_start: None,
             after_complete: None,
