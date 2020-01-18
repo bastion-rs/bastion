@@ -1,12 +1,12 @@
-use lightproc::proc_stack::{EmptyProcState, ProcStack};
+use lightproc::proc_stack::ProcStack;
+use lightproc::proc_state::EmptyProcState;
 
 #[test]
 fn stack_copy() {
     let stack = ProcStack::default()
         .with_pid(12)
-        .with_after_panic(|s: EmptyProcState| {
+        .with_after_panic(|s: &mut EmptyProcState| {
             println!("After panic!");
-            s
         });
 
     let stack2 = stack.clone();

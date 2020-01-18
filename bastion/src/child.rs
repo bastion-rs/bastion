@@ -14,6 +14,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use lightproc::proc_state::EmptyProcState;
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
@@ -76,7 +77,7 @@ impl Child {
         let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
-        ProcStack::default().with_after_panic(move |state: EmptyProcState| {
+        ProcStack::default().with_after_panic(move |state: &mut EmptyProcState| {
             // FIXME: clones
             let id = id.clone();
             warn!("Child({}): Panicked.", id);
@@ -85,7 +86,6 @@ impl Child {
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
             parent.send(env).ok();
-            state
         })
     }
 

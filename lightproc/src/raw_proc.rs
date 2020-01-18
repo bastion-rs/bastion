@@ -15,6 +15,7 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::sync::Arc;
 
 /// Raw pointers to the fields of a proc.
 pub(crate) struct RawProc<F, R, S> {

@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use std::future::Future;
 use std::thread;
+use lightproc::proc_state::EmptyProcState;
 
 fn spawn_on_thread<F, R>(future: F) -> RecoverableHandle<R>
 where
@@ -32,17 +33,14 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|s: EmptyProcState| {
+            .with_before_start(|s: &mut EmptyProcState| {
                 println!("Before start");
-                s
             })
-            .with_after_complete(|s: EmptyProcState| {
+            .with_after_complete(|s: &mut EmptyProcState| {
                 println!("After complete");
-                s
             })
-            .with_after_panic(|s: EmptyProcState| {
+            .with_after_panic(|s: &mut EmptyProcState| {
                 println!("After panic");
-                s
             }),
     );
 
