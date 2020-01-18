@@ -1,10 +1,9 @@
 use std::any::Any;
-use std::ops::{Deref, DerefMut};
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use std::fmt::{Error, Formatter};
+
+use std::fmt;
 use std::sync::{Arc, Mutex};
-use std::{fmt, mem};
-use std::fmt::{Formatter, Error};
 
 pub trait State: Send + Sync + AsAny + 'static {}
 impl<T> State for T where T: Send + Sync + 'static {}

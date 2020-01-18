@@ -5,13 +5,13 @@
 //!
 //! If we want to make an analogy, stack abstraction is similar to actor lifecycle abstractions
 //! in frameworks like Akka, but tailored version for Rust environment.
-use std::cell::RefCell;
+use super::proc_state::*;
+
 use std::fmt::{self, Debug, Formatter};
-use std::rc::Rc;
+use std::mem;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::mem;
-use super::proc_state::*;
 
 /// Stack abstraction for lightweight processes
 ///
@@ -180,9 +180,7 @@ impl ProcStack {
         S: State + Copy + 'static,
     {
         let state = self.state.clone();
-        let s = unsafe {
-            mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&state)
-        };
+        let s = unsafe { mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&state) };
         *s.lock().unwrap()
     }
 
@@ -199,9 +197,7 @@ impl ProcStack {
         C: Fn(&mut S) + Send + Sync + 'static,
     {
         let wrapped = move |s: ProcState| {
-            let x = unsafe {
-                mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&s)
-            };
+            let x = unsafe { mem::transmute::<&ProcState, &Arc<Mutex<S>>>(&s) };
             let mut mg = x.lock().unwrap();
             callback(&mut *mg);
         };

@@ -5,7 +5,7 @@ use lightproc::proc_state::EmptyProcState;
 fn stack_copy() {
     let stack = ProcStack::default()
         .with_pid(12)
-        .with_after_panic(|s: &mut EmptyProcState| {
+        .with_after_panic(|_s: &mut EmptyProcState| {
             println!("After panic!");
         });
 

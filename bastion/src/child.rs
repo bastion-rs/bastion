@@ -9,12 +9,12 @@ use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use lightproc::prelude::*;
+use lightproc::proc_state::EmptyProcState;
 use qutex::Qutex;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use lightproc::proc_state::EmptyProcState;
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
@@ -77,7 +77,7 @@ impl Child {
         let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
-        ProcStack::default().with_after_panic(move |state: &mut EmptyProcState| {
+        ProcStack::default().with_after_panic(move |_state: &mut EmptyProcState| {
             // FIXME: clones
             let id = id.clone();
             warn!("Child({}): Panicked.", id);

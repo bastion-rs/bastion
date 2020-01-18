@@ -85,13 +85,13 @@ impl<R> ProcHandle<R> {
     }
 
     /// Returns a reference to the stack stored inside the proc.
-    pub fn stack(&self) -> &mut ProcStack {
+    pub fn stack(&self) -> &ProcStack {
         let offset = ProcData::offset_stack();
         let ptr = self.raw_proc.as_ptr();
 
         unsafe {
-            let raw = (ptr as *mut u8).add(offset) as *mut ProcStack;
-            &mut *raw
+            let raw = (ptr as *mut u8).add(offset) as *const ProcStack;
+            &*raw
         }
     }
 }

@@ -1,10 +1,10 @@
 use crossbeam::channel;
 use futures::executor;
 use lightproc::prelude::*;
+use lightproc::proc_state::EmptyProcState;
 use std::future::Future;
 use std::sync::Arc;
 use std::thread;
-use lightproc::proc_state::EmptyProcState;
 
 fn spawn_on_thread<F, R>(fut: F) -> ProcHandle<R>
 where
@@ -26,10 +26,10 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|s: &mut EmptyProcState| {
+            .with_before_start(|_s: &mut EmptyProcState| {
                 println!("Before start");
             })
-            .with_after_complete(|s: &mut EmptyProcState| {
+            .with_after_complete(|_s: &mut EmptyProcState| {
                 println!("After complete");
             }),
     );

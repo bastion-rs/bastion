@@ -8,7 +8,7 @@ fn main() {
             println!("Example execution");
             panic!("fault");
         },
-        ProcStack::default().with_after_panic(|s: &mut EmptyProcState| {
+        ProcStack::default().with_after_panic(|_s: &mut EmptyProcState| {
             println!("after panic");
         }),
     );
