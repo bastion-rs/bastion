@@ -37,6 +37,7 @@ unstable = ["bastion-executor/unstable"]
 [dependencies]
 bastion-executor = { version = "= 0.3.2", path = "../bastion-executor" }
 futures = { version = "0.3", features = ["async-await"] }
+futures-timer = "2.0.2"
 fxhash = "0.2"
 lazy_static = "1.4"
 lightproc = { version = "= 0.3.3", path = "../lightproc" }

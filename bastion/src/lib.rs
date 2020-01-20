@@ -96,6 +96,6 @@ pub mod prelude {
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
-    pub use crate::supervisor::{SupervisionStrategy, Supervisor, SupervisorRef};
+    pub use crate::supervisor::{ActorRestartStrategy, SupervisionStrategy, Supervisor, SupervisorRef};
     pub use crate::{blocking, children, run, spawn, supervisor};
 }
