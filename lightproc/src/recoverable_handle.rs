@@ -40,7 +40,9 @@ impl<R> Future for RecoverableHandle<R> {
             Poll::Ready(Some(Ok(val))) => Poll::Ready(Some(val)),
             Poll::Ready(Some(Err(_))) => {
                 if let Some(after_panic_cb) = self.0.stack().after_panic.clone() {
-                    (*after_panic_cb.clone())();
+                    println!("EXECUTED");
+                    (*after_panic_cb.clone())(self.0.stack().state.clone());
+                    println!("DONE");
                 }
 
                 Poll::Ready(None)

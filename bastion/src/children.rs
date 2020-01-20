@@ -352,10 +352,8 @@ impl Children {
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| {
-                async {
-                    trace!("Children({}): Unknown child stopped.", self.id());
-                }
+            .for_each_concurrent(None, |_| async {
+                trace!("Children({}): Unknown child stopped.", self.id());
             })
             .await;
     }
@@ -372,10 +370,8 @@ impl Children {
         }
 
         children
-            .for_each_concurrent(None, |_| {
-                async {
-                    trace!("Children({}): Unknown child stopped.", self.id());
-                }
+            .for_each_concurrent(None, |_| async {
+                trace!("Children({}): Unknown child stopped.", self.id());
             })
             .await;
     }

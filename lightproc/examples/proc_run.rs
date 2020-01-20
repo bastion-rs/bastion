@@ -1,6 +1,7 @@
 use crossbeam::channel;
 use futures::executor;
 use lightproc::prelude::*;
+use lightproc::proc_state::EmptyProcState;
 use std::future::Future;
 use std::sync::Arc;
 use std::thread;
@@ -25,10 +26,10 @@ where
         schedule,
         ProcStack::default()
             .with_pid(1)
-            .with_before_start(|| {
+            .with_before_start(|_s: &mut EmptyProcState| {
                 println!("Before start");
             })
-            .with_after_complete(|| {
+            .with_after_complete(|_s: &mut EmptyProcState| {
                 println!("After complete");
             }),
     );

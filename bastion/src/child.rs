@@ -9,6 +9,7 @@ use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use lightproc::prelude::*;
+use lightproc::proc_state::EmptyProcState;
 use qutex::Qutex;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
@@ -76,7 +77,7 @@ impl Child {
         let sender = self.bcast.sender().clone();
 
         // FIXME: with_pid
-        ProcStack::default().with_after_panic(move || {
+        ProcStack::default().with_after_panic(move |_state: &mut EmptyProcState| {
             // FIXME: clones
             let id = id.clone();
             warn!("Child({}): Panicked.", id);

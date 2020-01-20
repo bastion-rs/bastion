@@ -22,7 +22,7 @@
 //! // ... process stack with a lifecycle callback
 //! let proc_stack =
 //!     ProcStack::default()
-//!         .with_after_panic(|| {
+//!         .with_after_panic(|s: &mut EmptyProcState| {
 //!             println!("After panic started!");
 //!         });
 //!
@@ -76,7 +76,7 @@ impl LightProc {
     /// # // ... process stack with a lifecycle callback
     /// # let proc_stack =
     /// #     ProcStack::default()
-    /// #         .with_after_panic(|| {
+    /// #         .with_after_panic(|s: &mut EmptyProcState| {
     /// #             println!("After panic started!");
     /// #         });
     /// #
@@ -120,7 +120,7 @@ impl LightProc {
     /// # // ... process stack with a lifecycle callback
     /// # let proc_stack =
     /// #     ProcStack::default()
-    /// #         .with_after_panic(|| {
+    /// #         .with_after_panic(|s: &mut EmptyProcState| {
     /// #             println!("After panic started!");
     /// #         });
     /// #
