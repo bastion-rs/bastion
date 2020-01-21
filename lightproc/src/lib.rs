@@ -30,6 +30,7 @@ mod state;
 pub mod lightproc;
 pub mod proc_handle;
 pub mod proc_stack;
+pub mod proc_state;
 pub mod recoverable_handle;
 
 /// The lightproc prelude.
@@ -39,5 +40,6 @@ pub mod prelude {
     pub use crate::lightproc::*;
     pub use crate::proc_handle::*;
     pub use crate::proc_stack::*;
+    pub use crate::proc_state::*;
     pub use crate::recoverable_handle::*;
 }

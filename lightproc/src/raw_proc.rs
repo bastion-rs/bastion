@@ -14,6 +14,7 @@ use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 /// Raw pointers to the fields of a proc.
@@ -396,7 +397,7 @@ where
         let guard = Guard(raw);
 
         if let Some(before_start_cb) = &(*raw.stack).before_start {
-            (*before_start_cb.clone())();
+            (*before_start_cb.clone())((*raw.stack).state.clone());
         }
 
         let poll = <F as Future>::poll(Pin::new_unchecked(&mut *raw.future), cx);
@@ -441,7 +442,7 @@ where
                             }
 
                             if let Some(after_complete_cb) = &(*raw.stack).after_complete {
-                                (*after_complete_cb.clone())();
+                                (*after_complete_cb.clone())((*raw.stack).state.clone());
                             }
 
                             // Drop the proc reference.
