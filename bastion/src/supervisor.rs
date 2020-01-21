@@ -236,7 +236,7 @@ impl Supervisor {
         }
 
         // TODO: stop or kill?
-        self.kill(0..).await;
+        self.kill(0..self.order.len()).await;
 
         if let Some(bcast) = bcast {
             self.bcast = bcast;
@@ -757,7 +757,7 @@ impl Supervisor {
     async fn restart(&mut self, range: Range<usize>) {
         debug!("Supervisor({}): Restarting range: {:?}", self.id(), range);
         // TODO: stop or kill?
-        self.kill(range.start..).await;
+        self.kill(range.clone()).await;
 
         let restart_strategy = self.restart_strategy.clone();
         let supervisor_id = &self.id().clone();
@@ -804,22 +804,7 @@ impl Supervisor {
                         bcast.id()
                     );
 
-                    match restart_strategy_inner.strategy() {
-                        ActorRestartStrategy::LinearBackOff { timeout } => {
-                            let start_in = timeout.as_secs()
-                                + (timeout.as_secs() * actor_restarts_count as u64);
-                            Delay::new(Duration::from_secs(start_in)).await;
-                        }
-                        ActorRestartStrategy::ExponentialBackOff {
-                            timeout,
-                            multiplier,
-                        } => {
-                            let start_in = timeout.as_secs()
-                                + (timeout.as_secs() * multiplier * actor_restarts_count as u64);
-                            Delay::new(Duration::from_secs(start_in)).await;
-                        }
-                        _ => {}
-                    };
+                    restart_strategy_inner.apply_strategy(actor_restarts_count).await;
 
                     // FIXME: panics?
                     let supervised = supervised.reset(bcast).await.unwrap();
@@ -861,7 +846,7 @@ impl Supervisor {
             };
             let launched = supervised.launch();
             self.launched
-                .insert(id.clone(), (self.order.len(), launched, restart_count));
+                .insert(id.clone(), (self.order.len(), launched, restart_count + 1));
             self.order.push(id);
         }
     }
@@ -907,7 +892,7 @@ impl Supervisor {
         }
     }
 
-    async fn kill(&mut self, range: RangeFrom<usize>) {
+    async fn kill(&mut self, range: Range<usize>) {
         debug!("Supervisor({}): Killing range: {:?}", self.id(), range);
         if range.start == 0 {
             self.bcast.kill_children();
@@ -1006,7 +991,7 @@ impl Supervisor {
                 msg: BastionMessage::Kill,
                 ..
             } => {
-                self.kill(0..).await;
+                self.kill(0..self.order.len()).await;
                 self.stopped();
 
                 return Err(());
@@ -1108,7 +1093,7 @@ impl Supervisor {
 
                 if self.recover(id).await.is_err() {
                     // TODO: stop or kill?
-                    self.kill(0..).await;
+                    self.kill(0..self.order.len()).await;
                     self.faulted();
 
                     return Err(());
@@ -1730,6 +1715,25 @@ impl RestartStrategy {
     pub fn with_actor_restart_strategy(mut self, strategy: ActorRestartStrategy) -> Self {
         self.strategy = strategy;
         self
+    }
+
+    pub(crate) async fn apply_strategy(&self, restarts_count: usize) {
+        match self.strategy {
+            ActorRestartStrategy::LinearBackOff { timeout } => {
+                let start_in = timeout.as_secs()
+                    + (timeout.as_secs() * restarts_count as u64);
+                Delay::new(Duration::from_secs(start_in)).await;
+            }
+            ActorRestartStrategy::ExponentialBackOff {
+                timeout,
+                multiplier,
+            } => {
+                let start_in = timeout.as_secs()
+                    + (timeout.as_secs() * multiplier * restarts_count as u64);
+                Delay::new(Duration::from_secs(start_in)).await;
+            }
+            _ => {}
+        };
     }
 }
 
