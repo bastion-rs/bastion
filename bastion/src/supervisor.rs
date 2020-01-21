@@ -66,9 +66,9 @@ pub struct Supervisor {
     // The order in which children and supervisors were added.
     // It is only updated when at least one of those is resat.
     order: Vec<BastionId>,
-    // The currently launched supervised children and supervisors. The
-    // last value stores amount of restarts of the certain actor.
-    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>, u64)>,
+    // The currently launched supervised children and supervisors.
+    // The last value is the amount of times a given actor has restarted.
+    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>, usize)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
@@ -140,13 +140,22 @@ enum Supervised {
 /// The strategy for restating an actor as far as it
 /// returned an failure.
 ///
-/// The default strategy is `Instantly`.
+/// The default strategy is `Immediate`.
 pub enum ActorRestartStrategy {
     /// Restart an actor as soon as possible, since the moment
     /// the actor finished with a failure.
-    Instantly,
+    Immediate,
+    /// Restart an actor after with the timeout. Each next restart
+    /// is increasing on the given duration.
+    LinearBackOff {
+        /// An initial delay before the restarting an actor.
+        timeout: Duration,
+    },
     /// Restart an actor after with the timeout. Each next timeout
     /// is increasing exponentially.
+    /// When passed a multiplier that equals to 1, the strategy works as the
+    /// linear back off strategy. Passing the multiplier that equals to 0 leads
+    /// to constant restart delays which is equal to the given timeout.
     ExponentialBackOff {
         /// An initial delay before the restarting an actor.
         timeout: Duration,
@@ -658,9 +667,10 @@ impl Supervisor {
     /// * `restart_strategy` - The strategy to use:
     ///     - [`ActorRestartStrategy::Instantly`] would restart the
     ///         failed actor as soon as possible.
+    ///     - [`ActorRestartStrategy::LinearBackOff`] would restart the
+    ///         failed actor with the delay increasing linearly.
     ///     - [`ActorRestartStrategy::ExponentialBackOff`] would restart the
-    ///         failed actor with the delay (in milliseconds), multiplied on the
-    ///         some coefficient.
+    ///         failed actor with the delay, multiplied by given coefficient.
     ///
     /// # Example
     ///
@@ -671,7 +681,7 @@ impl Supervisor {
     ///     # Bastion::init();
     ///     #
     /// Bastion::supervisor(|sp| {
-    ///     sp.with_restart_strategy(ActorRestartStrategy::Instantly)
+    ///     sp.with_restart_strategy(ActorRestartStrategy::Immediate)
     /// }).expect("Couldn't create the supervisor");
     ///     #
     ///     # Bastion::start();
@@ -681,6 +691,7 @@ impl Supervisor {
     /// ```
     ///
     /// [`ActorRestartStrategy::Instantly`]: supervisor/enum.ActorRestartStrategy.html#variant.Instantly
+    /// [`ActorRestartStrategy::LinearBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.LinearBackOff
     /// [`ActorRestartStrategy::ExponentialBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.ExponentialBackOff
     pub fn with_restart_strategy(mut self, restart_strategy: ActorRestartStrategy) -> Self {
         trace!(
@@ -780,12 +791,17 @@ impl Supervisor {
                 );
 
                 match restart_strategy_inner {
+                    ActorRestartStrategy::LinearBackOff { timeout } => {
+                        let start_in =
+                            timeout.as_secs() + (timeout.as_secs() * restart_count as u64);
+                        Delay::new(Duration::from_secs(start_in)).await;
+                    }
                     ActorRestartStrategy::ExponentialBackOff {
                         timeout,
                         multiplier,
                     } => {
-                        let start_in =
-                            timeout.as_secs() + (timeout.as_secs() * multiplier * restart_count);
+                        let start_in = timeout.as_secs()
+                            + (timeout.as_secs() * multiplier * restart_count as u64);
                         Delay::new(Duration::from_secs(start_in)).await;
                     }
                     _ => {}
@@ -1681,7 +1697,7 @@ impl Default for SupervisionStrategy {
 
 impl Default for ActorRestartStrategy {
     fn default() -> Self {
-        ActorRestartStrategy::Instantly
+        ActorRestartStrategy::Immediate
     }
 }
 
