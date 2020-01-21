@@ -77,7 +77,7 @@ pub struct Supervisor {
     // This is used when resetting only.
     killed: FxHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
-    restart_strategy: ActorRestartStrategy,
+    restart_strategy: RestartStrategy,
     // The callbacks called at the supervisor's different
     // lifecycle events.
     callbacks: Callbacks,
@@ -136,6 +136,18 @@ enum Supervised {
     Children(Children),
 }
 
+/// The strategy for a supervisor which is used for
+/// restoring failed actors. It it fails after N attempts,
+/// the supervisor will remove an actor.
+///
+/// The default strategy used is `ActorRestartStrategy::Immediate`
+/// with unlimited amount of retries (max_restarts in `None`).
+#[derive(Debug, Clone)]
+pub struct RestartStrategy {
+    max_restarts: Option<usize>,
+    strategy: ActorRestartStrategy,
+}
+
 #[derive(Debug, Clone)]
 /// The strategy for restating an actor as far as it
 /// returned an failure.
@@ -172,7 +184,7 @@ impl Supervisor {
         let stopped = FxHashMap::default();
         let killed = FxHashMap::default();
         let strategy = SupervisionStrategy::default();
-        let restart_strategy = ActorRestartStrategy::default();
+        let restart_strategy = RestartStrategy::default();
         let callbacks = Callbacks::new();
         let is_system_supervisor = false;
         let pre_start_msgs = Vec::new();
@@ -659,29 +671,28 @@ impl Supervisor {
     /// of its supervised children groups or supervisors dies to
     /// restore in the correct state.
     ///
-    /// The default strategy is
-    /// [`ActorRestartStrategy::Instanly`].
-    ///
-    /// # Arguments
-    ///
-    /// * `restart_strategy` - The strategy to use:
-    ///     - [`ActorRestartStrategy::Instantly`] would restart the
-    ///         failed actor as soon as possible.
-    ///     - [`ActorRestartStrategy::LinearBackOff`] would restart the
-    ///         failed actor with the delay increasing linearly.
-    ///     - [`ActorRestartStrategy::ExponentialBackOff`] would restart the
-    ///         failed actor with the delay, multiplied by given coefficient.
+    /// The default strategy is the [`ActorRestartStrategy::Immediate`] and
+    /// unlimited amount of retries.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use bastion::prelude::*;
+    /// # use std::time::Duration;
     /// #
     /// # fn main() {
     ///     # Bastion::init();
-    ///     #
-    /// Bastion::supervisor(|sp| {
-    ///     sp.with_restart_strategy(ActorRestartStrategy::Immediate)
+    ///     # Bastion::supervisor(|sp| {
+    ///     sp.with_restart_strategy(
+    ///         RestartStrategy::default()
+    ///             .with_max_restarts(Some(5))     // 5 attempts
+    ///             .with_actor_restart_strategy(           
+    ///                 ActorRestartStrategy::ExponentialBackOff {
+    ///                     timeout: Duration::from_millis(5000),
+    ///                     multiplier: 3,
+    ///                 }
+    ///             )
+    ///     )
     /// }).expect("Couldn't create the supervisor");
     ///     #
     ///     # Bastion::start();
@@ -689,11 +700,7 @@ impl Supervisor {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`ActorRestartStrategy::Instantly`]: supervisor/enum.ActorRestartStrategy.html#variant.Instantly
-    /// [`ActorRestartStrategy::LinearBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.LinearBackOff
-    /// [`ActorRestartStrategy::ExponentialBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.ExponentialBackOff
-    pub fn with_restart_strategy(mut self, restart_strategy: ActorRestartStrategy) -> Self {
+    pub fn with_restart_strategy(mut self, restart_strategy: RestartStrategy) -> Self {
         trace!(
             "Supervisor({}): Setting actor restart strategy: {:?}",
             self.id(),
@@ -775,49 +782,57 @@ impl Supervisor {
                 supervised.elem().clone().with_id(BastionId::new()),
             );
 
-            let restart_count = match self.launched.get(&id.clone()) {
+            let actor_restarts_count = match self.launched.get(&id.clone()) {
                 Some((_, _, count)) => *count,
                 None => 0,
             };
 
-            let restart_strategy_inner = restart_strategy.clone();
-            reset.push(async move {
-                debug!(
-                    "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
-                    supervisor_id,
-                    supervised.id(),
-                    killed,
-                    bcast.id()
-                );
+            let restart_required = match restart_strategy.max_restarts() {
+                Some(max_retries) => actor_restarts_count < max_retries,
+                None => true,
+            };
 
-                match restart_strategy_inner {
-                    ActorRestartStrategy::LinearBackOff { timeout } => {
-                        let start_in =
-                            timeout.as_secs() + (timeout.as_secs() * restart_count as u64);
-                        Delay::new(Duration::from_secs(start_in)).await;
+            if restart_required {
+                let restart_strategy_inner = restart_strategy.clone();
+
+                reset.push(async move {
+                    debug!(
+                        "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
+                        supervisor_id,
+                        supervised.id(),
+                        killed,
+                        bcast.id()
+                    );
+
+                    match restart_strategy_inner.strategy() {
+                        ActorRestartStrategy::LinearBackOff { timeout } => {
+                            let start_in = timeout.as_secs()
+                                + (timeout.as_secs() * actor_restarts_count as u64);
+                            Delay::new(Duration::from_secs(start_in)).await;
+                        }
+                        ActorRestartStrategy::ExponentialBackOff {
+                            timeout,
+                            multiplier,
+                        } => {
+                            let start_in = timeout.as_secs()
+                                + (timeout.as_secs() * multiplier * actor_restarts_count as u64);
+                            Delay::new(Duration::from_secs(start_in)).await;
+                        }
+                        _ => {}
+                    };
+
+                    // FIXME: panics?
+                    let supervised = supervised.reset(bcast).await.unwrap();
+                    // FIXME: might not keep order
+                    if killed {
+                        supervised.callbacks().after_restart();
+                    } else {
+                        supervised.callbacks().before_start();
                     }
-                    ActorRestartStrategy::ExponentialBackOff {
-                        timeout,
-                        multiplier,
-                    } => {
-                        let start_in = timeout.as_secs()
-                            + (timeout.as_secs() * multiplier * restart_count as u64);
-                        Delay::new(Duration::from_secs(start_in)).await;
-                    }
-                    _ => {}
-                };
 
-                // FIXME: panics?
-                let supervised = supervised.reset(bcast).await.unwrap();
-                // FIXME: might not keep order
-                if killed {
-                    supervised.callbacks().after_restart();
-                } else {
-                    supervised.callbacks().before_start();
-                }
-
-                supervised
-            })
+                    supervised
+                })
+            }
         }
 
         trace!(
@@ -984,8 +999,9 @@ impl Supervisor {
                     self.id(),
                     supervised.id()
                 );
+
                 let restart_count = match self.launched.get(&id.clone()) {
-                    Some((_, _, count)) => count + 1,
+                    Some((_, _, count)) => *count + 1,
                     None => 0,
                 };
                 let launched = supervised.launch();
@@ -1689,9 +1705,87 @@ impl Supervised {
     }
 }
 
+impl RestartStrategy {
+    /// Creates a new instance of RestartStrategy.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_retries` - Defines an amout of attempts to restore an actor
+    /// to the initial state. Set `None` to have unlimited amout of attemps.
+    ///
+    /// * `strategy` - The strategy to use:
+    ///     - [`ActorRestartStrategy::Immediate`] would restart the
+    ///         failed actor as soon as possible.
+    ///     - [`ActorRestartStrategy::LinearBackOff`] would restart the
+    ///         failed actor with the delay increasing linearly.
+    ///     - [`ActorRestartStrategy::ExponentialBackOff`] would restart the
+    ///         failed actor with the delay, multiplied by given coefficient.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use std::time::Duration;
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    /// #     use std::time::Duration;
+    /// #     let actor_restart_strategy = ActorRestartStrategy::LinearBackOff {
+    /// #         timeout: Duration::from_secs(5)
+    /// #     };
+    /// #     let restart_strategy = RestartStrategy::default()
+    /// #        .with_actor_restart_strategy(actor_restart_strategy);
+    /// # }
+    /// ```
+    ///
+    /// [`ActorRestartStrategy::Instantly`]: supervisor/enum.ActorRestartStrategy.html#variant.Instantly
+    /// [`ActorRestartStrategy::LinearBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.LinearBackOff
+    /// [`ActorRestartStrategy::ExponentialBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.ExponentialBackOff
+    pub fn new(max_restarts: Option<usize>, strategy: ActorRestartStrategy) -> Self {
+        RestartStrategy {
+            max_restarts,
+            strategy,
+        }
+    }
+
+    /// Returns the acceptable count of retries for the failed actor.
+    /// The `None` value means the amount of attempts is unlimited.
+    pub fn max_restarts(&self) -> Option<usize> {
+        self.max_restarts
+    }
+
+    /// Returns the current strategy for restarting failed actors.
+    pub fn strategy(&self) -> ActorRestartStrategy {
+        self.strategy.clone()
+    }
+
+    /// Sets the limit of attempts for restoring failed actors.
+    pub fn with_max_restarts(mut self, max_restarts: Option<usize>) -> Self {
+        self.max_restarts = max_restarts;
+        self
+    }
+
+    /// Sets the actor restart strategy the supervisor should use
+    /// of its supervised children groups or supervisors dies to
+    /// restore in the correct state.
+    pub fn with_actor_restart_strategy(mut self, strategy: ActorRestartStrategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
+}
+
 impl Default for SupervisionStrategy {
     fn default() -> Self {
         SupervisionStrategy::OneForOne
+    }
+}
+
+impl Default for RestartStrategy {
+    fn default() -> Self {
+        RestartStrategy {
+            // Unlimited amount of restarts.
+            max_restarts: None,
+            strategy: ActorRestartStrategy::default(),
+        }
     }
 }
 
