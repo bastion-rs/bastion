@@ -18,7 +18,7 @@ use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
-use std::ops::{Range, RangeFrom};
+use std::ops::Range;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
@@ -851,7 +851,7 @@ impl Supervisor {
         }
     }
 
-    async fn stop(&mut self, range: RangeFrom<usize>) {
+    async fn stop(&mut self, range: Range<usize>) {
         debug!("Supervisor({}): Stopping range: {:?}", self.id(), range);
         if range.start == 0 {
             self.bcast.stop_children();
@@ -982,7 +982,7 @@ impl Supervisor {
                 msg: BastionMessage::Stop,
                 ..
             } => {
-                self.stop(0..).await;
+                self.stop(0..self.order.len()).await;
                 self.stopped();
 
                 return Err(());
