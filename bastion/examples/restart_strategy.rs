@@ -24,7 +24,7 @@ fn supervisor(supervisor: Supervisor) -> Supervisor {
 }
 
 fn failed_actors_group(children: Children) -> Children {
-    children.with_exec(move |ctx: BastionContext| async move {
+    children.with_exec(move |_ctx: BastionContext| async move {
         println!("Worker started!");
         panic!("Unexpected error...");
     })

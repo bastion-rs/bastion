@@ -18,6 +18,7 @@ use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 use std::task::Poll;
@@ -755,6 +756,17 @@ impl Supervisor {
     }
 
     async fn restart(&mut self, range: Range<usize>) {
+        let mut tracked_actors = HashMap::new();
+        for index in range.clone() {
+            let bastion_id = self.order[index].clone();
+            let restart_count = match self.launched.get(&bastion_id) {
+                Some((_, _, count)) => *count,
+                None => 0,
+            };
+
+            tracked_actors.insert(bastion_id, restart_count);
+        }
+
         debug!("Supervisor({}): Restarting range: {:?}", self.id(), range);
         // TODO: stop or kill?
         self.kill(range.clone()).await;
@@ -782,9 +794,9 @@ impl Supervisor {
                 supervised.elem().clone().with_id(BastionId::new()),
             );
 
-            let actor_restarts_count = match self.launched.get(&id.clone()) {
-                Some((_, _, count)) => *count,
-                None => 0,
+            let actor_restarts_count = match tracked_actors.get(&id.clone()) {
+                Some(count) => *count + 1,
+                None => 1,
             };
 
             let restart_required = match restart_strategy.max_restarts() {
@@ -804,7 +816,10 @@ impl Supervisor {
                         bcast.id()
                     );
 
-                    restart_strategy_inner.apply_strategy(actor_restarts_count).await;
+                    let old_bastion_id = supervised.id().clone();
+                    restart_strategy_inner
+                        .apply_strategy(actor_restarts_count)
+                        .await;
 
                     // FIXME: panics?
                     let supervised = supervised.reset(bcast).await.unwrap();
@@ -815,7 +830,7 @@ impl Supervisor {
                         supervised.callbacks().before_start();
                     }
 
-                    supervised
+                    (old_bastion_id, supervised)
                 })
             }
         }
@@ -825,7 +840,7 @@ impl Supervisor {
             self.id(),
             reset.len()
         );
-        while let Some(supervised) = reset.next().await {
+        while let Some((old_bastion_id, supervised)) = reset.next().await {
             self.bcast.register(supervised.bcast());
             if self.started {
                 let msg = BastionMessage::start();
@@ -840,13 +855,13 @@ impl Supervisor {
                 supervised.id()
             );
             let id = supervised.id().clone();
-            let restart_count = match self.launched.get(&id.clone()) {
-                Some((_, _, count)) => *count,
-                None => 0,
+            let restart_count = match tracked_actors.get(&old_bastion_id) {
+                Some(count) => *count + 1,
+                None => 1,
             };
             let launched = supervised.launch();
             self.launched
-                .insert(id.clone(), (self.order.len(), launched, restart_count + 1));
+                .insert(id.clone(), (self.order.len(), launched, restart_count));
             self.order.push(id);
         }
     }
@@ -952,7 +967,7 @@ impl Supervisor {
                 let (start, _, _) = self.launched.get(&id).ok_or(())?;
                 let start = *start;
 
-                self.restart(start..start+1).await;
+                self.restart(start..start + 1).await;
             }
             SupervisionStrategy::OneForAll => {
                 self.restart(0..self.order.len()).await;
@@ -1720,16 +1735,15 @@ impl RestartStrategy {
     pub(crate) async fn apply_strategy(&self, restarts_count: usize) {
         match self.strategy {
             ActorRestartStrategy::LinearBackOff { timeout } => {
-                let start_in = timeout.as_secs()
-                    + (timeout.as_secs() * restarts_count as u64);
+                let start_in = timeout.as_secs() + (timeout.as_secs() * restarts_count as u64);
                 Delay::new(Duration::from_secs(start_in)).await;
             }
             ActorRestartStrategy::ExponentialBackOff {
                 timeout,
                 multiplier,
             } => {
-                let start_in = timeout.as_secs()
-                    + (timeout.as_secs() * multiplier * restarts_count as u64);
+                let start_in =
+                    timeout.as_secs() + (timeout.as_secs() * multiplier * restarts_count as u64);
                 Delay::new(Duration::from_secs(start_in)).await;
             }
             _ => {}
