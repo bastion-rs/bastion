@@ -20,7 +20,6 @@ fn main() {
     Bastion::block_until_stopped();
 }
 
-
 fn supervisor(supervisor: Supervisor) -> Supervisor {
     // Here we are specifying the used restart strategy for our supervisor.
     // By default the bastion's supervisors are always trying to restart
