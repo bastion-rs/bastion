@@ -137,7 +137,7 @@ enum Supervised {
     Children(Children),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 /// The restart policy which is used during restoring failed
 /// actors by the supervisor.
 ///
@@ -159,13 +159,13 @@ pub enum RestartPolicy {
 ///
 /// The default strategy used is `ActorRestartStrategy::Immediate`
 /// with the `RestartPolicy::Always` restart policy.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RestartStrategy {
     restart_policy: RestartPolicy,
     strategy: ActorRestartStrategy,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 /// The strategy for restating an actor as far as it
 /// returned an failure.
 ///
@@ -702,7 +702,7 @@ impl Supervisor {
     ///     # Bastion::supervisor(|sp| {
     ///     sp.with_restart_strategy(
     ///         RestartStrategy::default()
-    ///             .with_max_restarts(Some(5))     // 5 attempts
+    ///             .with_restart_policy(RestartPolicy::Tries(5))
     ///             .with_actor_restart_strategy(           
     ///                 ActorRestartStrategy::ExponentialBackOff {
     ///                     timeout: Duration::from_millis(5000),
