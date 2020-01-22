@@ -137,15 +137,31 @@ enum Supervised {
     Children(Children),
 }
 
+#[derive(Debug, Clone)]
+/// The restart policy which is used during restoring failed
+/// actors by the supervisor.
+///
+/// The default restart policy is `Always`.
+pub enum RestartPolicy {
+    /// Restart the failed actor with unlimited amount of attempts.
+    Always,
+    /// Never restart the failed actor when it happens.
+    Never,
+    /// Restart the failed actor with the limited amount of attempts.
+    /// If the actor can't be run after N attempts, the failed actor
+    /// will be removed from the execution by the supervisor.
+    Tries(usize),
+}
+
 /// The strategy for a supervisor which is used for
 /// restoring failed actors. It it fails after N attempts,
 /// the supervisor will remove an actor.
 ///
 /// The default strategy used is `ActorRestartStrategy::Immediate`
-/// with unlimited amount of retries (max_restarts in `None`).
+/// with the `RestartPolicy::Always` restart policy.
 #[derive(Debug, Clone)]
 pub struct RestartStrategy {
-    max_restarts: Option<usize>,
+    restart_policy: RestartPolicy,
     strategy: ActorRestartStrategy,
 }
 
@@ -799,9 +815,10 @@ impl Supervisor {
                 None => 1,
             };
 
-            let restart_required = match restart_strategy.max_restarts() {
-                Some(max_retries) => actor_restarts_count < max_retries,
-                None => true,
+            let restart_required = match restart_strategy.restart_policy() {
+                RestartPolicy::Always => true,
+                RestartPolicy::Never => false,
+                RestartPolicy::Tries(max_retries) => actor_restarts_count < max_retries,
             };
 
             if restart_required {
@@ -1670,8 +1687,14 @@ impl RestartStrategy {
     ///
     /// # Arguments
     ///
-    /// * `max_retries` - Defines an amout of attempts to restore an actor
-    /// to the initial state. Set `None` to have unlimited amout of attemps.
+    /// * `restart_policy` - Defines a restart policy to use for failed actor:
+    ///     - [`RestartStrategy::Always`] would restart the
+    ///         failed actor each time as it fails.
+    ///     - [`RestartStrategy::Never`] would not restart the
+    ///         failed actor and remove it from tracking.
+    ///     - [`RestartStrategy::Tries`] would restart the
+    ///         failed actor a limited amount of times. If can't be started,
+    ///         then will remove it from tracking.   
     ///
     /// * `strategy` - The strategy to use:
     ///     - [`ActorRestartStrategy::Immediate`] would restart the
@@ -1697,20 +1720,23 @@ impl RestartStrategy {
     /// # }
     /// ```
     ///
+    /// [`RestartStrategy::Always`]: supervisor/enum.RestartStrategy.html#variant.Always
+    /// [`RestartStrategy::Never`]: supervisor/enum.RestartStrategy.html#variant.Never
+    /// [`RestartStrategy::Tries`]: supervisor/enum.RestartStrategy.html#variant.Tries
     /// [`ActorRestartStrategy::Instantly`]: supervisor/enum.ActorRestartStrategy.html#variant.Instantly
     /// [`ActorRestartStrategy::LinearBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.LinearBackOff
     /// [`ActorRestartStrategy::ExponentialBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.ExponentialBackOff
-    pub fn new(max_restarts: Option<usize>, strategy: ActorRestartStrategy) -> Self {
+    pub fn new(restart_policy: RestartPolicy, strategy: ActorRestartStrategy) -> Self {
         RestartStrategy {
-            max_restarts,
+            restart_policy,
             strategy,
         }
     }
 
     /// Returns the acceptable count of retries for the failed actor.
     /// The `None` value means the amount of attempts is unlimited.
-    pub fn max_restarts(&self) -> Option<usize> {
-        self.max_restarts
+    pub fn restart_policy(&self) -> RestartPolicy {
+        self.restart_policy.clone()
     }
 
     /// Returns the current strategy for restarting failed actors.
@@ -1719,8 +1745,8 @@ impl RestartStrategy {
     }
 
     /// Sets the limit of attempts for restoring failed actors.
-    pub fn with_max_restarts(mut self, max_restarts: Option<usize>) -> Self {
-        self.max_restarts = max_restarts;
+    pub fn with_restart_policy(mut self, restart_policy: RestartPolicy) -> Self {
+        self.restart_policy = restart_policy;
         self
     }
 
@@ -1760,8 +1786,7 @@ impl Default for SupervisionStrategy {
 impl Default for RestartStrategy {
     fn default() -> Self {
         RestartStrategy {
-            // Unlimited amount of restarts.
-            max_restarts: None,
+            restart_policy: RestartPolicy::Always,
             strategy: ActorRestartStrategy::default(),
         }
     }
