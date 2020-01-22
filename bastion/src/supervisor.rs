@@ -802,11 +802,10 @@ impl Supervisor {
 
                 reset.push(async move {
                     debug!(
-                        "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
+                        "Supervisor({}): Resetting Supervised({}) (killed={}).",
                         supervisor_id,
                         supervised.id(),
                         killed,
-                        bcast.id()
                     );
 
                     let old_bastion_id = supervised.id().clone();
@@ -957,40 +956,8 @@ impl Supervisor {
         );
         match self.strategy {
             SupervisionStrategy::OneForOne => {
-<<<<<<< HEAD
                 let (start, _, _) = self.launched.get(&id).ok_or(())?;
                 let start = *start;
-=======
-                let (order, launched, _) = self.launched.remove(&id).ok_or(())?;
-                // TODO: add a "waiting" list and poll from it instead of awaiting
-                // FIXME: panics?
-                let supervised = launched.await.unwrap();
-                supervised.callbacks().before_restart();
-
-                self.bcast.unregister(supervised.id());
-
-                let parent = Parent::supervisor(self.as_ref());
-                let bcast =
-                    Broadcast::new(parent, supervised.elem().clone().with_id(BastionId::new()));
-                let id = bcast.id().clone();
-                debug!(
-                    "Supervisor({}): Resetting Supervised({}) to Supervised({}).",
-                    self.id(),
-                    supervised.id(),
-                    bcast.id()
-                );
-                // FIXME: panics?
-                let supervised = supervised.reset().await.unwrap();
-                supervised.callbacks().after_restart();
-
-                self.bcast.register(supervised.bcast());
-                if self.started {
-                    let msg = BastionMessage::start();
-                    let env =
-                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-                    self.bcast.send_child(&id, env);
-                }
->>>>>>> Preserve BastionId for a respawned Child, wip: transfer Receiver to a respawned Child
 
                 self.restart(start..start + 1).await;
             }
