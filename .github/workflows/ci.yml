@@ -72,7 +72,7 @@ jobs:
           toolchain: nightly
           default: true
           components: rustfmt
-        
+
       - name: fmt
         run: cargo fmt --all -- --check
 
