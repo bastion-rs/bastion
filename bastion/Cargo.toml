@@ -40,7 +40,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { version = "= 0.3.4", path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.4" }
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0.0"
 fxhash = "0.2"
