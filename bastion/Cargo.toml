@@ -1,6 +1,11 @@
 [package]
 name = "bastion"
-version = "0.3.2-alpha.0"
+# Steps to release to crates.io:
+# - Remove path dependencies
+# - Update CHANGELOG.md.
+#   - npm install -g auto-changelog && auto-changelog at the root
+# - Create "v0.x.y" git tag at the root of the project.
+version = "0.3.5-alpha.0"
 description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
@@ -35,12 +40,14 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { version = "= 0.3.2", path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.5-alpha.0", path = "../bastion-executor" }
+lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
+
+
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0.0"
 fxhash = "0.2"
 lazy_static = "1.4"
-lightproc = { version = "= 0.3.3", path = "../lightproc" }
 log = "0.4"
 # TODO: https://github.com/cogciprocate/qutex/pull/5
 # TODO: https://github.com/cogciprocate/qutex/pull/6
