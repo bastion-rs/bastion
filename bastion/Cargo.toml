@@ -40,12 +40,14 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { version = "= 0.3.4" }
+bastion-executor = { version = "= 0.3.5-alpha.0", path = "../bastion-executor" }
+lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
+
+
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0.0"
 fxhash = "0.2"
 lazy_static = "1.4"
-lightproc = { version = "= 0.3.4" }
 log = "0.4"
 # TODO: https://github.com/cogciprocate/qutex/pull/5
 # TODO: https://github.com/cogciprocate/qutex/pull/6
