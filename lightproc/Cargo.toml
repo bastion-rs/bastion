@@ -1,6 +1,6 @@
 [package]
 name = "lightproc"
-version = "0.3.3"
+version = "0.3.4"
 description = "Lightweight process abstraction for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system", "lightweight-process"]
