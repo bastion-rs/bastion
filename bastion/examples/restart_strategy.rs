@@ -7,9 +7,9 @@ use bastion::prelude::*;
 ///
 /// Prologue:
 /// This examples demonstrates how to override the default restart strategy
-/// on a custom, provided by the bastion crate. The supervisor will spawn
+/// with a custom strategy, provided by the bastion crate. The supervisor will spawn
 /// the only one tracked actor that will be restarted a couple of times and
-/// the certain timeout after a raised failure in the actor's code.
+/// after certain timeout failure will arise from the actor's code.
 ///
 fn main() {
     Bastion::init();
