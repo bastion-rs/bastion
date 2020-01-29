@@ -61,12 +61,6 @@ pub struct Pool {
 }
 
 impl Pool {
-    /// Error recovery for the fallen threads
-    pub fn recover_async_thread() {
-        // FIXME: Do recovery for fallen worker threads
-        unimplemented!()
-    }
-
     ///
     /// Spawn a process (which contains future + process stack) onto the executor via [Pool] interface.
     pub fn spawn<F, T>(&self, future: F, stack: ProcStack) -> RecoverableHandle<T>
