@@ -43,7 +43,7 @@ unstable = ["bastion-executor/unstable"]
 bastion-executor = { version = "= 0.3.5-alpha.0", path = "../bastion-executor" }
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
 
-
+dashmap = "3.4.0"
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0.0"
 fxhash = "0.2"

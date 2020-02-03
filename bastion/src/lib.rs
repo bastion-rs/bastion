@@ -80,6 +80,7 @@ pub mod context;
 pub mod envelope;
 pub mod message;
 pub mod path;
+pub mod registry;
 pub mod supervisor;
 
 ///
@@ -96,6 +97,9 @@ pub mod prelude {
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
+    pub use crate::registry::{
+        BastionRegistryMap, DefaultRegistryDispatcher, Registry, RegistryDispatcher, RegistryType,
+    };
     pub use crate::supervisor::{
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,
