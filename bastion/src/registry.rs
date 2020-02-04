@@ -1,14 +1,14 @@
 //!
 //! Special module that allows users to interact and communicate with a
-//! group of actors through the Registry name.  
-use crate::context::BastionId;
+//! group of actors through the Registry name.
+use crate::child_ref::ChildRef;
 use crate::envelope::SignedMessage;
 use dashmap::DashMap;
 use std::fmt::{self, Debug};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
-pub type BastionRegistryMap = DashMap<BastionId, String>;
+pub type BastionRegistryMap = DashMap<ChildRef, String>;
 
 /// Generic trait which any custom dispatcher must implement for
 /// further usage by the `Registry`.
@@ -87,14 +87,14 @@ impl Registry {
     }
 
     /// Appends the information about actor to the registry.
-    pub fn register(&self, key: BastionId, module_name: String) {
+    pub fn register(&self, key: ChildRef, module_name: String) {
         self.storage.insert(key, module_name);
         self.dispatcher.dispatch(&self.storage);
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
-    pub fn remove(&self, key: BastionId) -> Option<(BastionId, String)> {
+    pub fn remove(&self, key: ChildRef) -> Option<(ChildRef, String)> {
         self.storage.remove(&key)
     }
 
