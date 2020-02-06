@@ -94,8 +94,8 @@ pub mod prelude {
     pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId, NIL_ID};
     pub use crate::dispatcher::{
-        BastionDispatcherMap, DefaultDispatcherHandler, Dispatcher, DispatcherHandler,
-        DispatcherType,
+        BastionDispatcherMap, BroadcastTarget, DefaultDispatcherHandler, Dispatcher,
+        DispatcherHandler, DispatcherType, NotificationType,
     };
     pub use crate::envelope::{RefAddr, SignedMessage};
     pub use crate::message::{Answer, AnswerSender, Message, Msg};

@@ -12,14 +12,39 @@ use std::fmt::{self, Debug};
 pub type BastionDispatcherMap = DashMap<ChildRef, String>;
 
 #[derive(Debug, Clone)]
+/// Defines types of the notifications handled by the dispatcher
+/// when the group of actors is changing.
+pub enum NotificationType {
+    /// Represents a notification when a new actor wants to
+    /// join to the existing group of actors.
+    Register,
+    /// Represents a notification when the existing actor
+    /// was stopped, killed, suspended or finished an execution.
+    Remove,
+}
+
+#[derive(Debug, Clone)]
+/// Defines types of the notifications handled by the dispatcher
+/// when the group of actors is changing.
+///
+/// If the message can't be delivered to the declared group, then
+/// the message will be marked as the "dead letter".
+pub enum BroadcastTarget {
+    /// Send the broadcasted message to everyone in the system.
+    All,
+    /// Send the broadcasted message to each actor in group.
+    Group(String),
+}
+
+#[derive(Debug, Clone)]
 /// Defines the type of the dispatcher.
 ///
-/// The default type is `System`.
+/// The default type is `Anonymous`.
 pub enum DispatcherType {
     /// The default kind of the dispatcher which is using for
-    /// handling all actors in the cluster. Can be no more than
+    /// handling all actors in the cluster. Can be more than
     /// one instance of this type.
-    System,
+    Anonymous,
     /// The dispatcher with a unique name which will be using
     /// for updating and notifying actors in the same group
     /// base on the desired strategy. The logic handling broadcasted
@@ -35,7 +60,10 @@ pub struct DefaultDispatcherHandler;
 
 /// Generic trait which any custom dispatcher handler must implement for
 /// the further usage by the `Dispatcher` instances.
-pub trait DispatcherHandler {}
+pub trait DispatcherHandler {
+    fn notify(&self, entries: &BastionDispatcherMap, notification_type: NotificationType);
+    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage);
+}
 
 /// A generic implementation of the Bastion dispatcher
 ///
@@ -85,13 +113,18 @@ impl Dispatcher {
     /// Appends the information about actor to the dispatcher.
     pub fn register(&self, key: ChildRef, module_name: String) {
         self.actors.insert(key, module_name);
-        self.handler.notify(&self.actors);
+        self.handler
+            .notify(&self.actors, NotificationType::Register);
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
     pub fn remove(&self, key: ChildRef) -> Option<(ChildRef, String)> {
-        self.actors.remove(&key)
+        let result = self.actors.remove(&key);
+        if result.is_some() {
+            self.handler.notify(&self.actors, NotificationType::Remove);
+        }
+        result
     }
 
     /// Sends the message to the group of actors.
@@ -113,7 +146,10 @@ impl Debug for Dispatcher {
     }
 }
 
-impl DispatcherHandler for DefaultDispatcherHandler {}
+impl DispatcherHandler for DefaultDispatcherHandler {
+    fn notify(&self, entries: &BastionDispatcherMap, notification_type: NotificationType) {}
+    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage) {}
+}
 
 impl Default for Dispatcher {
     fn default() -> Self {
@@ -133,6 +169,6 @@ impl Default for DefaultDispatcherHandler {
 
 impl Default for DispatcherType {
     fn default() -> Self {
-        DispatcherType::System
+        DispatcherType::Anonymous
     }
 }
