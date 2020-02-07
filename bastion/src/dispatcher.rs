@@ -63,9 +63,14 @@ pub struct DefaultDispatcherHandler;
 /// the further usage by the `Dispatcher` instances.
 pub trait DispatcherHandler {
     /// Sends the notification of the certain type to each actor in group.
-    fn notify(&self, entries: &BastionDispatcherMap, notification_type: NotificationType);
+    fn notify(
+        &self,
+        from_child: &ChildRef,
+        entries: &BastionDispatcherMap,
+        notification_type: NotificationType,
+    );
     /// Broadcast the message to actors in according to the implemented behaviour.
-    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage);
+    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: &SignedMessage);
 }
 
 /// A generic implementation of the Bastion dispatcher
@@ -78,7 +83,7 @@ pub trait DispatcherHandler {
 pub struct Dispatcher {
     /// Defines the type of the dispatcher.
     dispatcher_type: DispatcherType,
-    /// The handler used for each `notification` or a message.
+    /// The handler used for a notification or a message.
     handler: Box<dyn DispatcherHandler + Send + Sync + 'static>,
     /// Special field that stores information about all
     /// registered actors in the group.
@@ -117,27 +122,34 @@ impl Dispatcher {
     }
 
     /// Appends the information about actor to the dispatcher.
-    pub fn register(&self, key: ChildRef, module_name: String) {
-        self.actors.insert(key, module_name);
+    pub fn register(&self, key: &ChildRef, module_name: String) {
+        self.actors.insert(key.to_owned(), module_name);
         self.handler
-            .notify(&self.actors, NotificationType::Register);
+            .notify(key, &self.actors, NotificationType::Register);
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
-    pub fn remove(&self, key: ChildRef) -> Option<(ChildRef, String)> {
-        let result = self.actors.remove(&key);
+    pub fn remove(&self, key: &ChildRef) -> Option<(ChildRef, String)> {
+        let result = self.actors.remove(key);
         if result.is_some() {
-            self.handler.notify(&self.actors, NotificationType::Remove);
+            self.handler
+                .notify(key, &self.actors, NotificationType::Remove);
         }
         result
+    }
+
+    /// Forwards the message to the handler for processing.
+    pub fn notify(&self, from_child: &ChildRef, notification_type: NotificationType) {
+        self.handler
+            .notify(from_child, &self.actors, notification_type)
     }
 
     /// Sends the message to the group of actors.
     /// The logic of who and how should receive the message relies onto
     /// the handler implementation.
-    pub fn broadcast_message(&self, message: SignedMessage) {
-        self.handler.broadcast_message(&self.actors, message);
+    pub fn broadcast_message(&self, message: &SignedMessage) {
+        self.handler.broadcast_message(&self.actors, &message);
     }
 }
 
@@ -153,8 +165,14 @@ impl Debug for Dispatcher {
 }
 
 impl DispatcherHandler for DefaultDispatcherHandler {
-    fn notify(&self, _entries: &BastionDispatcherMap, _notification_type: NotificationType) {}
-    fn broadcast_message(&self, _entries: &BastionDispatcherMap, _message: SignedMessage) {}
+    fn notify(
+        &self,
+        _from_child: &ChildRef,
+        _entries: &BastionDispatcherMap,
+        _notification_type: NotificationType,
+    ) {
+    }
+    fn broadcast_message(&self, _entries: &BastionDispatcherMap, _message: &SignedMessage) {}
 }
 
 impl DispatcherType {
@@ -194,6 +212,15 @@ impl Hash for DispatcherType {
     }
 }
 
+impl Into<DispatcherType> for String {
+    fn into(self) -> DispatcherType {
+        match self == DispatcherType::Anonymous.name() {
+            true => DispatcherType::Anonymous,
+            false => DispatcherType::Named(self),
+        }
+    }
+}
+
 #[derive(Debug)]
 /// The global dispatcher of bastion the cluster.
 ///
@@ -205,9 +232,57 @@ pub(crate) struct GlobalDispatcher {
 }
 
 impl GlobalDispatcher {
+    /// Creates a new instance of the global registry.
     pub(crate) fn new() -> Self {
         GlobalDispatcher {
             dispatchers: DashMap::new(),
+        }
+    }
+
+    /// Passes the notification from the actor to everyone that registered in the same
+    /// groups as the caller.
+    pub(crate) fn notify(
+        &self,
+        from_actor: &ChildRef,
+        dispatchers: &Vec<Dispatcher>,
+        notification_type: NotificationType,
+    ) {
+        for dispatcher in dispatchers {
+            dispatcher.notify(from_actor, notification_type.clone())
+        }
+    }
+
+    /// Broadcasts the given message in according with the specified target.
+    pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &SignedMessage) {
+        let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
+
+        match target {
+            BroadcastTarget::All => self
+                .dispatchers
+                .iter()
+                .map(|pair| pair.key().name().into())
+                .for_each(|group_name| acked_dispatchers.push(group_name)),
+            BroadcastTarget::Group(name) => {
+                let target_dispatcher = name.into();
+                acked_dispatchers.push(target_dispatcher);
+            }
+        }
+
+        for dispatcher_type in acked_dispatchers {
+            match self.dispatchers.get(&dispatcher_type) {
+                Some(pair) => {
+                    let dispatcher = pair.value();
+                    dispatcher.broadcast_message(message);
+                }
+                // TODO: Put the message into the dead queue
+                None => {
+                    let name = dispatcher_type.name();
+                    warn!(
+                        "The message can't be delivered to the group with the '{}' name.",
+                        name
+                    );
+                }
+            }
         }
     }
 }

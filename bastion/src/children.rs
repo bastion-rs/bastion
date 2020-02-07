@@ -6,6 +6,7 @@ use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
@@ -84,6 +85,8 @@ pub struct Children {
     // is received.
     pre_start_msgs: Vec<Envelope>,
     started: bool,
+    // List of dispatchers attached to each actor in the group.
+    dispatchers: Vec<Dispatcher>,
 }
 
 impl Children {
@@ -95,6 +98,7 @@ impl Children {
         let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
         let started = false;
+        let dispatchers = Vec::new();
 
         Children {
             bcast,
@@ -104,6 +108,7 @@ impl Children {
             callbacks,
             pre_start_msgs,
             started,
+            dispatchers,
         }
     }
 
