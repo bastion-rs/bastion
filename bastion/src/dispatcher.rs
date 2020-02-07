@@ -6,6 +6,7 @@ use crate::child_ref::ChildRef;
 use crate::envelope::SignedMessage;
 use dashmap::DashMap;
 use std::fmt::{self, Debug};
+use std::hash::{Hash, Hasher};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -36,7 +37,7 @@ pub enum BroadcastTarget {
     Group(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 /// Defines the type of the dispatcher.
 ///
 /// The default type is `Anonymous`.
@@ -76,7 +77,7 @@ pub struct Dispatcher {
     /// Defines the type of the dispatcher.
     dispatcher_type: DispatcherType,
     /// The handler used for each `notification` or a message.
-    handler: Box<dyn DispatcherHandler>,
+    handler: Box<dyn DispatcherHandler + Send + Sync + 'static>,
     /// Special field that stores information about all
     /// registered actors in the group.
     actors: BastionDispatcherMap,
@@ -89,7 +90,7 @@ impl Dispatcher {
     }
 
     /// Returns the used handler by the dispatcher.
-    pub fn handler(&self) -> &Box<dyn DispatcherHandler> {
+    pub fn handler(&self) -> &Box<dyn DispatcherHandler + Send + Sync + 'static> {
         &self.handler
     }
 
@@ -101,7 +102,10 @@ impl Dispatcher {
     }
 
     /// Sets the handler for the dispatcher.
-    pub fn with_handler(mut self, handler: Box<dyn DispatcherHandler>) -> Self {
+    pub fn with_handler(
+        mut self,
+        handler: Box<dyn DispatcherHandler + Send + Sync + 'static>,
+    ) -> Self {
         trace!(
             "Setting handler for the {:?} dispatcher.",
             self.dispatcher_type
@@ -151,6 +155,15 @@ impl DispatcherHandler for DefaultDispatcherHandler {
     fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage) {}
 }
 
+impl DispatcherType {
+    pub(crate) fn name(&self) -> String {
+        match self {
+            DispatcherType::Anonymous => String::from("__Anonymous__"),
+            DispatcherType::Named(value) => value.to_owned(),
+        }
+    }
+}
+
 impl Default for Dispatcher {
     fn default() -> Self {
         Dispatcher {
@@ -170,5 +183,24 @@ impl Default for DefaultDispatcherHandler {
 impl Default for DispatcherType {
     fn default() -> Self {
         DispatcherType::Anonymous
+    }
+}
+
+impl Hash for DispatcherType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name().hash(state);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct GlobalDispatcher {
+    dispatchers: DashMap<DispatcherType, Dispatcher>,
+}
+
+impl GlobalDispatcher {
+    pub(crate) fn new() -> Self {
+        GlobalDispatcher {
+            dispatchers: DashMap::new(),
+        }
     }
 }

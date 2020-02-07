@@ -1,6 +1,7 @@
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, NIL_ID};
+use crate::dispatcher::GlobalDispatcher;
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment};
 use crate::path::{BastionPath, BastionPathElement};
@@ -28,6 +29,7 @@ pub(crate) struct GlobalSystem {
     handle: Qutex<Option<RecoverableHandle<()>>>,
     running: Mutex<bool>,
     stopping_cvar: Condvar,
+    dispatcher: GlobalDispatcher,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,7 @@ impl GlobalSystem {
         let path = Arc::new(BastionPath::root());
         let running = Mutex::new(true);
         let stopping_cvar = Condvar::new();
+        let dispatcher = GlobalDispatcher::new();
 
         GlobalSystem {
             sender,
@@ -62,6 +65,7 @@ impl GlobalSystem {
             handle,
             running,
             stopping_cvar,
+            dispatcher,
         }
     }
 
@@ -83,6 +87,10 @@ impl GlobalSystem {
 
     pub(crate) fn path(&self) -> &Arc<BastionPath> {
         &self.path
+    }
+
+    pub(crate) fn dispatcher(&self) -> &GlobalDispatcher {
+        &self.dispatcher
     }
 
     pub(crate) fn notify_stopped(&self) {
@@ -154,10 +162,12 @@ impl System {
 
     fn spawn_dead_letters(root_sv: &SupervisorRef) -> Result<ChildrenRef, ()> {
         root_sv.children_with_id(NIL_ID, |children| {
-            children.with_exec(|ctx: BastionContext| async move {
-                loop {
-                    let smsg = ctx.recv().await?;
-                    debug!("Received dead letter: {:?}", smsg);
+            children.with_exec(|ctx: BastionContext| {
+                async move {
+                    loop {
+                        let smsg = ctx.recv().await?;
+                        debug!("Received dead letter: {:?}", smsg);
+                    }
                 }
             })
         })
