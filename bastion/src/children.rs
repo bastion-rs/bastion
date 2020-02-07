@@ -298,6 +298,41 @@ impl Children {
         self
     }
 
+    /// Appends each supervised element to the declared dispatcher.
+    ///
+    /// By default supervised elements aren't added to any of dispatcher.
+    ///
+    /// # Arguments
+    ///
+    /// * `redundancy` - An instance of struct that implements the
+    /// `DispatcherHandler` trait.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_dispatcher(
+    ///             Dispatcher::default()
+    ///                 .with_dispatcher_type(DispatcherType::Named("CustomGroup".to_string()))
+    ///         )
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
+        self.dispatchers.push(dispatcher);
+        self
+    }
+
     /// Sets the callbacks that will get called at this children group's
     /// different lifecycle events.
     ///
@@ -357,8 +392,10 @@ impl Children {
 
         let launched = self.launched.drain().map(|(_, (_, launched))| launched);
         FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
             })
             .await;
     }
@@ -375,8 +412,10 @@ impl Children {
         }
 
         children
-            .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
+            .for_each_concurrent(None, |_| {
+                async {
+                    trace!("Children({}): Unknown child stopped.", self.id());
+                }
             })
             .await;
     }
