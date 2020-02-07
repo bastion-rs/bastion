@@ -62,7 +62,9 @@ pub struct DefaultDispatcherHandler;
 /// Generic trait which any custom dispatcher handler must implement for
 /// the further usage by the `Dispatcher` instances.
 pub trait DispatcherHandler {
+    /// Sends the notification of the certain type to each actor in group.
     fn notify(&self, entries: &BastionDispatcherMap, notification_type: NotificationType);
+    /// Broadcast the message to actors in according to the implemented behaviour.
     fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage);
 }
 
@@ -151,8 +153,8 @@ impl Debug for Dispatcher {
 }
 
 impl DispatcherHandler for DefaultDispatcherHandler {
-    fn notify(&self, entries: &BastionDispatcherMap, notification_type: NotificationType) {}
-    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: SignedMessage) {}
+    fn notify(&self, _entries: &BastionDispatcherMap, _notification_type: NotificationType) {}
+    fn broadcast_message(&self, _entries: &BastionDispatcherMap, _message: SignedMessage) {}
 }
 
 impl DispatcherType {
@@ -193,7 +195,12 @@ impl Hash for DispatcherType {
 }
 
 #[derive(Debug)]
+/// The global dispatcher of bastion the cluster.
+///
+/// The main purpose of this dispatcher is be a point through
+/// developers can communicate with actors through group names.
 pub(crate) struct GlobalDispatcher {
+    /// Storage for all registered group of actors.
     dispatchers: DashMap<DispatcherType, Dispatcher>,
 }
 
