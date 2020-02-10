@@ -279,7 +279,8 @@ impl ChildRef {
         &self.sender
     }
 
-    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+    /// Returns the [`BastionPath`] of the child
+    pub fn path(&self) -> &Arc<BastionPath> {
         &self.path
     }
 }
