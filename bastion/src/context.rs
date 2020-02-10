@@ -4,9 +4,11 @@
 
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
+use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
+use crate::system::SYSTEM;
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
@@ -543,6 +545,19 @@ impl BastionContext {
             .map_err(|err| err.into_inner().into_msg().unwrap())?;
 
         Ok(answer)
+    }
+
+    /// Sends the notification to each declared dispatcher of the actor.
+    pub fn notify(&self, dispatchers: &Vec<DispatcherType>, notification_type: NotificationType) {
+        let global_dispatcher = SYSTEM.dispatcher();
+        let from_actor = self.current();
+        global_dispatcher.notify(from_actor, dispatchers, notification_type);
+    }
+
+    /// Sends the broadcasted message to the target group(s).
+    pub fn broadcast_message(&self, target: BroadcastTarget, message: &SignedMessage) {
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.broadcast_message(target, message);
     }
 }
 

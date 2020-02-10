@@ -270,12 +270,16 @@ impl GlobalDispatcher {
     pub(crate) fn notify(
         &self,
         from_actor: &ChildRef,
-        dispatchers: &Vec<Dispatcher>,
+        dispatchers: &Vec<DispatcherType>,
         notification_type: NotificationType,
     ) {
-        for dispatcher in dispatchers {
-            dispatcher.notify(from_actor, notification_type.clone())
-        }
+        self.dispatchers
+            .iter()
+            .filter(|pair| dispatchers.contains(&pair.key()))
+            .for_each(|pair| {
+                let dispatcher = pair.value();
+                dispatcher.notify(from_actor, notification_type.clone())
+            })
     }
 
     /// Broadcasts the given message in according with the specified target.
