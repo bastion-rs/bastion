@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
-pub type BastionDispatcherMap = DashMap<ChildRef, String>;
+pub type DispatcherMap = DashMap<ChildRef, String>;
 
 #[derive(Debug, Clone)]
 /// Defines types of the notifications handled by the dispatcher
@@ -66,11 +66,11 @@ pub trait DispatcherHandler {
     fn notify(
         &self,
         from_child: &ChildRef,
-        entries: &BastionDispatcherMap,
+        entries: &DispatcherMap,
         notification_type: NotificationType,
     );
     /// Broadcast the message to actors in according to the implemented behaviour.
-    fn broadcast_message(&self, entries: &BastionDispatcherMap, message: &SignedMessage);
+    fn broadcast_message(&self, entries: &DispatcherMap, message: &SignedMessage);
 }
 
 /// A generic implementation of the Bastion dispatcher
@@ -87,7 +87,7 @@ pub struct Dispatcher {
     handler: Box<dyn DispatcherHandler + Send + Sync + 'static>,
     /// Special field that stores information about all
     /// registered actors in the group.
-    actors: BastionDispatcherMap,
+    actors: DispatcherMap,
 }
 
 impl Dispatcher {
@@ -122,7 +122,7 @@ impl Dispatcher {
     }
 
     /// Appends the information about actor to the dispatcher.
-    pub fn register(&self, key: &ChildRef, module_name: String) {
+    pub(crate) fn register(&self, key: &ChildRef, module_name: String) {
         self.actors.insert(key.to_owned(), module_name);
         self.handler
             .notify(key, &self.actors, NotificationType::Register);
@@ -130,13 +130,11 @@ impl Dispatcher {
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
-    pub fn remove(&self, key: &ChildRef) -> Option<(ChildRef, String)> {
-        let result = self.actors.remove(key);
-        if result.is_some() {
+    pub(crate) fn remove(&self, key: &ChildRef) {
+        if let Some(_) = self.actors.remove(key) {
             self.handler
                 .notify(key, &self.actors, NotificationType::Remove);
         }
-        result
     }
 
     /// Forwards the message to the handler for processing.
@@ -168,11 +166,11 @@ impl DispatcherHandler for DefaultDispatcherHandler {
     fn notify(
         &self,
         _from_child: &ChildRef,
-        _entries: &BastionDispatcherMap,
+        _entries: &DispatcherMap,
         _notification_type: NotificationType,
     ) {
     }
-    fn broadcast_message(&self, _entries: &BastionDispatcherMap, _message: &SignedMessage) {}
+    fn broadcast_message(&self, _entries: &DispatcherMap, _message: &SignedMessage) {}
 }
 
 impl DispatcherType {
@@ -237,6 +235,34 @@ impl GlobalDispatcher {
         GlobalDispatcher {
             dispatchers: DashMap::new(),
         }
+    }
+
+    /// Appends the information about actor to the dispatcher.
+    pub(crate) fn register(
+        &self,
+        dispatchers: &Vec<DispatcherType>,
+        key: &ChildRef,
+        module_name: String,
+    ) {
+        self.dispatchers
+            .iter()
+            .filter(|pair| dispatchers.contains(&pair.key()))
+            .for_each(|pair| {
+                let dispatcher = pair.value();
+                dispatcher.register(key, module_name.clone())
+            })
+    }
+
+    /// Removes and then returns the record from the registry by the given key.
+    /// Returns `None` when the record wasn't found by the given key.
+    pub(crate) fn remove(&self, dispatchers: &Vec<DispatcherType>, key: &ChildRef) {
+        self.dispatchers
+            .iter()
+            .filter(|pair| dispatchers.contains(&pair.key()))
+            .for_each(|pair| {
+                let dispatcher = pair.value();
+                dispatcher.remove(key)
+            })
     }
 
     /// Passes the notification from the actor to everyone that registered in the same

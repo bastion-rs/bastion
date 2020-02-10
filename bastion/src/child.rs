@@ -1,9 +1,11 @@
 //!
 //! Child is a element of Children group executing user-defined computation
 use crate::broadcast::Broadcast;
+use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
+use crate::system::SYSTEM;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -95,11 +97,13 @@ impl Child {
 
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
+        self.remove_from_dispatchers();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
+        self.remove_from_dispatchers();
         self.bcast.faulted();
     }
 
@@ -165,6 +169,17 @@ impl Child {
 
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
+
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref();
+            let used_dispatchers = parent.dispatchers();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            // FIXME: Pass the module name explicitly?
+            let module_name = module_path!().to_string();
+            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+        }
+
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -253,6 +268,28 @@ impl Child {
     pub(crate) fn launch(self) -> RecoverableHandle<()> {
         let stack = self.stack();
         pool::spawn(self.run(), stack)
+    }
+
+    // TODO: Required re-design for getting ChildRef right after the actor init.
+    fn child_ref(&self) -> ChildRef {
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+        parent
+            .elems()
+            .iter()
+            .find(|x| x.id() == self.id())
+            .unwrap()
+            .clone()
+    }
+
+    // Cleanup the actor's record from each declared dispatcher
+    fn remove_from_dispatchers(&self) {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref();
+            let used_dispatchers = parent.dispatchers();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            global_dispatcher.remove(used_dispatchers, &child_ref);
+        }
     }
 }
 

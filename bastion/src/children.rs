@@ -196,7 +196,13 @@ impl Children {
             children.push(child);
         }
 
-        ChildrenRef::new(id, sender, path, children)
+        let dispatchers = self
+            .dispatchers
+            .iter()
+            .map(|dispatcher| dispatcher.dispatcher_type())
+            .collect();
+
+        ChildrenRef::new(id, sender, path, children, dispatchers)
     }
 
     /// Sets the closure taking a [`BastionContext`] and returning a
