@@ -316,3 +316,125 @@ impl GlobalDispatcher {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::child_ref::ChildRef;
+    use crate::context::BastionId;
+    use crate::dispatcher::*;
+    use crate::envelope::{RefAddr, SignedMessage};
+    use crate::message::Msg;
+    use crate::path::BastionPath;
+    use futures::channel::mpsc;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone)]
+    struct CustomHandler {
+        called: Arc<Mutex<bool>>,
+    }
+
+    impl CustomHandler {
+        pub fn new(value: bool) -> Self {
+            CustomHandler {
+                called: Arc::new(Mutex::new(value)),
+            }
+        }
+
+        pub fn was_called(&self) -> bool {
+            *self.called.clone().lock().unwrap()
+        }
+    }
+
+    impl DispatcherHandler for CustomHandler {
+        fn notify(
+            &self,
+            _from_child: &ChildRef,
+            _entries: &DispatcherMap,
+            _notification_type: NotificationType,
+        ) {
+            let handler_field_ref = self.called.clone();
+            let mut data = handler_field_ref.lock().unwrap();
+            *data = true;
+        }
+
+        fn broadcast_message(&self, _entries: &DispatcherMap, _message: &SignedMessage) {
+            let handler_field_ref = self.called.clone();
+            let mut data = handler_field_ref.lock().unwrap();
+            *data = true;
+        }
+    }
+
+    #[test]
+    fn test_get_dispatcher_type_as_anonymous() {
+        let instance = Dispatcher::default();
+
+        assert_eq!(instance.dispatcher_type(), DispatcherType::Anonymous);
+    }
+
+    #[test]
+    fn test_get_dispatcher_type_as_named() {
+        let name = "test_group".to_string();
+        let dispatcher_type = DispatcherType::Named(name.clone());
+        let instance = Dispatcher::default().with_dispatcher_type(dispatcher_type.clone());
+
+        assert_eq!(instance.dispatcher_type(), dispatcher_type);
+    }
+
+    #[test]
+    fn test_dispatcher_append_child_ref() {
+        let instance = Dispatcher::default();
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        assert_eq!(instance.actors.contains_key(&child_ref), false);
+
+        instance.register(&child_ref, "my::test::module".to_string());
+        assert_eq!(instance.actors.contains_key(&child_ref), true);
+    }
+
+    #[test]
+    fn test_dispatcher_remove_child_ref() {
+        let instance = Dispatcher::default();
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        instance.register(&child_ref, "my::test::module".to_string());
+        assert_eq!(instance.actors.contains_key(&child_ref), true);
+
+        instance.remove(&child_ref);
+        assert_eq!(instance.actors.contains_key(&child_ref), false);
+    }
+
+    #[test]
+    fn test_notify() {
+        let handler = Box::new(CustomHandler::new(false));
+        let instance = Dispatcher::default().with_handler(handler.clone());
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        instance.notify(&child_ref, NotificationType::Register);
+        let handler_was_called = handler.was_called();
+        assert_eq!(handler_was_called, true);
+    }
+
+    #[test]
+    fn test_broadcast_message() {
+        let handler = Box::new(CustomHandler::new(false));
+        let instance = Dispatcher::default().with_handler(handler.clone());
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+
+        const DATA: &'static str = "A message containing data (ask).";
+        let message = SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender));
+
+        instance.broadcast_message(&message);
+        let handler_was_called = handler.was_called();
+        assert_eq!(handler_was_called, true);
+    }
+}
