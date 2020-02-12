@@ -7,6 +7,7 @@ use crate::envelope::SignedMessage;
 use dashmap::DashMap;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -226,7 +227,7 @@ impl Into<DispatcherType> for String {
 /// developers can communicate with actors through group names.
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
-    dispatchers: DashMap<DispatcherType, Dispatcher>,
+    dispatchers: DashMap<DispatcherType, Arc<Box<Dispatcher>>>,
 }
 
 impl GlobalDispatcher {
@@ -317,26 +318,24 @@ impl GlobalDispatcher {
     }
 
     /// Adds dispatcher to the global registry.
-    pub(crate) fn register_dispatcher(&self, dispatcher: Dispatcher) {
+    pub(crate) fn register_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) {
         let dispatcher_type = dispatcher.dispatcher_type();
+        let is_registered = self.dispatchers.contains_key(&dispatcher_type.clone());
 
-        match self.dispatchers.contains_key(&dispatcher_type.clone()) {
-            false => {
-                self.dispatchers.insert(dispatcher_type, dispatcher);
-            }
-            true => {
-                if dispatcher_type != DispatcherType::Anonymous {
-                    warn!(
-                        "The dispatcher with the '{:?}' name already registered in the cluster.",
-                        dispatcher_type
-                    )
-                }
-            }
-        };
+        if is_registered && dispatcher_type != DispatcherType::Anonymous {
+            warn!(
+                "The dispatcher with the '{:?}' name already registered in the cluster.",
+                dispatcher_type
+            );
+            return;
+        }
+
+        let instance = dispatcher.clone();
+        self.dispatchers.insert(dispatcher_type, instance);
     }
 
     /// Removes dispatcher from the global registry.
-    pub(crate) fn remove_dispatcher(&self, dispatcher: &Dispatcher) {
+    pub(crate) fn remove_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) {
         self.dispatchers.remove(&dispatcher.dispatcher_type());
     }
 }
@@ -405,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_local_dispatcher__append_child_ref() {
+    fn test_local_dispatcher_append_child_ref() {
         let instance = Dispatcher::default();
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();

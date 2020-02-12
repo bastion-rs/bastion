@@ -10,6 +10,7 @@ use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
+use crate::system::SYSTEM;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -21,6 +22,7 @@ use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
 use std::iter::FromIterator;
+use std::sync::Arc;
 use std::task::Poll;
 
 #[derive(Debug)]
@@ -86,7 +88,7 @@ pub struct Children {
     pre_start_msgs: Vec<Envelope>,
     started: bool,
     // List of dispatchers attached to each actor in the group.
-    dispatchers: Vec<Dispatcher>,
+    dispatchers: Vec<Arc<Box<Dispatcher>>>,
 }
 
 impl Children {
@@ -335,7 +337,7 @@ impl Children {
     /// # }
     /// ```
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
-        self.dispatchers.push(dispatcher);
+        self.dispatchers.push(Arc::new(Box::new(dispatcher)));
         self
     }
 
@@ -428,11 +430,13 @@ impl Children {
 
     fn stopped(&mut self) {
         debug!("Children({}): Stopped.", self.id());
+        self.remove_dispatchers();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Children({}): Faulted.", self.id());
+        self.remove_dispatchers();
         self.bcast.faulted();
     }
 
@@ -519,6 +523,8 @@ impl Children {
 
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
+        self.register_dispatchers();
+
         loop {
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
@@ -625,5 +631,23 @@ impl Children {
         debug!("Children({}): Launching.", self.id());
         let stack = self.stack();
         pool::spawn(self.run(), stack)
+    }
+
+    /// Registers all declared local dispatchers in the global dispatcher.
+    fn register_dispatchers(&self) {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for dispatcher in self.dispatchers.iter() {
+            global_dispatcher.register_dispatcher(dispatcher)
+        }
+    }
+
+    /// Removes all declared local dispatchers from the global dispatcher.
+    fn remove_dispatchers(&self) {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for dispatcher in self.dispatchers.iter() {
+            global_dispatcher.remove_dispatcher(dispatcher)
+        }
     }
 }
