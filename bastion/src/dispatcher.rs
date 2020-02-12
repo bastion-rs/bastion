@@ -315,6 +315,30 @@ impl GlobalDispatcher {
             }
         }
     }
+
+    /// Adds dispatcher to the global registry.
+    pub(crate) fn register_dispatcher(&self, dispatcher: Dispatcher) {
+        let dispatcher_type = dispatcher.dispatcher_type();
+
+        match self.dispatchers.contains_key(&dispatcher_type.clone()) {
+            false => {
+                self.dispatchers.insert(dispatcher_type, dispatcher);
+            }
+            true => {
+                if dispatcher_type != DispatcherType::Anonymous {
+                    warn!(
+                        "The dispatcher with the '{:?}' name already registered in the cluster.",
+                        dispatcher_type
+                    )
+                }
+            }
+        };
+    }
+
+    /// Removes dispatcher from the global registry.
+    pub(crate) fn remove_dispatcher(&self, dispatcher: &Dispatcher) {
+        self.dispatchers.remove(&dispatcher.dispatcher_type());
+    }
 }
 
 #[cfg(test)]
@@ -381,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatcher_append_child_ref() {
+    fn test_local_dispatcher__append_child_ref() {
         let instance = Dispatcher::default();
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
@@ -410,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_notify() {
+    fn test_local_dispatcher_notify() {
         let handler = Box::new(CustomHandler::new(false));
         let instance = Dispatcher::default().with_handler(handler.clone());
         let bastion_id = BastionId::new();
@@ -424,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn test_broadcast_message() {
+    fn test_local_dispatcher_broadcast_message() {
         let handler = Box::new(CustomHandler::new(false));
         let instance = Dispatcher::default().with_handler(handler.clone());
         let (sender, _) = mpsc::unbounded();
@@ -437,4 +461,19 @@ mod tests {
         let handler_was_called = handler.was_called();
         assert_eq!(handler_was_called, true);
     }
+
+    #[test]
+    fn test_global_dispatcher_add_local_dispatcher() {}
+
+    #[test]
+    fn test_global_dispatcher_remove_local_dispatcher() {}
+
+    #[test]
+    fn test_global_dispatcher_remove() {}
+
+    #[test]
+    fn test_global_dispatcher_notify() {}
+
+    #[test]
+    fn test_global_dispatcher_broadcast_message() {}
 }
