@@ -169,16 +169,7 @@ impl Child {
 
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
-
-        if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref();
-            let used_dispatchers = parent.dispatchers();
-
-            let global_dispatcher = SYSTEM.dispatcher();
-            // FIXME: Pass the module name explicitly?
-            let module_name = module_path!().to_string();
-            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
-        }
+        self.register_in_dispatchers();
 
         loop {
             match poll!(&mut self.bcast.next()) {
@@ -279,6 +270,18 @@ impl Child {
             .find(|x| x.id() == self.id())
             .unwrap()
             .clone()
+    }
+
+    fn register_in_dispatchers(&self) {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref();
+            let used_dispatchers = parent.dispatchers();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            // FIXME: Pass the module name explicitly?
+            let module_name = module_path!().to_string();
+            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+        }
     }
 
     // Cleanup the actor's record from each declared dispatcher
