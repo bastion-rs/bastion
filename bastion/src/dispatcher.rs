@@ -462,17 +462,147 @@ mod tests {
     }
 
     #[test]
-    fn test_global_dispatcher_add_local_dispatcher() {}
+    fn test_global_dispatcher_add_local_dispatcher() {
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
+        ));
+        let global_dispatcher = GlobalDispatcher::new();
+
+        assert_eq!(
+            global_dispatcher.dispatchers.contains_key(&dispatcher_type),
+            false
+        );
+
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+        assert_eq!(
+            global_dispatcher.dispatchers.contains_key(&dispatcher_type),
+            true
+        );
+    }
 
     #[test]
-    fn test_global_dispatcher_remove_local_dispatcher() {}
+    fn test_global_dispatcher_remove_local_dispatcher() {
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
+        ));
+        let global_dispatcher = GlobalDispatcher::new();
+
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+        assert_eq!(
+            global_dispatcher.dispatchers.contains_key(&dispatcher_type),
+            true
+        );
+
+        global_dispatcher.remove_dispatcher(&local_dispatcher);
+        assert_eq!(
+            global_dispatcher.dispatchers.contains_key(&dispatcher_type),
+            false
+        );
+    }
 
     #[test]
-    fn test_global_dispatcher_remove() {}
+    fn test_global_dispatcher_register_actor() {
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
+        ));
+        let actor_groups = vec![dispatcher_type];
+        let module_name = "my::test::module".to_string();
+
+        let global_dispatcher = GlobalDispatcher::new();
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+
+        assert_eq!(local_dispatcher.actors.contains_key(&child_ref), false);
+
+        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        assert_eq!(local_dispatcher.actors.contains_key(&child_ref), true);
+    }
 
     #[test]
-    fn test_global_dispatcher_notify() {}
+    fn test_global_dispatcher_remove_actor() {
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
+        ));
+        let actor_groups = vec![dispatcher_type];
+        let module_name = "my::test::module".to_string();
+
+        let global_dispatcher = GlobalDispatcher::new();
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+
+        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        assert_eq!(local_dispatcher.actors.contains_key(&child_ref), true);
+
+        global_dispatcher.remove(&actor_groups, &child_ref);
+        assert_eq!(local_dispatcher.actors.contains_key(&child_ref), false);
+    }
 
     #[test]
-    fn test_global_dispatcher_broadcast_message() {}
+    fn test_global_dispatcher_notify() {
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let handler = Box::new(CustomHandler::new(false));
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default()
+                .with_dispatcher_type(dispatcher_type.clone())
+                .with_handler(handler.clone()),
+        ));
+        let actor_groups = vec![dispatcher_type];
+        let module_name = "my::test::module".to_string();
+
+        let global_dispatcher = GlobalDispatcher::new();
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+
+        global_dispatcher.notify(&child_ref, &actor_groups, NotificationType::Register);
+        let handler_was_called = handler.was_called();
+        assert_eq!(handler_was_called, true);
+    }
+
+    #[test]
+    fn test_global_dispatcher_broadcast_message() {
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let child_ref = ChildRef::new(bastion_id, sender, path);
+
+        let dispatcher_type = DispatcherType::Named("test".to_string());
+        let handler = Box::new(CustomHandler::new(false));
+        let local_dispatcher = Arc::new(Box::new(
+            Dispatcher::default()
+                .with_dispatcher_type(dispatcher_type.clone())
+                .with_handler(handler.clone()),
+        ));
+        let actor_groups = vec![dispatcher_type];
+        let module_name = "my::test::module".to_string();
+
+        let global_dispatcher = GlobalDispatcher::new();
+        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        const DATA: &'static str = "A message containing data (ask).";
+        let message = SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender));
+
+        global_dispatcher.broadcast_message(BroadcastTarget::Group("".to_string()), &message);
+        let handler_was_called = handler.was_called();
+        assert_eq!(handler_was_called, true);
+    }
 }
