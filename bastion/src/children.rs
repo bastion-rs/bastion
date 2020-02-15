@@ -313,7 +313,7 @@ impl Children {
     /// # Arguments
     ///
     /// * `redundancy` - An instance of struct that implements the
-    /// `DispatcherHandler` trait.
+    /// [`DispatcherHandler`] trait.
     ///
     /// # Example
     ///
@@ -336,6 +336,7 @@ impl Children {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
+    /// [`DispatcherHandler`]: ../dispatcher/trait.DispatcherHandler.html
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
         self.dispatchers.push(Arc::new(Box::new(dispatcher)));
         self

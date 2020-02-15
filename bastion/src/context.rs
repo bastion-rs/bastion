@@ -548,6 +548,13 @@ impl BastionContext {
     }
 
     /// Sends the notification to each declared dispatcher of the actor.
+    ///
+    /// # Argument
+    ///
+    /// * `dispatchers` - Vector of dispatcher names to which need to
+    /// deliver a notification.
+    /// * `notification_type` - The type of the notification to send.
+    ///
     pub fn notify(&self, dispatchers: &Vec<DispatcherType>, notification_type: NotificationType) {
         let global_dispatcher = SYSTEM.dispatcher();
         let from_actor = self.current();
@@ -555,6 +562,15 @@ impl BastionContext {
     }
 
     /// Sends the broadcasted message to the target group(s).
+    ///
+    /// # Argument
+    ///
+    /// * `target` - Defines the message receivers in according with
+    /// the [`BroadcastTarget`] value.
+    /// * `message` - The broadcasted message.
+    ///
+    /// [`BroadcastTarget`]: ../dispatcher/enum.DispatcherType.html
+    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub fn broadcast_message(&self, target: BroadcastTarget, message: &SignedMessage) {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.broadcast_message(target, message);

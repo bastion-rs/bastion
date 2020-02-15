@@ -70,7 +70,7 @@ impl ChildrenRef {
     }
 
     /// Returns a list of dispatcher names that can be used for
-    /// comminucation with other actors in the same group.
+    /// comminucation with other actors in the same group(s).
     ///
     /// # Example
     ///

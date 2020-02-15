@@ -272,6 +272,7 @@ impl Child {
             .clone()
     }
 
+    /// Adds the actor into each registry declared in the parent node.
     fn register_in_dispatchers(&self) {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
             let child_ref = self.child_ref();
@@ -284,7 +285,7 @@ impl Child {
         }
     }
 
-    // Cleanup the actor's record from each declared dispatcher
+    /// Cleanup the actor's record from each declared dispatcher.
     fn remove_from_dispatchers(&self) {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
             let child_ref = self.child_ref();

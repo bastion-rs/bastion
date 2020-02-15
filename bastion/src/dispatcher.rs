@@ -70,7 +70,7 @@ pub trait DispatcherHandler {
         entries: &DispatcherMap,
         notification_type: NotificationType,
     );
-    /// Broadcast the message to actors in according to the implemented behaviour.
+    /// Broadcasts the message to actors in according to the implemented behaviour.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &SignedMessage);
 }
 
