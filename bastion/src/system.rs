@@ -162,12 +162,10 @@ impl System {
 
     fn spawn_dead_letters(root_sv: &SupervisorRef) -> Result<ChildrenRef, ()> {
         root_sv.children_with_id(NIL_ID, |children| {
-            children.with_exec(|ctx: BastionContext| {
-                async move {
-                    loop {
-                        let smsg = ctx.recv().await?;
-                        debug!("Received dead letter: {:?}", smsg);
-                    }
+            children.with_exec(|ctx: BastionContext| async move {
+                loop {
+                    let smsg = ctx.recv().await?;
+                    debug!("Received dead letter: {:?}", smsg);
                 }
             })
         })
