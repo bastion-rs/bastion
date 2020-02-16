@@ -1711,21 +1711,20 @@ impl RestartStrategy {
     /// # use bastion::prelude::*;
     /// #
     /// # fn main() {
-    /// #     use std::time::Duration;
-    /// #     let actor_restart_strategy = ActorRestartStrategy::LinearBackOff {
-    /// #         timeout: Duration::from_secs(5)
-    /// #     };
-    /// #     let restart_strategy = RestartStrategy::default()
-    /// #        .with_actor_restart_strategy(actor_restart_strategy);
+    ///    let actor_restart_strategy = ActorRestartStrategy::LinearBackOff {
+    ///        timeout: Duration::from_secs(5)
+    ///    };
+    ///    let restart_strategy = RestartStrategy::default()
+    ///       .with_actor_restart_strategy(actor_restart_strategy);
     /// # }
     /// ```
     ///
-    /// [`RestartStrategy::Always`]: supervisor/enum.RestartStrategy.html#variant.Always
-    /// [`RestartStrategy::Never`]: supervisor/enum.RestartStrategy.html#variant.Never
-    /// [`RestartStrategy::Tries`]: supervisor/enum.RestartStrategy.html#variant.Tries
-    /// [`ActorRestartStrategy::Instantly`]: supervisor/enum.ActorRestartStrategy.html#variant.Instantly
-    /// [`ActorRestartStrategy::LinearBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.LinearBackOff
-    /// [`ActorRestartStrategy::ExponentialBackOff`]: supervisor/enum.ActorRestartStrategy.html#variant.ExponentialBackOff
+    /// [`RestartStrategy::Always`]: enum.RestartPolicy.html#variant.Always
+    /// [`RestartStrategy::Never`]: enum.RestartPolicy.html#variant.Never
+    /// [`RestartStrategy::Tries`]: enum.RestartPolicy.html#variant.Tries
+    /// [`ActorRestartStrategy::Immediate`]: enum.ActorRestartStrategy.html#variant.Immediate
+    /// [`ActorRestartStrategy::LinearBackOff`]: enum.ActorRestartStrategy.html#variant.LinearBackOff
+    /// [`ActorRestartStrategy::ExponentialBackOff`]: enum.ActorRestartStrategy.html#variant.ExponentialBackOff
     pub fn new(restart_policy: RestartPolicy, strategy: ActorRestartStrategy) -> Self {
         RestartStrategy {
             restart_policy,
