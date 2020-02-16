@@ -262,37 +262,37 @@ impl Child {
     }
 
     // TODO: Required re-design for getting ChildRef right after the actor init.
-    fn child_ref(&self) -> ChildRef {
+    fn child_ref(&self) -> Option<ChildRef> {
         let parent = self.bcast.parent().clone().into_children().unwrap();
-        parent
-            .elems()
-            .iter()
-            .find(|x| x.id() == self.id())
-            .unwrap()
-            .clone()
+        match parent.elems().iter().find(|x| x.id() == self.id()) {
+            Some(item) => Some(item.clone()),
+            None => None,
+        }
     }
 
     /// Adds the actor into each registry declared in the parent node.
     fn register_in_dispatchers(&self) {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref();
-            let used_dispatchers = parent.dispatchers();
+            if let Some(child_ref) = self.child_ref() {
+                let used_dispatchers = parent.dispatchers();
 
-            let global_dispatcher = SYSTEM.dispatcher();
-            // FIXME: Pass the module name explicitly?
-            let module_name = module_path!().to_string();
-            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+                let global_dispatcher = SYSTEM.dispatcher();
+                // FIXME: Pass the module name explicitly?
+                let module_name = module_path!().to_string();
+                global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+            }
         }
     }
 
     /// Cleanup the actor's record from each declared dispatcher.
     fn remove_from_dispatchers(&self) {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref();
-            let used_dispatchers = parent.dispatchers();
+            if let Some(child_ref) = self.child_ref() {
+                let used_dispatchers = parent.dispatchers();
 
-            let global_dispatcher = SYSTEM.dispatcher();
-            global_dispatcher.remove(used_dispatchers, &child_ref);
+                let global_dispatcher = SYSTEM.dispatcher();
+                global_dispatcher.remove(used_dispatchers, &child_ref);
+            }
         }
     }
 }
