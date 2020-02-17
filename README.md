@@ -27,6 +27,30 @@
 </td>
 </tr>
 <tr>
+  <td>Doc [Bastion]</td>
+  <td>
+    <a href="https://docs.rs/bastion">
+    <img alt="Documentation (Bastion)" src="https://img.shields.io/badge/rustdoc-bastion-blue.svg" />
+    </a>
+  </td>
+</tr>
+<tr>
+  <td>Doc [Bastion Executor]</td>
+  <td>
+    <a href="https://docs.rs/bastion-executor">
+    <img alt="Documentation (Bastion Executor)" src="https://img.shields.io/badge/rustdoc-bastion_executor-blue.svg" />
+    </a>
+  </td>
+</tr>
+<tr>
+  <td>Doc [LightProc]</td>
+  <td>
+    <a href="https://docs.rs/lightproc">
+    <img alt="Documentation (LightProc)" src="https://img.shields.io/badge/rustdoc-lightproc-blue.svg" />
+    </a>
+  </td>
+</tr>
+<tr>
   <td>Build Status</td>
   <td>
     <a href="https://github.com/bastion-rs/bastion/actions">
