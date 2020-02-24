@@ -1,5 +1,5 @@
 use bastion::prelude::*;
-use snap::*;
+use snap::raw::*;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
