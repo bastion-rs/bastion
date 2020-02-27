@@ -605,7 +605,7 @@ impl Children {
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let ctx = BastionContext::new(id, child_ref, children, supervisor, state.clone());
+            let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);
@@ -615,7 +615,7 @@ impl Children {
                 self.id(),
                 bcast.id()
             );
-            let child = Child::new(exec, bcast, state);
+            let child = Child::new(exec, bcast, state, child_ref);
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
             let launched = child.launch();
@@ -631,7 +631,7 @@ impl Children {
     }
 
     /// Registers all declared local dispatchers in the global dispatcher.
-    fn register_dispatchers(&self) {
+    pub(crate) fn register_dispatchers(&self) {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {
@@ -640,7 +640,7 @@ impl Children {
     }
 
     /// Removes all declared local dispatchers from the global dispatcher.
-    fn remove_dispatchers(&self) {
+    pub(crate) fn remove_dispatchers(&self) {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {

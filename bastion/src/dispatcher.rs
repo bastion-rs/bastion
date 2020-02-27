@@ -71,7 +71,7 @@ pub trait DispatcherHandler {
         notification_type: NotificationType,
     );
     /// Broadcasts the message to actors in according to the implemented behaviour.
-    fn broadcast_message(&self, entries: &DispatcherMap, message: &SignedMessage);
+    fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>);
 }
 
 /// A generic implementation of the Bastion dispatcher
@@ -147,7 +147,7 @@ impl Dispatcher {
     /// Sends the message to the group of actors.
     /// The logic of who and how should receive the message relies onto
     /// the handler implementation.
-    pub fn broadcast_message(&self, message: &SignedMessage) {
+    pub fn broadcast_message(&self, message: &Arc<SignedMessage>) {
         self.handler.broadcast_message(&self.actors, &message);
     }
 }
@@ -171,7 +171,7 @@ impl DispatcherHandler for DefaultDispatcherHandler {
         _notification_type: NotificationType,
     ) {
     }
-    fn broadcast_message(&self, _entries: &DispatcherMap, _message: &SignedMessage) {}
+    fn broadcast_message(&self, _entries: &DispatcherMap, _message: &Arc<SignedMessage>) {}
 }
 
 impl DispatcherType {
@@ -227,7 +227,7 @@ impl Into<DispatcherType> for String {
 /// developers can communicate with actors through group names.
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
-    dispatchers: DashMap<DispatcherType, Arc<Box<Dispatcher>>>,
+    pub dispatchers: DashMap<DispatcherType, Arc<Box<Dispatcher>>>,
 }
 
 impl GlobalDispatcher {
@@ -242,27 +242,29 @@ impl GlobalDispatcher {
     pub(crate) fn register(
         &self,
         dispatchers: &Vec<DispatcherType>,
-        key: &ChildRef,
+        child_ref: &ChildRef,
         module_name: String,
     ) {
-        self.dispatchers
+        dispatchers
             .iter()
-            .filter(|pair| dispatchers.contains(&pair.key()))
-            .for_each(|pair| {
-                let dispatcher = pair.value();
-                dispatcher.register(key, module_name.clone())
+            .filter(|key| self.dispatchers.contains_key(*key))
+            .for_each(|key| {
+                if let Some(dispatcher) = self.dispatchers.get(key) {
+                    dispatcher.register(child_ref, module_name.clone())
+                }
             })
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
-    pub(crate) fn remove(&self, dispatchers: &Vec<DispatcherType>, key: &ChildRef) {
-        self.dispatchers
+    pub(crate) fn remove(&self, dispatchers: &Vec<DispatcherType>, child_ref: &ChildRef) {
+        dispatchers
             .iter()
-            .filter(|pair| dispatchers.contains(&pair.key()))
-            .for_each(|pair| {
-                let dispatcher = pair.value();
-                dispatcher.remove(key)
+            .filter(|key| self.dispatchers.contains_key(*key))
+            .for_each(|key| {
+                if let Some(dispatcher) = self.dispatchers.get(key) {
+                    dispatcher.remove(child_ref)
+                }
             })
     }
 
@@ -284,7 +286,7 @@ impl GlobalDispatcher {
     }
 
     /// Broadcasts the given message in according with the specified target.
-    pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &SignedMessage) {
+    pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
         let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
 
         match target {
@@ -303,7 +305,7 @@ impl GlobalDispatcher {
             match self.dispatchers.get(&dispatcher_type) {
                 Some(pair) => {
                     let dispatcher = pair.value();
-                    dispatcher.broadcast_message(message);
+                    dispatcher.broadcast_message(&message.clone());
                 }
                 // TODO: Put the message into the dead queue
                 None => {
@@ -380,7 +382,7 @@ mod tests {
             *data = true;
         }
 
-        fn broadcast_message(&self, _entries: &DispatcherMap, _message: &SignedMessage) {
+        fn broadcast_message(&self, _entries: &DispatcherMap, _message: &Arc<SignedMessage>) {
             let handler_field_ref = self.called.clone();
             let mut data = handler_field_ref.lock().unwrap();
             *data = true;
@@ -454,7 +456,7 @@ mod tests {
         let path = Arc::new(BastionPath::root());
 
         const DATA: &'static str = "A message containing data (ask).";
-        let message = SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender));
+        let message = Arc::new(SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender)));
 
         instance.broadcast_message(&message);
         let handler_was_called = handler.was_called();
@@ -599,7 +601,7 @@ mod tests {
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
         const DATA: &'static str = "A message containing data (ask).";
-        let message = SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender));
+        let message = Arc::new(SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender)));
 
         global_dispatcher.broadcast_message(BroadcastTarget::Group("".to_string()), &message);
         let handler_was_called = handler.was_called();

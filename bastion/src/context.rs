@@ -13,6 +13,7 @@ use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Identifier for a root supervisor and dead-letters children.
@@ -570,10 +571,14 @@ impl BastionContext {
     /// * `message` - The broadcasted message.
     ///
     /// [`BroadcastTarget`]: ../dispatcher/enum.DispatcherType.html
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
-    pub fn broadcast_message(&self, target: BroadcastTarget, message: &SignedMessage) {
+    pub fn broadcast_message<M: Message>(&self, target: BroadcastTarget, message: M) {
+        let msg = Arc::new(SignedMessage {
+            msg: Msg::broadcast(message),
+            sign: self.signature(),
+        });
+
         let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.broadcast_message(target, message);
+        global_dispatcher.broadcast_message(target, &msg);
     }
 }
 
