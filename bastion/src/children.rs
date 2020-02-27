@@ -605,7 +605,8 @@ impl Children {
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
+            let ctx =
+                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);

@@ -58,7 +58,12 @@ impl Init {
 }
 
 impl Child {
-    pub(crate) fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>, child_ref: ChildRef) -> Self {
+    pub(crate) fn new(
+        exec: Exec,
+        bcast: Broadcast,
+        state: Qutex<ContextState>,
+        child_ref: ChildRef
+    ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
         let started = false;

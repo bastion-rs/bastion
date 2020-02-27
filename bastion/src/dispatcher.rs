@@ -601,7 +601,10 @@ mod tests {
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
         const DATA: &'static str = "A message containing data (ask).";
-        let message = Arc::new(SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender)));
+        let message = Arc::new(SignedMessage::new(
+            Msg::broadcast(DATA),
+            RefAddr::new(path, sender)
+        ));
 
         global_dispatcher.broadcast_message(BroadcastTarget::Group("".to_string()), &message);
         let handler_was_called = handler.was_called();
