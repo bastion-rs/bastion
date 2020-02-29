@@ -6,9 +6,11 @@ use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
+use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
+use crate::system::SYSTEM;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -20,6 +22,7 @@ use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
 use std::iter::FromIterator;
+use std::sync::Arc;
 use std::task::Poll;
 
 #[derive(Debug)]
@@ -84,6 +87,8 @@ pub struct Children {
     // is received.
     pre_start_msgs: Vec<Envelope>,
     started: bool,
+    // List of dispatchers attached to each actor in the group.
+    dispatchers: Vec<Arc<Box<Dispatcher>>>,
 }
 
 impl Children {
@@ -95,6 +100,7 @@ impl Children {
         let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
         let started = false;
+        let dispatchers = Vec::new();
 
         Children {
             bcast,
@@ -104,6 +110,7 @@ impl Children {
             callbacks,
             pre_start_msgs,
             started,
+            dispatchers,
         }
     }
 
@@ -191,7 +198,13 @@ impl Children {
             children.push(child);
         }
 
-        ChildrenRef::new(id, sender, path, children)
+        let dispatchers = self
+            .dispatchers
+            .iter()
+            .map(|dispatcher| dispatcher.dispatcher_type())
+            .collect();
+
+        ChildrenRef::new(id, sender, path, children, dispatchers)
     }
 
     /// Sets the closure taking a [`BastionContext`] and returning a
@@ -293,6 +306,42 @@ impl Children {
         self
     }
 
+    /// Appends each supervised element to the declared dispatcher.
+    ///
+    /// By default supervised elements aren't added to any of dispatcher.
+    ///
+    /// # Arguments
+    ///
+    /// * `redundancy` - An instance of struct that implements the
+    /// [`DispatcherHandler`] trait.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_dispatcher(
+    ///             Dispatcher::default()
+    ///                 .with_dispatcher_type(DispatcherType::Named("CustomGroup".to_string()))
+    ///         )
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    /// [`DispatcherHandler`]: ../dispatcher/trait.DispatcherHandler.html
+    pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
+        self.dispatchers.push(Arc::new(Box::new(dispatcher)));
+        self
+    }
+
     /// Sets the callbacks that will get called at this children group's
     /// different lifecycle events.
     ///
@@ -378,11 +427,13 @@ impl Children {
 
     fn stopped(&mut self) {
         debug!("Children({}): Stopped.", self.id());
+        self.remove_dispatchers();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Children({}): Faulted.", self.id());
+        self.remove_dispatchers();
         self.bcast.faulted();
     }
 
@@ -469,6 +520,8 @@ impl Children {
 
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
+        self.register_dispatchers();
+
         loop {
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
@@ -552,7 +605,8 @@ impl Children {
             let state = ContextState::new();
             let state = Qutex::new(state);
 
-            let ctx = BastionContext::new(id, child_ref, children, supervisor, state.clone());
+            let ctx =
+                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);
@@ -562,7 +616,7 @@ impl Children {
                 self.id(),
                 bcast.id()
             );
-            let child = Child::new(exec, bcast, state);
+            let child = Child::new(exec, bcast, state, child_ref);
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
             let launched = child.launch();
@@ -575,5 +629,23 @@ impl Children {
         debug!("Children({}): Launching.", self.id());
         let stack = self.stack();
         pool::spawn(self.run(), stack)
+    }
+
+    /// Registers all declared local dispatchers in the global dispatcher.
+    pub(crate) fn register_dispatchers(&self) {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for dispatcher in self.dispatchers.iter() {
+            global_dispatcher.register_dispatcher(dispatcher)
+        }
+    }
+
+    /// Removes all declared local dispatchers from the global dispatcher.
+    pub(crate) fn remove_dispatchers(&self) {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for dispatcher in self.dispatchers.iter() {
+            global_dispatcher.remove_dispatcher(dispatcher)
+        }
     }
 }

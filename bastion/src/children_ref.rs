@@ -3,6 +3,7 @@
 use crate::broadcast::Sender;
 use crate::child_ref::ChildRef;
 use crate::context::BastionId;
+use crate::dispatcher::DispatcherType;
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Message};
 use crate::path::BastionPath;
@@ -18,6 +19,7 @@ pub struct ChildrenRef {
     sender: Sender,
     path: Arc<BastionPath>,
     children: Vec<ChildRef>,
+    dispatchers: Vec<DispatcherType>,
 }
 
 impl ChildrenRef {
@@ -26,12 +28,14 @@ impl ChildrenRef {
         sender: Sender,
         path: Arc<BastionPath>,
         children: Vec<ChildRef>,
+        dispatchers: Vec<DispatcherType>,
     ) -> Self {
         ChildrenRef {
             id,
             sender,
             path,
             children,
+            dispatchers,
         }
     }
 
@@ -63,6 +67,31 @@ impl ChildrenRef {
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
+    }
+
+    /// Returns a list of dispatcher names that can be used for
+    /// comminucation with other actors in the same group(s).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    ///     # let children_ref = Bastion::children(|children| children).unwrap();
+    /// let dispatchers = children_ref.dispatchers();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`ChildRef`]: children/struct.ChildRef.html
+    pub fn dispatchers(&self) -> &Vec<DispatcherType> {
+        &self.dispatchers
     }
 
     /// Returns a list of [`ChildRef`] referencing the elements

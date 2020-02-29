@@ -535,6 +535,7 @@ impl Supervisor {
         let mut children = init(children);
         debug!("Children({}): Initialized.", children.id());
         // FIXME: children group elems launched without the group itself being launched
+        children.register_dispatchers();
         children.launch_elems();
 
         debug!(

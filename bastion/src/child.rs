@@ -1,9 +1,11 @@
 //!
 //! Child is a element of Children group executing user-defined computation
 use crate::broadcast::Broadcast;
+use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
+use crate::system::SYSTEM;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -33,6 +35,8 @@ pub(crate) struct Child {
     // started. Those will be "replayed" once a start message
     // is received.
     pre_start_msgs: Vec<Envelope>,
+    // A shortcut for accessing to this actor by others.
+    child_ref: ChildRef,
     started: bool,
 }
 
@@ -54,7 +58,12 @@ impl Init {
 }
 
 impl Child {
-    pub(crate) fn new(exec: Exec, bcast: Broadcast, state: Qutex<ContextState>) -> Self {
+    pub(crate) fn new(
+        exec: Exec,
+        bcast: Broadcast,
+        state: Qutex<ContextState>,
+        child_ref: ChildRef,
+    ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
         let started = false;
@@ -64,6 +73,7 @@ impl Child {
             exec,
             state,
             pre_start_msgs,
+            child_ref,
             started,
         }
     }
@@ -95,11 +105,13 @@ impl Child {
 
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
+        self.remove_from_dispatchers();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
+        self.remove_from_dispatchers();
         self.bcast.faulted();
     }
 
@@ -165,6 +177,8 @@ impl Child {
 
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
+        self.register_in_dispatchers();
+
         loop {
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
@@ -253,6 +267,30 @@ impl Child {
     pub(crate) fn launch(self) -> RecoverableHandle<()> {
         let stack = self.stack();
         pool::spawn(self.run(), stack)
+    }
+
+    /// Adds the actor into each registry declared in the parent node.
+    fn register_in_dispatchers(&self) {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let used_dispatchers = parent.dispatchers();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            // FIXME: Pass the module name explicitly?
+            let module_name = module_path!().to_string();
+            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+        }
+    }
+
+    /// Cleanup the actor's record from each declared dispatcher.
+    fn remove_from_dispatchers(&self) {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let used_dispatchers = parent.dispatchers();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            global_dispatcher.remove(used_dispatchers, &child_ref);
+        }
     }
 }
 

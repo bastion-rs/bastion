@@ -77,6 +77,7 @@ pub mod child_ref;
 pub mod children;
 pub mod children_ref;
 pub mod context;
+pub mod dispatcher;
 pub mod envelope;
 pub mod message;
 pub mod path;
@@ -92,6 +93,10 @@ pub mod prelude {
     pub use crate::children_ref::ChildrenRef;
     pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId, NIL_ID};
+    pub use crate::dispatcher::{
+        BroadcastTarget, DefaultDispatcherHandler, Dispatcher, DispatcherHandler, DispatcherMap,
+        DispatcherType, NotificationType,
+    };
     pub use crate::envelope::{RefAddr, SignedMessage};
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;

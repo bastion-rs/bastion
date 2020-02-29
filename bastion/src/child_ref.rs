@@ -7,6 +7,7 @@ use crate::message::{Answer, BastionMessage, Message};
 use crate::path::BastionPath;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -292,3 +293,9 @@ impl PartialEq for ChildRef {
 }
 
 impl Eq for ChildRef {}
+
+impl Hash for ChildRef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
