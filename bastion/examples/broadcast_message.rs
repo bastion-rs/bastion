@@ -22,7 +22,6 @@ use bastion::prelude::*;
 ///
 fn main() {
     Bastion::init();
-    Bastion::init();
 
     Bastion::supervisor(input_supervisor).expect("Couldn't create the supervisor.");
     Bastion::supervisor(map_supervisor).expect("Couldn't create the supervisor.");
