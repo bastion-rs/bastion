@@ -250,7 +250,8 @@ impl ChildrenRef {
             .map_err(|err| err.into_inner())
     }
 
-    pub(crate) fn path(&self) -> &Arc<BastionPath> {
+    /// Returns the [`BastionPath`] of this ChildrenRef
+    pub fn path(&self) -> &Arc<BastionPath> {
         &self.path
     }
 

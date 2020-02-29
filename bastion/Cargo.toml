@@ -57,4 +57,4 @@ uuid = { version = "0.8", features = ["v4"] }
 [dev-dependencies]
 env_logger = "0.7"
 proptest = "0.9"
-snap = "0.2"
+snap = "1.0"

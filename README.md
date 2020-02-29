@@ -100,17 +100,17 @@ You can use this to launch automatically supervised tasks.
     * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
 
 ## Guarantees
-* At most once delivery for all the messages.
+* At most once delivery for all messages.
 * Completely asynchronous system design.
 * Asynchronous program boundaries with [fort](https://github.com/bastion-rs/fort).
 * Dynamic supervision of supervisors (adding a subtree later during the execution)
 * Lifecycle management both at `futures` and [lightproc](https://github.com/bastion-rs/bastion/tree/master/lightproc) layers.
 * Faster middleware development.
-* Above all "fault-tolerance".
+* Fault tolerance above all.
 
 ## Why Bastion?
-If one of the questions below answered with yes, then Bastion is just for you:
-* Do I need fault-tolerancy in my project?
+If you answer any of the questions below with yes, then Bastion is just for you:
+* Do I need fault-tolerance in my project?
 * Do I hate to implement weird Actor traits?
 * I shouldn't need a webserver to run an actor system, right?
 * Do I want to make my existing code unbreakable?
