@@ -456,7 +456,10 @@ mod tests {
         let path = Arc::new(BastionPath::root());
 
         const DATA: &'static str = "A message containing data (ask).";
-        let message = Arc::new(SignedMessage::new(Msg::broadcast(DATA), RefAddr::new(path, sender)));
+        let message = Arc::new(SignedMessage::new(
+            Msg::broadcast(DATA),
+            RefAddr::new(path, sender),
+        ));
 
         instance.broadcast_message(&message);
         let handler_was_called = handler.was_called();
@@ -603,7 +606,7 @@ mod tests {
         const DATA: &'static str = "A message containing data (ask).";
         let message = Arc::new(SignedMessage::new(
             Msg::broadcast(DATA),
-            RefAddr::new(path, sender)
+            RefAddr::new(path, sender),
         ));
 
         global_dispatcher.broadcast_message(BroadcastTarget::Group("".to_string()), &message);

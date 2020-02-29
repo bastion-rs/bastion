@@ -62,7 +62,7 @@ impl Child {
         exec: Exec,
         bcast: Broadcast,
         state: Qutex<ContextState>,
-        child_ref: ChildRef
+        child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
