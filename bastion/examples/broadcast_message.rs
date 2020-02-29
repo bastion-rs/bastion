@@ -23,9 +23,10 @@ use bastion::prelude::*;
 fn main() {
     Bastion::init();
 
-    Bastion::supervisor(input_supervisor).expect("Couldn't create the supervisor.");
-    Bastion::supervisor(map_supervisor).expect("Couldn't create the supervisor.");
-    Bastion::supervisor(response_supervisor).expect("Couldn't create the supervisor.");
+    Bastion::supervisor(input_supervisor)
+        .and_then(|_| Bastion::supervisor(map_supervisor))
+        .and_then(|_| Bastion::supervisor(response_supervisor))
+        .expect("Couldn't create supervisor chain.");
 
     Bastion::start();
     Bastion::block_until_stopped();
