@@ -84,9 +84,6 @@ Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispa
 
 ---
 
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_large)
-
 ## Usage
 
 Bastion comes with a default one-for-one strategy root supervisor.
@@ -165,11 +162,17 @@ We use [Discord](https://discord.gg/DqRqtRT) for development discussions. Also p
 More interaction and more ideas are better!
 
 ## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_shield)
 
 All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
 
 A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](https://github.com/bastion-rs/.github/blob/master/CONTRIBUTING.md) on GitHub.
+
+## License
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_large)
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_shield)
+
 
 ---
 <sup><sub>* Currently, we are working on distributed properties and protocol[.](https://spoti.fi/2OaEsj9)</sub></sup>
