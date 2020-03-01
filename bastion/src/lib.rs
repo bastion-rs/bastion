@@ -83,6 +83,8 @@ pub mod message;
 pub mod path;
 pub mod supervisor;
 
+pub mod parallel;
+
 ///
 /// Prelude of Bastion
 pub mod prelude {
