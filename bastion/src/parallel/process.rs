@@ -40,6 +40,12 @@ impl Builder {
         }
     }
 
+    /// Process data which has given to spawned Process
+    pub(crate) fn data(&mut self, proc_data: ProcessData) -> &mut Self {
+        self.data = proc_data;
+        self
+    }
+
     /// Set an environment variable in the spawned process. Equivalent to `Command::env`
     pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
     where
@@ -101,13 +107,46 @@ impl Builder {
     }
 
     ///
-    /// Before start 
+    /// Process before start
     #[cfg(unix)]
     pub fn before_start<F>(&mut self, f: F) -> &mut Self
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static
     {
         self.data.callbacks.before_start = Some(Arc::new(Mutex::new(Box::new(f))));
+        self
+    }
+
+    ///
+    /// Process before restart
+    #[cfg(unix)]
+    pub fn before_restart<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnMut() -> io::Result<()> + Send + Sync + 'static
+    {
+        self.data.callbacks.before_restart = Some(Arc::new(Mutex::new(Box::new(f))));
+        self
+    }
+
+    ///
+    /// Process after restart
+    #[cfg(unix)]
+    pub fn after_restart<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnMut() -> io::Result<()> + Send + Sync + 'static
+    {
+        self.data.callbacks.after_restart = Some(Arc::new(Mutex::new(Box::new(f))));
+        self
+    }
+
+    ///
+    /// Process after stop
+    #[cfg(unix)]
+    pub fn after_stop<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnMut() -> io::Result<()> + Send + Sync + 'static
+    {
+        self.data.callbacks.after_stop = Some(Arc::new(Mutex::new(Box::new(f))));
         self
     }
 }
