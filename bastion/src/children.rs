@@ -619,7 +619,7 @@ impl Children {
             let supervisor = self.bcast.parent().clone().into_supervisor();
 
             let state = ContextState::new();
-            let state = Qutex::new(state);
+            let state = Qutex::new(Box::pin(state));
 
             let ctx =
                 BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());

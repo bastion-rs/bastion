@@ -30,7 +30,7 @@ pub(crate) struct Child {
     // This is used to store the messages that were received
     // for the child's associated future to be able to
     // retrieve them.
-    state: Qutex<ContextState>,
+    state: Qutex<Pin<Box<ContextState>>>,
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -61,7 +61,7 @@ impl Child {
     pub(crate) fn new(
         exec: Exec,
         bcast: Broadcast,
-        state: Qutex<ContextState>,
+        state: Qutex<Pin<Box<ContextState>>>,
         child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
@@ -157,8 +157,9 @@ impl Child {
                 sign,
             } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
-                let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
-                state.push_msg(msg, sign);
+                let mut guard = self.state.clone().lock_async().await.map_err(|_| ())?;
+                let mut state = guard.as_mut();
+                state.push_message(msg, sign);
             }
             // FIXME
             Envelope {
