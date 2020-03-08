@@ -702,6 +702,7 @@ macro_rules! msg {
 ///         # children.with_exec(move |ctx: BastionContext| {
 ///             # let child_ref = children_ref.elems()[0].clone();
 ///             # async move {
+/// // now you can ask the child, from another children
 /// let answer: Answer = ctx.ask(&child_ref.addr(), "hello").expect("Couldn't send the message.");
 ///
 /// msg! { answer.await.expect("Couldn't receive the answer."),
