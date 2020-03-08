@@ -675,3 +675,57 @@ macro_rules! msg {
         }
     } };
 }
+
+#[macro_export]
+/// Answers to a given message, with the given answer.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// #
+/// # fn main() {
+///     # Bastion::init();
+///     # let children_ref =
+/// // Create a new child...
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             let msg = ctx.recv().await?;
+///             answer!(msg, "goodbye").unwrap();
+///             Ok(())
+///         }
+///     })
+/// }).expect("Couldn't create the children group.");
+///
+///     # Bastion::children(|children| {
+///         # children.with_exec(move |ctx: BastionContext| {
+///             # let child_ref = children_ref.elems()[0].clone();
+///             # async move {
+/// // now you can ask the child, from another children
+/// let answer: Answer = ctx.ask(&child_ref.addr(), "hello").expect("Couldn't send the message.");
+///
+/// msg! { answer.await.expect("Couldn't receive the answer."),
+///     msg: &'static str => {
+///         assert_eq!(msg, "goodbye");
+///     };
+///     _: _ => ();
+/// }
+///                 #
+///                 # Ok(())
+///             # }
+///         # })
+///     # }).unwrap();
+///     #
+///     # Bastion::start();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+macro_rules! answer {
+    ($msg:expr, $answer:expr) => {{
+        let (mut msg, sign) = $msg.extract();
+        let sender = msg.take_sender().expect("failed to take render");
+        sender.send($answer, sign)
+    }};
+}

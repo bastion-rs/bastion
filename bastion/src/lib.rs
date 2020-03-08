@@ -105,5 +105,5 @@ pub mod prelude {
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,
     };
-    pub use crate::{blocking, children, run, spawn, supervisor};
+    pub use crate::{answer, blocking, children, run, spawn, supervisor};
 }
