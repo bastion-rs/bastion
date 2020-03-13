@@ -520,7 +520,6 @@ impl Children {
 
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
-        self.register_dispatchers();
 
         loop {
             for (_, launched) in self.launched.values_mut() {
