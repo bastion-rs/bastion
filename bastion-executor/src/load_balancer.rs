@@ -6,18 +6,23 @@
 //!
 use crate::load_balancer;
 use crate::placement;
-use crossbeam_utils::sync::ShardedLock;
-use fxhash::FxHashMap;
 use lazy_static::*;
 use std::thread;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::usize;
 use std::mem::MaybeUninit;
+
 /// Stats of all the smp queues.
 pub trait SmpStats{
+     /// Stores the load of the given queue.
      fn store_load(&self, affinity: usize, load: usize);
+     /// returns tuple of queue id and load in an sorted order.
      fn get_sorted_load(&self) -> Vec<(usize, usize)>;
+     /// mean of the all smp queue load.
+     fn mean(&self) -> usize;
+     /// update the smp mean.
+     fn update_mean(&self);
 }
 ///
 /// Load-balancer struct which is just a convenience wrapper over the statistics calculations.
@@ -32,15 +37,7 @@ impl LoadBalancer {
             .name("bastion-load-balancer-thread".to_string())
             .spawn(move || {
                 loop {
-                    if let Ok(mut stats) = load_balancer::stats().try_write() {
-                        // Write latest downscaled mean to statistics
-                        stats.mean_level = stats
-                            .smp_queues
-                            .values()
-                            .sum::<usize>()
-                            .wrapping_div(*core_retrieval());
-                    }
-
+                     load_balancer::stats().update_mean();
                     // We don't have β-reduction here… Life is unfair. Life is cruel.
                     //
                     // Try sleeping for a while to wait
@@ -54,53 +51,23 @@ impl LoadBalancer {
     }
 }
 
+/// Maximum number of core supported by mordern computers.
+const MAX_CORE: usize = 40;
+
 ///
 /// Holding all statistics related to the run queue
 ///
 /// Contains:
-/// * Global run queue size
 /// * Mean level of processes in the run queues
 /// * SMP queue distributions
-#[derive(Clone, Debug, Default)]
 pub struct Stats {
-    pub(crate) global_run_queue: usize,
-    pub(crate) mean_level: usize,
-    pub(crate) smp_queues: FxHashMap<usize, usize>,
-}
-
-impl SmpStats for ShardedLock<Stats>{
-
-    fn store_load(&self, affinity: usize, load: usize){
-        let mut stats = self.write().unwrap();
-        stats.smp_queues.insert(affinity, load);
-    }
-
-    fn get_sorted_load(&self) -> Vec<(usize, usize)> {
-        let stats = self.read().unwrap();
-
-        // Collect all the stats.
-        let mut core_vec: Vec<_> = stats
-        .smp_queues
-        .iter()
-        .map(|(&x, &y)| (x, y))
-        .collect::<Vec<(usize, usize)>>();
-        
-        // Sort to find the over loaded queue.
-        core_vec.sort_by(|x, y| y.1.cmp(&x.1));
-        core_vec
-    }
-}
-
-/// Maximum number of core supported by mordern computers.
-const MAX_CORE: usize = 40;
-
-pub struct LockLessStats {
     smp_load: [AtomicUsize;MAX_CORE],
+    mean_level: AtomicUsize,
 }
 
-impl LockLessStats{
+impl Stats{
     /// new returns LockLessStats
-    pub fn new(num_cores: usize)  -> LockLessStats{
+    pub fn new(num_cores: usize)  -> Stats{
 
         let smp_load: [AtomicUsize; MAX_CORE] = {
             let mut data: [MaybeUninit<AtomicUsize>; MAX_CORE] = unsafe{
@@ -121,16 +88,17 @@ impl LockLessStats{
                 std::mem::transmute::<_, [AtomicUsize; MAX_CORE]>(data)
             }
         };
-        LockLessStats{
+        Stats{
             smp_load: smp_load,
+            mean_level: AtomicUsize::new(0),
         }
     }
 }
 
-unsafe impl Sync for LockLessStats{}
-unsafe impl Send for LockLessStats{}
+unsafe impl Sync for Stats{}
+unsafe impl Send for Stats{}
 
-impl SmpStats for LockLessStats{
+impl SmpStats for Stats{
 
     fn store_load(&self, affinity: usize, load: usize){
         self.smp_load[affinity].store(load, Ordering::SeqCst);
@@ -141,6 +109,7 @@ impl SmpStats for LockLessStats{
 
         for (i, item) in self.smp_load.iter().enumerate(){
             let load = item.load(Ordering::SeqCst);
+            // load till maximum core.
             if load == usize::MAX{
                 break;
             }
@@ -149,42 +118,33 @@ impl SmpStats for LockLessStats{
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
     }
-}
+    
+    fn mean(&self) -> usize{
+        self.mean_level.load(Ordering::SeqCst)
+    }
 
-unsafe impl Send for Stats {}
-unsafe impl Sync for Stats {}
+    fn update_mean(&self){
+        let mut sum: usize = 0;
+        
+        for item in self.smp_load.iter(){
+            let load = item.load(Ordering::SeqCst);
+            
+            if load == usize::MAX {
+                break;
+            }
+            sum = sum + load;
+        }
+
+        self.mean_level.store(sum, Ordering::SeqCst);
+    }
+}
 
 ///
 /// Static access to runtime statistics
 #[inline]
-pub fn stats() -> &'static ShardedLock<Stats> {
+pub fn stats() -> &'static Stats {
     lazy_static! {
-        static ref LB_STATS: ShardedLock<Stats> = {
-            let stats = Stats {
-                global_run_queue: 0,
-                mean_level: 0,
-                smp_queues: FxHashMap::with_capacity_and_hasher(
-                    placement::get_core_ids().unwrap().len(),
-                    Default::default()
-                )
-            };
-
-            // Start AMQL generator
-            LoadBalancer::amql_generation();
-
-            // Return stats
-            ShardedLock::new(stats)
-        };
-    }
-    &*LB_STATS
-}
-
-
-#[inline]
-pub fn lockless_stats() -> &'static LockLessStats {
-    lazy_static! {
-        // hardcoding the number of cores.
-        static ref LOCKLESS_STATS: LockLessStats = LockLessStats::new(12);
+        static ref LOCKLESS_STATS: Stats = Stats::new(*core_retrieval());
     }
     &*LOCKLESS_STATS
 }

@@ -1,7 +1,7 @@
 #![feature(test)]
 
 extern crate test;
-use bastion_executor::load_balancer::{SmpStats, stats, lockless_stats}; 
+use bastion_executor::load_balancer::{SmpStats, stats}; 
 use std::thread;
 use bastion_executor::placement;
 
@@ -27,18 +27,12 @@ fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S){
 }
 use test::Bencher;
 
-// 1,352,791 ns/iter (+/- 2,682,013)
-#[bench]
-fn locked_stats_bench(b: &mut Bencher) {
-    b.iter(|| {
-        stress_stats(stats());
-    });
-}
+// previous lock based stats benchmark 1,352,791 ns/iter (+/- 2,682,013)
 
 // 158,278 ns/iter (+/- 117,103)
 #[bench]
 fn lockless_stats_bench(b: &mut Bencher) {
     b.iter(|| {
-        stress_stats(lockless_stats());
+        stress_stats(stats());
     });
 }
