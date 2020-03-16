@@ -1,10 +1,9 @@
 #![feature(test)]
 
 extern crate test;
-use bastion_executor::load_balancer::{SmpStats, Stats, stats, lockless_stats}; 
+use bastion_executor::load_balancer::{SmpStats, stats, lockless_stats}; 
 use std::thread;
 use bastion_executor::placement;
-use crossbeam_utils::sync::ShardedLock;
 
 fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S){
     let cores = placement::get_core_ids().expect("Core mapping couldn't be fetched");
@@ -30,7 +29,7 @@ use test::Bencher;
 
 // 1,352,791 ns/iter (+/- 2,682,013)
 #[bench]
-fn locked_stats(b: &mut Bencher) {
+fn locked_stats_bench(b: &mut Bencher) {
     b.iter(|| {
         stress_stats(stats());
     });
