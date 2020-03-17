@@ -7,9 +7,9 @@ use crate::load_balancer;
 use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
+use load_balancer::SmpStats;
 use std::cell::{Cell, UnsafeCell};
 use std::{iter, ptr};
-use load_balancer::SmpStats;
 ///
 /// Get the current process's stack
 pub fn current() -> ProcStack {
@@ -85,50 +85,43 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
-
     let load_mean = load_balancer::stats().mean();
     // Pop a task from the local queue, if not empty.
     local.pop().or_else(|| {
         // Otherwise, we need to look for a task elsewhere.
-        iter::repeat_with(||  {
+        iter::repeat_with(|| {
             let core_vec = load_balancer::stats().get_sorted_load();
 
-                // First try to get procs from global queue
-                pool.injector.steal_batch_and_pop(&local).or_else(|| {
-                    match core_vec.get(0) {
-                        Some((core, _)) => {
-                            // If affinity is the one with the highest let other's do the stealing
-                            if *core == affinity {
-                                Steal::Retry
-                            } else {
-                                // Try iterating through biggest to smallest
-                                core_vec
-                                    .iter()
-                                    .map(|s| {
-                                        // Steal the mean amount to balance all queues considering incoming workloads
-                                        // Otherwise do an ignorant steal (which is going to be useless)
-                                        if load_mean > 0 {
-                                            pool.stealers
-                                                .get(s.0)
-                                                .unwrap()
-                                                .steal_batch_and_pop_with_amount(
-                                                    &local,
-                                                    load_mean,
-                                                )
-                                        } else {
-                                            pool.stealers
-                                                .get(s.0)
-                                                .unwrap()
-                                                .steal_batch_and_pop(&local)
-                                            // TODO: Set evacuation flag in thread_local
-                                        }
-                                    })
-                                    .collect()
-                            }
+            // First try to get procs from global queue
+            pool.injector.steal_batch_and_pop(&local).or_else(|| {
+                match core_vec.get(0) {
+                    Some((core, _)) => {
+                        // If affinity is the one with the highest let other's do the stealing
+                        if *core == affinity {
+                            Steal::Retry
+                        } else {
+                            // Try iterating through biggest to smallest
+                            core_vec
+                                .iter()
+                                .map(|s| {
+                                    // Steal the mean amount to balance all queues considering incoming workloads
+                                    // Otherwise do an ignorant steal (which is going to be useless)
+                                    if load_mean > 0 {
+                                        pool.stealers
+                                            .get(s.0)
+                                            .unwrap()
+                                            .steal_batch_and_pop_with_amount(&local, load_mean)
+                                    } else {
+                                        pool.stealers.get(s.0).unwrap().steal_batch_and_pop(&local)
+                                        // TODO: Set evacuation flag in thread_local
+                                    }
+                                })
+                                .collect()
                         }
-                        _ => Steal::Retry,
                     }
-                })
+                    _ => Steal::Retry,
+                }
+            })
         })
         // Loop while no task was stolen and any steal operation needs to be retried.
         .find(|s| !s.is_retry())
