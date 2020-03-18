@@ -52,7 +52,7 @@ impl LoadBalancer {
 }
 
 /// Maximum number of core supported by modern computers.
-const MAX_CORE: usize = 48;
+const MAX_CORE: usize = 256;
 
 ///
 /// Holding all statistics related to the run queue
