@@ -51,7 +51,7 @@ impl LoadBalancer {
     }
 }
 
-/// Maximum number of core supported by mordern computers.
+/// Maximum number of core supported by modern computers.
 const MAX_CORE: usize = 48;
 
 ///
