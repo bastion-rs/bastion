@@ -40,7 +40,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["bastion-executor/unstable"]
 
 [dependencies]
-bastion-executor = { version = "= 0.3.5-alpha.0", path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
 
 dashmap = "3.4.0"
