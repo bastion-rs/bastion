@@ -80,8 +80,6 @@
 
 Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery.
 
-<h6 align="center">Please note that Bastion is not production-ready yet and might break some backward compatibility for now.</h6>
-
 ---
 
 ## Usage
