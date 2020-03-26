@@ -247,6 +247,48 @@ impl System {
         }
     }
 
+    async fn deploy(&mut self, deployment: Deployment) {
+        match deployment {
+            Deployment::Supervisor(supervisor) => {
+                debug!("System: Deploying Supervisor({}).", supervisor.id());
+                supervisor.callbacks().before_start();
+
+                self.bcast.register(supervisor.bcast());
+                if self.started {
+                    let msg = BastionMessage::start();
+                    let envelope =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_child(supervisor.id(), envelope);
+                }
+
+                info!("System: Launching Supervisor({}).", supervisor.id());
+                let id = supervisor.id().clone();
+                let launched = supervisor.launch();
+                self.launched.insert(id, launched);
+            }
+            // FIXME
+            Deployment::Children(_) => unimplemented!(),
+        }
+    }
+
+    async fn prune_supervised_object(&mut self, id: BastionId) {
+        // TODO: Err if None?
+        if let Some(launched) = self.launched.remove(&id) {
+            // TODO: stop or kill?
+            self.bcast.kill_child(&id);
+            self.waiting.push(launched);
+        }
+    }
+
+    fn restart_supervised_object(&mut self, id: BastionId) {
+        // TODO: Err if None?
+        if let Some(launched) = self.launched.remove(&id) {
+            warn!("System: Supervisor({}) faulted.", id);
+            self.waiting.push(launched);
+            self.restart.insert(id);
+        }
+    }
+
     async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
         match env {
             Envelope {
@@ -276,42 +318,11 @@ impl System {
             Envelope {
                 msg: BastionMessage::Deploy(deployment),
                 ..
-            } => match deployment {
-                Deployment::Supervisor(supervisor) => {
-                    debug!("System: Deploying Supervisor({}).", supervisor.id());
-                    supervisor.callbacks().before_start();
-
-                    self.bcast.register(supervisor.bcast());
-                    if self.started {
-                        let msg = BastionMessage::start();
-                        let envelope = Envelope::new(
-                            msg,
-                            self.bcast.path().clone(),
-                            self.bcast.sender().clone(),
-                        );
-                        self.bcast.send_child(supervisor.id(), envelope);
-                    }
-
-                    info!("System: Launching Supervisor({}).", supervisor.id());
-                    let id = supervisor.id().clone();
-                    let launched = supervisor.launch();
-                    self.launched.insert(id, launched);
-                }
-                // FIXME
-                Deployment::Children(_) => unimplemented!(),
-            },
+            } => self.deploy(deployment).await,
             Envelope {
                 msg: BastionMessage::Prune { id },
                 ..
-            } => {
-                // TODO: Err if None?
-                if let Some(launched) = self.launched.remove(&id) {
-                    // TODO: stop or kill?
-                    self.bcast.kill_child(&id);
-
-                    self.waiting.push(launched);
-                }
-            }
+            } => self.prune_supervised_object(id).await,
             // FIXME
             Envelope {
                 msg: BastionMessage::SuperviseWith(_),
@@ -327,25 +338,11 @@ impl System {
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
-            } => {
-                // TODO: Err if None?
-                if let Some(launched) = self.launched.remove(&id) {
-                    info!("System: Supervisor({}) stopped.", id);
-                    self.waiting.push(launched);
-                    self.restart.remove(&id);
-                }
-            }
+            } => self.restart_supervised_object(id),
             Envelope {
                 msg: BastionMessage::Faulted { id },
                 ..
-            } => {
-                // TODO: Err if None?
-                if let Some(launched) = self.launched.remove(&id) {
-                    warn!("System: Supervisor({}) faulted.", id);
-                    self.waiting.push(launched);
-                    self.restart.insert(id);
-                }
-            }
+            } => self.restart_supervised_object(id),
         }
 
         Ok(())

@@ -437,8 +437,46 @@ impl Children {
         self.bcast.faulted();
     }
 
-    async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
-        match env {
+    async fn kill_children(&mut self) -> Result<(), ()> {
+        self.kill().await;
+        self.stopped();
+        Err(())
+    }
+
+    async fn stop_children(&mut self) -> Result<(), ()> {
+        self.kill().await;
+        self.stopped();
+        Err(())
+    }
+
+    async fn handle_stopped_child(&mut self, id: &BastionId) -> Result<(), ()> {
+        // FIXME: Err if false?
+        if self.launched.contains_key(&id) {
+            debug!("Children({}): Child({}) stopped.", self.id(), id);
+            self.stop().await;
+            self.stopped();
+
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+    async fn handle_faulted_child(&mut self, id: &BastionId) -> Result<(), ()> {
+        // FIXME: Err if false?
+        if self.launched.contains_key(id) {
+            warn!("Children({}): Child({}) faulted.", self.id(), id);
+            self.kill().await;
+            self.faulted();
+
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+    async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
+        match envelope {
             Envelope {
                 msg: BastionMessage::Start,
                 ..
@@ -446,21 +484,11 @@ impl Children {
             Envelope {
                 msg: BastionMessage::Stop,
                 ..
-            } => {
-                self.stop().await;
-                self.stopped();
-
-                return Err(());
-            }
+            } => self.kill_children().await?,
             Envelope {
                 msg: BastionMessage::Kill,
                 ..
-            } => {
-                self.kill().await;
-                self.stopped();
-
-                return Err(());
-            }
+            } => self.stop_children().await?,
             // FIXME
             Envelope {
                 msg: BastionMessage::Deploy(_),
@@ -485,33 +513,45 @@ impl Children {
                     self.id(),
                     message
                 );
-                self.bcast.send_children(env);
+                self.bcast.send_children(envelope);
             }
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
-            } => {
-                // FIXME: Err if false?
-                if self.launched.contains_key(&id) {
-                    debug!("Children({}): Child({}) stopped.", self.id(), id);
-                    self.stop().await;
-                    self.stopped();
-
-                    return Err(());
-                }
-            }
+            } => self.handle_stopped_child(&id).await?,
             Envelope {
                 msg: BastionMessage::Faulted { id },
                 ..
-            } => {
-                // FIXME: Err if false?
-                if self.launched.contains_key(&id) {
-                    warn!("Children({}): Child({}) faulted.", self.id(), id);
-                    self.kill().await;
-                    self.faulted();
+            } => self.handle_faulted_child(&id).await?,
+        }
 
-                    return Err(());
-                }
+        Ok(())
+    }
+
+    async fn initialize(&mut self) -> Result<(), ()> {
+        trace!(
+            "Children({}): Received a new message (started=false): {:?}",
+            self.id(),
+            BastionMessage::Start
+        );
+        debug!("Children({}): Starting.", self.id());
+        self.started = true;
+
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_children(env);
+
+        let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
+        self.pre_start_msgs.shrink_to_fit();
+
+        debug!(
+            "Children({}): Replaying messages received before starting.",
+            self.id()
+        );
+        for msg in msgs {
+            trace!("Children({}): Replaying message: {:?}", self.id(), msg);
+            if self.handle(msg).await.is_err() {
+                return Err(());
             }
         }
 
@@ -532,31 +572,8 @@ impl Children {
                     msg: BastionMessage::Start,
                     ..
                 })) => {
-                    trace!(
-                        "Children({}): Received a new message (started=false): {:?}",
-                        self.id(),
-                        BastionMessage::Start
-                    );
-                    debug!("Children({}): Starting.", self.id());
-                    self.started = true;
-
-                    let msg = BastionMessage::start();
-                    let env =
-                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-                    self.bcast.send_children(env);
-
-                    let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
-                    self.pre_start_msgs.shrink_to_fit();
-
-                    debug!(
-                        "Children({}): Replaying messages received before starting.",
-                        self.id()
-                    );
-                    for msg in msgs {
-                        trace!("Children({}): Replaying message: {:?}", self.id(), msg);
-                        if self.handle(msg).await.is_err() {
-                            return self;
-                        }
+                    if self.initialize().await.is_err() {
+                        return self;
                     }
                 }
                 Poll::Ready(Some(msg)) if !self.started => {

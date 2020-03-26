@@ -175,6 +175,32 @@ impl Child {
         Ok(())
     }
 
+    async fn initialize(&mut self) -> Result<(), ()> {
+        trace!(
+            "Child({}): Received a new message (started=false): {:?}",
+            self.id(),
+            BastionMessage::Start
+        );
+        debug!("Child({}): Starting.", self.id());
+        self.started = true;
+
+        let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
+        self.pre_start_msgs.shrink_to_fit();
+
+        debug!(
+            "Child({}): Replaying messages received before starting.",
+            self.id()
+        );
+        for msg in msgs {
+            trace!("Child({}): Replaying message: {:?}", self.id(), msg);
+            if self.handle(msg).await.is_err() {
+                return Err(());
+            }
+        }
+
+        Ok(())
+    }
+
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
         self.register_in_dispatchers();
@@ -186,26 +212,8 @@ impl Child {
                     msg: BastionMessage::Start,
                     ..
                 })) => {
-                    trace!(
-                        "Child({}): Received a new message (started=false): {:?}",
-                        self.id(),
-                        BastionMessage::Start
-                    );
-                    debug!("Child({}): Starting.", self.id());
-                    self.started = true;
-
-                    let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
-                    self.pre_start_msgs.shrink_to_fit();
-
-                    debug!(
-                        "Child({}): Replaying messages received before starting.",
-                        self.id()
-                    );
-                    for msg in msgs {
-                        trace!("Child({}): Replaying message: {:?}", self.id(), msg);
-                        if self.handle(msg).await.is_err() {
-                            return;
-                        }
+                    if self.initialize().await.is_err() {
+                        return;
                     }
 
                     continue;

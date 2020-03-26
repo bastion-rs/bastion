@@ -1005,6 +1005,87 @@ impl Supervisor {
         Ok(())
     }
 
+    async fn deinit_with_stop(&mut self) {
+        self.stop(0..self.order.len()).await;
+        self.stopped();
+    }
+
+    async fn deinit_with_kill(&mut self) {
+        self.kill(0..self.order.len()).await;
+        self.stopped();
+    }
+
+    async fn deploy_supervised_object(&mut self, deployment: Deployment) {
+        let supervised = match deployment {
+            Deployment::Supervisor(supervisor) => {
+                debug!(
+                    "Supervisor({}): Deploying Supervisor({}).",
+                    self.id(),
+                    supervisor.id()
+                );
+                supervisor.callbacks().before_start();
+                Supervised::supervisor(supervisor)
+            }
+            Deployment::Children(children) => {
+                debug!(
+                    "Supervisor({}): Deploying Children({}).",
+                    self.id(),
+                    children.id()
+                );
+                children.callbacks().before_start();
+                Supervised::children(children)
+            }
+        };
+
+        self.bcast.register(supervised.bcast());
+        if self.started {
+            let msg = BastionMessage::start();
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_child(supervised.id(), env);
+        }
+
+        debug!(
+            "Supervisor({}): Launching Supervised({}).",
+            self.id(),
+            supervised.id()
+        );
+        let id = supervised.id().clone();
+        let launched = supervised.launch();
+        self.launched
+            .insert(id.clone(), (self.order.len(), launched, 0));
+        self.order.push(id);
+    }
+
+    async fn cleanup_supervised_object(&mut self, id: BastionId) {
+        // FIXME: Err if None?
+        if let Some((_, launched, _)) = self.launched.remove(&id) {
+            debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
+            // TODO: add a "waiting" list an poll from it instead of awaiting
+            // FIXME: panics?
+            let supervised = launched.await.unwrap();
+            supervised.callbacks().after_stop();
+
+            self.bcast.unregister(&id);
+            self.stopped.insert(id.clone(), supervised);
+        }
+    }
+
+    async fn recover_supervised_object(&mut self, id: BastionId) -> Result<(), ()> {
+        if self.launched.contains_key(&id) {
+            warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
+        }
+
+        if self.recover(id).await.is_err() {
+            // TODO: stop or kill?
+            self.kill(0..self.order.len()).await;
+            self.faulted();
+
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
         match env {
             Envelope {
@@ -1015,64 +1096,20 @@ impl Supervisor {
                 msg: BastionMessage::Stop,
                 ..
             } => {
-                self.stop(0..self.order.len()).await;
-                self.stopped();
-
+                self.deinit_with_stop().await;
                 return Err(());
             }
             Envelope {
                 msg: BastionMessage::Kill,
                 ..
             } => {
-                self.kill(0..self.order.len()).await;
-                self.stopped();
-
+                self.deinit_with_kill().await;
                 return Err(());
             }
             Envelope {
                 msg: BastionMessage::Deploy(deployment),
                 ..
-            } => {
-                let supervised = match deployment {
-                    Deployment::Supervisor(supervisor) => {
-                        debug!(
-                            "Supervisor({}): Deploying Supervisor({}).",
-                            self.id(),
-                            supervisor.id()
-                        );
-                        supervisor.callbacks().before_start();
-                        Supervised::supervisor(supervisor)
-                    }
-                    Deployment::Children(children) => {
-                        debug!(
-                            "Supervisor({}): Deploying Children({}).",
-                            self.id(),
-                            children.id()
-                        );
-                        children.callbacks().before_start();
-                        Supervised::children(children)
-                    }
-                };
-
-                self.bcast.register(supervised.bcast());
-                if self.started {
-                    let msg = BastionMessage::start();
-                    let env =
-                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-                    self.bcast.send_child(supervised.id(), env);
-                }
-
-                debug!(
-                    "Supervisor({}): Launching Supervised({}).",
-                    self.id(),
-                    supervised.id()
-                );
-                let id = supervised.id().clone();
-                let launched = supervised.launch();
-                self.launched
-                    .insert(id.clone(), (self.order.len(), launched, 0));
-                self.order.push(id);
-            }
+            } => self.deploy_supervised_object(deployment).await,
             // FIXME
             Envelope {
                 msg: BastionMessage::Prune { .. },
@@ -1103,34 +1140,44 @@ impl Supervisor {
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
-            } => {
-                // FIXME: Err if None?
-                if let Some((_, launched, _)) = self.launched.remove(&id) {
-                    debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
-                    // TODO: add a "waiting" list an poll from it instead of awaiting
-                    // FIXME: panics?
-                    let supervised = launched.await.unwrap();
-                    supervised.callbacks().after_stop();
-
-                    self.bcast.unregister(&id);
-                    self.stopped.insert(id, supervised);
-                }
-            }
+            } => self.cleanup_supervised_object(id).await,
             Envelope {
                 msg: BastionMessage::Faulted { id },
                 ..
             } => {
-                if self.launched.contains_key(&id) {
-                    warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
-                }
-
-                if self.recover(id).await.is_err() {
-                    // TODO: stop or kill?
-                    self.kill(0..self.order.len()).await;
-                    self.faulted();
-
+                if self.recover_supervised_object(id).await.is_err() {
                     return Err(());
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn initialize(&mut self) -> Result<(), ()> {
+        trace!(
+            "Supervisor({}): Received a new message (started=false): {:?}",
+            self.id(),
+            BastionMessage::Start
+        );
+        debug!("Supervisor({}): Starting.", self.id());
+        self.started = true;
+
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_children(env);
+
+        let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
+        self.pre_start_msgs.shrink_to_fit();
+
+        debug!(
+            "Supervisor({}): Replaying messages received before starting.",
+            self.id()
+        );
+        for msg in msgs {
+            trace!("Supervisor({}): Replaying message: {:?}", self.id(), msg);
+            if self.handle(msg).await.is_err() {
+                return Err(());
             }
         }
 
@@ -1146,31 +1193,8 @@ impl Supervisor {
                     msg: BastionMessage::Start,
                     ..
                 })) => {
-                    trace!(
-                        "Supervisor({}): Received a new message (started=false): {:?}",
-                        self.id(),
-                        BastionMessage::Start
-                    );
-                    debug!("Supervisor({}): Starting.", self.id());
-                    self.started = true;
-
-                    let msg = BastionMessage::start();
-                    let env =
-                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-                    self.bcast.send_children(env);
-
-                    let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
-                    self.pre_start_msgs.shrink_to_fit();
-
-                    debug!(
-                        "Supervisor({}): Replaying messages received before starting.",
-                        self.id()
-                    );
-                    for msg in msgs {
-                        trace!("Supervisor({}): Replaying message: {:?}", self.id(), msg);
-                        if self.handle(msg).await.is_err() {
-                            return self;
-                        }
+                    if self.initialize().await.is_err() {
+                        return self;
                     }
                 }
                 Poll::Ready(Some(msg)) if !self.started => {
