@@ -12,6 +12,7 @@ use crate::system::SYSTEM;
 use core::future::Future;
 
 use std::fmt::{self, Debug, Formatter};
+use lightproc::proc_state::State;
 
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level

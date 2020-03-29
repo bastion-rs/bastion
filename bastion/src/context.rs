@@ -2,19 +2,21 @@
 //! A context allows a child's future to access its received
 //! messages, parent and supervisor.
 
+use state::Container;
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
-use crate::system::SYSTEM;
+use crate::{state::SharedState, system::SYSTEM};
 use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Mutex, Arc, MutexGuard};
 use uuid::Uuid;
+use lightproc::proc_state::State;
 
 /// Identifier for a root supervisor and dead-letters children.
 pub const NIL_ID: BastionId = BastionId(Uuid::nil());
@@ -54,7 +56,7 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```
 pub struct BastionId(Uuid);
 
-#[derive(Debug)]
+
 /// A child's execution context, allowing its [`exec`] future
 /// to receive messages and access a [`ChildRef`] referencing
 /// it, a [`ChildrenRef`] referencing its children group and
@@ -106,6 +108,17 @@ pub struct BastionContext {
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
     state: Qutex<ContextState>,
+    shared_state: Arc<Mutex<SharedState<'static>>>
+}
+
+impl fmt::Debug for BastionContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BastionContext")
+            .field("id", &self.id)
+            .field("child", &self.child)
+            // TODO: write others
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -128,6 +141,7 @@ impl BastionContext {
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
+        shared_state: Arc<Mutex<SharedState<'static>>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -136,6 +150,7 @@ impl BastionContext {
             children,
             supervisor,
             state,
+            shared_state
         }
     }
 
@@ -205,6 +220,12 @@ impl BastionContext {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn parent(&self) -> &ChildrenRef {
         &self.children
+    }
+
+    pub fn state(&self) -> &MutexGuard<'_, crate::state::SharedState<'static>>
+    {
+        let ss = self.shared_state.clone();
+        &ss.lock().unwrap()
     }
 
     /// Returns a [`SupervisorRef`] referencing the supervisor

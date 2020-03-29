@@ -7,7 +7,7 @@ use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
-use fxhash::FxHashMap;
+use t1ha::T1haHashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -21,7 +21,7 @@ pub(crate) struct Broadcast {
     recver: Receiver,
     path: Arc<BastionPath>, // Arc is needed because we put path to Envelope
     parent: Parent,
-    children: FxHashMap<BastionId, Sender>,
+    children: T1haHashMap<BastionId, Sender>,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +51,7 @@ impl Parent {
 impl Broadcast {
     pub(crate) fn new(parent: Parent, element: BastionPathElement) -> Self {
         let (sender, recver) = mpsc::unbounded();
-        let children = FxHashMap::default();
+        let children = T1haHashMap::default();
 
         let parent_path: BastionPath = match &parent {
             Parent::None | Parent::System => BastionPath::root(),
@@ -79,7 +79,7 @@ impl Broadcast {
         assert!(parent.is_none() || parent.is_system());
 
         let (sender, recver) = mpsc::unbounded();
-        let children = FxHashMap::default();
+        let children = T1haHashMap::default();
         let path = BastionPath::root();
         let path = Arc::new(path);
 
