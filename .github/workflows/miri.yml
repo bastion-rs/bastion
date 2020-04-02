@@ -1,0 +1,37 @@
+name: Unleash MIRI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2020-03-08
+          override: true
+      - uses: davidB/rust-cargo-make@v1
+        with:
+          version: '0.30.0'
+      - name: Miri
+        env:
+          RUST_BACKTRACE: full
+          RUST_LOG: 'trace'
+        run: |
+          rustup component add miri
+          cargo miri setup
+          cargo clean
+          # Do some Bastion shake
+          cd bastion && \
+            cargo miri test -- -Zmiri-disable-isolation -- dispatcher && \
+            cargo miri test -- -Zmiri-disable-isolation -- path && \
+            cargo miri test -- -Zmiri-disable-isolation -- broadcast && \
+            cargo miri test -- -Zmiri-disable-isolation -- children_ref && \
+            cd -
