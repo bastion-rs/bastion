@@ -205,6 +205,7 @@ impl Default for DispatcherType {
     }
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for DispatcherType {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name().hash(state);
