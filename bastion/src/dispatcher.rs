@@ -7,7 +7,10 @@ use crate::envelope::SignedMessage;
 use dashmap::DashMap;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -55,11 +58,43 @@ pub enum DispatcherType {
     Named(String),
 }
 
-#[derive(Debug)]
-/// The special handler, which is creating by default. Initially
-/// doesn't do any useful processing.
-pub struct DefaultDispatcherHandler;
+/// The default handler, which does round-robin.
+pub type DefaultDispatcherHandler = RoundRobinHandler;
 
+/// Dispatcher that will do simple round-robin distribution
+#[derive(Default, Debug)]
+pub struct RoundRobinHandler {
+    index: AtomicU64,
+}
+
+impl DispatcherHandler for RoundRobinHandler {
+    // Will left this implementation as empty.
+    fn notify(
+        &self,
+        _from_child: &ChildRef,
+        _entries: &DispatcherMap,
+        _notification_type: NotificationType,
+    ) {
+    }
+    // Each child in turn will receive a message.
+    fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
+        let current_index = self.index.load(Ordering::SeqCst) % entries.len() as u64;
+
+        let mut skipped = 0;
+        for pair in entries.iter() {
+            if skipped != current_index {
+                skipped += 1;
+                continue;
+            }
+
+            let entry = pair.key();
+            entry.tell_anonymously(message.clone()).unwrap();
+            break;
+        }
+
+        self.index.store(current_index + 1, Ordering::SeqCst);
+    }
+}
 /// Generic trait which any custom dispatcher handler must implement for
 /// the further usage by the `Dispatcher` instances.
 pub trait DispatcherHandler {
@@ -163,17 +198,6 @@ impl Debug for Dispatcher {
     }
 }
 
-impl DispatcherHandler for DefaultDispatcherHandler {
-    fn notify(
-        &self,
-        _from_child: &ChildRef,
-        _entries: &DispatcherMap,
-        _notification_type: NotificationType,
-    ) {
-    }
-    fn broadcast_message(&self, _entries: &DispatcherMap, _message: &Arc<SignedMessage>) {}
-}
-
 impl DispatcherType {
     pub(crate) fn name(&self) -> String {
         match self {
@@ -190,12 +214,6 @@ impl Default for Dispatcher {
             handler: Box::new(DefaultDispatcherHandler::default()),
             actors: DashMap::new(),
         }
-    }
-}
-
-impl Default for DefaultDispatcherHandler {
-    fn default() -> Self {
-        DefaultDispatcherHandler {}
     }
 }
 
