@@ -73,9 +73,8 @@ fn process_group(children: Children) -> Children {
             // automatically.
             //
             // If needed to use more than one groups, then do more `with_dispatcher` calls
-            Dispatcher::default()
-                .with_dispatcher_type(DispatcherType::Named("Processing".to_string())),
-                    )
+            Dispatcher::with_type(DispatcherType::Named("Processing".to_string())),
+        )
         .with_exec(move |ctx: BastionContext| async move {
             println!("[Processing] Worker started!");
 
@@ -120,8 +119,7 @@ fn response_group(children: Children) -> Children {
             // and flexibility in code.
             //
             // The single difference is only the name for Dispatcher for our actor's group.
-            Dispatcher::default()
-                .with_dispatcher_type(DispatcherType::Named("Response".to_string())),
+            Dispatcher::with_type(DispatcherType::Named("Response".to_string())),
         )
         .with_exec(move |ctx: BastionContext| async move {
             println!("[Response] Worker started!");

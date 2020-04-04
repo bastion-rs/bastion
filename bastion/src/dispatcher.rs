@@ -144,6 +144,19 @@ impl Dispatcher {
         self
     }
 
+    /// Creates a dispatcher with a specific dispatcher type.
+    pub fn with_type(dispatcher_type: DispatcherType) -> Self {
+        trace!(
+            "Instanciating a dispatcher with type {:?}.",
+            dispatcher_type
+        );
+        Self {
+            dispatcher_type,
+            handler: Box::new(DefaultDispatcherHandler::default()),
+            actors: Default::default(),
+        }
+    }
+
     /// Sets the handler for the dispatcher.
     pub fn with_handler(
         mut self,
@@ -419,7 +432,7 @@ mod tests {
     fn test_get_dispatcher_type_as_named() {
         let name = "test_group".to_string();
         let dispatcher_type = DispatcherType::Named(name.clone());
-        let instance = Dispatcher::default().with_dispatcher_type(dispatcher_type.clone());
+        let instance = Dispatcher::with_type(dispatcher_type.clone());
 
         assert_eq!(instance.dispatcher_type(), dispatcher_type);
     }
@@ -488,9 +501,7 @@ mod tests {
     #[test]
     fn test_global_dispatcher_add_local_dispatcher() {
         let dispatcher_type = DispatcherType::Named("test".to_string());
-        let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
-        ));
+        let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
         let global_dispatcher = GlobalDispatcher::new();
 
         assert_eq!(
@@ -508,9 +519,7 @@ mod tests {
     #[test]
     fn test_global_dispatcher_remove_local_dispatcher() {
         let dispatcher_type = DispatcherType::Named("test".to_string());
-        let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
-        ));
+        let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
         let global_dispatcher = GlobalDispatcher::new();
 
         global_dispatcher.register_dispatcher(&local_dispatcher);
@@ -534,9 +543,7 @@ mod tests {
         let child_ref = ChildRef::new(bastion_id, sender, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
-        let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
-        ));
+        let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
         let actor_groups = vec![dispatcher_type];
         let module_name = "my::test::module".to_string();
 
@@ -557,9 +564,7 @@ mod tests {
         let child_ref = ChildRef::new(bastion_id, sender, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
-        let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default().with_dispatcher_type(dispatcher_type.clone()),
-        ));
+        let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
         let actor_groups = vec![dispatcher_type];
         let module_name = "my::test::module".to_string();
 
@@ -583,9 +588,7 @@ mod tests {
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let handler = Box::new(CustomHandler::new(false));
         let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default()
-                .with_dispatcher_type(dispatcher_type.clone())
-                .with_handler(handler.clone()),
+            Dispatcher::with_type(dispatcher_type.clone()).with_handler(handler.clone()),
         ));
         let actor_groups = vec![dispatcher_type];
         let module_name = "my::test::module".to_string();
@@ -609,9 +612,7 @@ mod tests {
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let handler = Box::new(CustomHandler::new(false));
         let local_dispatcher = Arc::new(Box::new(
-            Dispatcher::default()
-                .with_dispatcher_type(dispatcher_type.clone())
-                .with_handler(handler.clone()),
+            Dispatcher::with_type(dispatcher_type.clone()).with_handler(handler.clone()),
         ));
         let actor_groups = vec![dispatcher_type];
         let module_name = "my::test::module".to_string();
