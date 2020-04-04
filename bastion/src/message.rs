@@ -7,10 +7,11 @@
 //! * Messages are not guaranteed to be ordered, all message's order is causal.
 //!
 use crate::children::Children;
-use crate::context::BastionId;
+use crate::context::{BastionId, ContextState};
 use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use futures::channel::oneshot::{self, Receiver};
+use qutex::Qutex;
 use std::any::{type_name, Any};
 use std::fmt::Debug;
 use std::future::Future;
@@ -191,6 +192,7 @@ pub(crate) enum BastionMessage {
     Deploy(Deployment),
     Prune { id: BastionId },
     SuperviseWith(SupervisionStrategy),
+    InstantiatedChild { parent_id: BastionId, child_id: BastionId, state: Qutex<Pin<Box<ContextState>>> },
     Message(Msg),
     Stopped { id: BastionId },
     Faulted { id: BastionId },
@@ -388,6 +390,14 @@ impl BastionMessage {
         BastionMessage::SuperviseWith(strategy)
     }
 
+    pub(crate) fn instantiated_child(
+        parent_id: BastionId,
+        child_id: BastionId,
+        state: Qutex<Pin<Box<ContextState>>>
+    ) -> Self {
+        BastionMessage::InstantiatedChild { parent_id, child_id, state }
+    }
+
     pub(crate) fn broadcast<M: Message>(msg: M) -> Self {
         let msg = Msg::broadcast(msg);
         BastionMessage::Message(msg)
@@ -422,6 +432,9 @@ impl BastionMessage {
             BastionMessage::Prune { id } => BastionMessage::prune(id.clone()),
             BastionMessage::SuperviseWith(strategy) => {
                 BastionMessage::supervise_with(strategy.clone())
+            }
+            BastionMessage::InstantiatedChild { parent_id, child_id, state } => {
+                BastionMessage::instantiated_child(parent_id.clone(), child_id.clone(), state.clone())
             }
             BastionMessage::Message(msg) => BastionMessage::Message(msg.try_clone()?),
             BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),

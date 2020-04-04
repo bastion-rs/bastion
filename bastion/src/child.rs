@@ -153,6 +153,10 @@ impl Child {
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::InstantiatedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Message(msg),
                 sign,
             } => {

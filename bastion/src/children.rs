@@ -505,6 +505,10 @@ impl Children {
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::InstantiatedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Message(ref message),
                 ..
             } => {
@@ -618,12 +622,16 @@ impl Children {
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
 
-            let state = ContextState::new();
-            let state = Qutex::new(Box::pin(state));
+            let state = Qutex::new(Box::pin(ContextState::new()));
 
             let ctx =
-                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
+                BastionContext::new(id.clone(), child_ref.clone(), children, supervisor, state.clone());
             let exec = (self.init.0)(ctx);
+
+            let parent_id = self.bcast.id().clone();
+            let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env);
 
             self.bcast.register(&bcast);
 

@@ -5,7 +5,7 @@ use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::Callbacks;
 use crate::children::Children;
 use crate::children_ref::ChildrenRef;
-use crate::context::BastionId;
+use crate::context::{BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::path::{BastionPath, BastionPathElement};
@@ -16,6 +16,7 @@ use futures::{pending, poll};
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
+use qutex::Qutex;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
@@ -23,6 +24,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
+use std::pin::Pin;
 
 #[derive(Debug)]
 /// A supervisor that can supervise both [`Children`] and other
@@ -67,6 +69,11 @@ pub struct Supervisor {
     // The order in which children and supervisors were added.
     // It is only updated when at least one of those is resat.
     order: Vec<BastionId>,
+    // Special wrapper around launched Children and Child that helps
+    // to figure out what and how to restart when it necessary.
+    // The key is the Children's BastionId and the values are
+    // represented as Child instances with the same executed closure.
+    tracked_groups: FxHashMap<BastionId, Vec<TrackedChildState>>,
     // The currently launched supervised children and supervisors.
     // The last value is the amount of times a given actor has restarted.
     launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>, usize)>,
@@ -91,6 +98,13 @@ pub struct Supervisor {
     // is received.
     pre_start_msgs: Vec<Envelope>,
     started: bool,
+}
+
+#[derive(Debug, Clone)]
+struct TrackedChildState {
+    id: BastionId,
+    state: Qutex<Pin<Box<ContextState>>>,
+    restarts_counts: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +211,7 @@ impl Supervisor {
     pub(crate) fn new(bcast: Broadcast) -> Self {
         debug!("Supervisor({}): Initializing.", bcast.id());
         let order = Vec::new();
+        let tracked_groups = FxHashMap::default();
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
         let killed = FxHashMap::default();
@@ -210,6 +225,7 @@ impl Supervisor {
         Supervisor {
             bcast,
             order,
+            tracked_groups,
             launched,
             stopped,
             killed,
@@ -1127,6 +1143,16 @@ impl Supervisor {
                 self.strategy = strategy;
             }
             Envelope {
+                msg: BastionMessage::InstantiatedChild { parent_id, child_id, state },
+                ..
+            } => {
+                let child_state = TrackedChildState::new(child_id, state);
+                match self.tracked_groups.get_mut(&parent_id) {
+                    Some(childs) => { childs.push(child_state); },
+                    None => { self.tracked_groups.insert(parent_id, vec![child_state]); },
+                }
+            }
+            Envelope {
                 msg: BastionMessage::Message(ref message),
                 ..
             } => {
@@ -1605,6 +1631,16 @@ impl SupervisorRef {
 
     pub(crate) fn path(&self) -> &Arc<BastionPath> {
         &self.path
+    }
+}
+
+impl TrackedChildState {
+    fn new(id: BastionId, state: Qutex<Pin<Box<ContextState>>>) -> Self {
+        TrackedChildState {
+            id,
+            state,
+            restarts_counts: 0
+        }
     }
 }
 
