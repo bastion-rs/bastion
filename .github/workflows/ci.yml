@@ -17,16 +17,16 @@ jobs:
           - stable
           - nightly
         include:
-        - toolchain: x86_64-pc-windows-msvc
-          os: windows-latest
-        - toolchain: x86_64-pc-windows-gnu
-          os: windows-latest
-        - toolchain: i686-pc-windows-msvc
-          os: windows-latest
-        - toolchain: x86_64-unknown-linux-gnu
-          os: ubuntu-latest
-        - toolchain: x86_64-apple-darwin
-          os: macOS-latest
+          - toolchain: x86_64-pc-windows-msvc
+            os: windows-latest
+          - toolchain: x86_64-pc-windows-gnu
+            os: windows-latest
+          - toolchain: i686-pc-windows-msvc
+            os: windows-latest
+          - toolchain: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - toolchain: x86_64-apple-darwin
+            os: macOS-latest
 
     name: ${{ matrix.version }} - ${{ matrix.toolchain }}
     runs-on: ${{ matrix.os }}
@@ -45,7 +45,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --benches --bins --examples --tests
+          args: --all-targets --all-features --benches --bins --examples --tests
 
       - name: check stable
         if: matrix.version == 'stable'
@@ -59,6 +59,12 @@ jobs:
         with:
           command: test
           args: --all
+
+      - name: tests nightly
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-targets --all-features
 
   check_fmt_and_docs:
     name: Checking fmt and docs
