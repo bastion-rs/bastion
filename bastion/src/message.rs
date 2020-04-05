@@ -194,6 +194,7 @@ pub(crate) enum BastionMessage {
     SuperviseWith(SupervisionStrategy),
     InstantiatedChild { parent_id: BastionId, child_id: BastionId, state: Qutex<Pin<Box<ContextState>>> },
     Message(Msg),
+    RestartRequired { id: BastionId, parent_id: BastionId},
     Stopped { id: BastionId },
     Faulted { id: BastionId },
 }
@@ -413,6 +414,10 @@ impl BastionMessage {
         (BastionMessage::Message(msg), answer)
     }
 
+    pub(crate) fn restart_required(id: BastionId, parent_id: BastionId) -> Self {
+        BastionMessage::RestartRequired { id, parent_id }
+    }
+
     pub(crate) fn stopped(id: BastionId) -> Self {
         BastionMessage::Stopped { id }
     }
@@ -437,8 +442,9 @@ impl BastionMessage {
                 BastionMessage::instantiated_child(parent_id.clone(), child_id.clone(), state.clone())
             }
             BastionMessage::Message(msg) => BastionMessage::Message(msg.try_clone()?),
+            BastionMessage::RestartRequired { id, parent_id } => BastionMessage::restart_required(id.clone(), parent_id.clone()),
             BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
-            BastionMessage::Faulted { id } => BastionMessage::faulted(id.clone()),
+            BastionMessage::Faulted { id} => BastionMessage::faulted(id.clone()),
         };
 
         Some(clone)

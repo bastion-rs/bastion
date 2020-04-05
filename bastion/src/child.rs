@@ -92,7 +92,7 @@ impl Child {
             let id = id.clone();
             warn!("Child({}): Panicked.", id);
 
-            let msg = BastionMessage::faulted(id);
+            let msg = BastionMessage::restart_required(id, parent.id().clone());
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
             parent.send(env).ok();
@@ -165,6 +165,10 @@ impl Child {
                 let mut state = guard.as_mut();
                 state.push_message(msg, sign);
             }
+            Envelope {
+                msg: BastionMessage::RestartRequired { .. },
+                ..
+            } => unreachable!(),
             // FIXME
             Envelope {
                 msg: BastionMessage::Stopped { .. },

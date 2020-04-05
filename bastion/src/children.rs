@@ -475,6 +475,15 @@ impl Children {
         Ok(())
     }
 
+    fn request_restarting_child(&mut self, id: &BastionId, parent_id: &BastionId) {
+        if parent_id == self.bcast.id() && self.launched.contains_key(id) {
+            let parent_id = self.bcast.id().clone();
+            let msg = BastionMessage::restart_required(id.clone(), parent_id);
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env).ok();
+        }
+    }
+
     async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
         match envelope {
             Envelope {
@@ -484,11 +493,11 @@ impl Children {
             Envelope {
                 msg: BastionMessage::Stop,
                 ..
-            } => self.kill_children().await?,
+            } => self.stop_children().await?,
             Envelope {
                 msg: BastionMessage::Kill,
                 ..
-            } => self.stop_children().await?,
+            } => self.kill_children().await?,
             // FIXME
             Envelope {
                 msg: BastionMessage::Deploy(_),
@@ -519,6 +528,10 @@ impl Children {
                 );
                 self.bcast.send_children(envelope);
             }
+            Envelope {
+                msg: BastionMessage::RestartRequired { id, parent_id },
+                ..
+            } => self.request_restarting_child(&id, &parent_id),
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
@@ -631,7 +644,7 @@ impl Children {
             let parent_id = self.bcast.id().clone();
             let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
             let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-            self.bcast.send_parent(env);
+            self.bcast.send_parent(env).ok();
 
             self.bcast.register(&bcast);
 

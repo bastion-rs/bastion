@@ -107,6 +107,12 @@ struct TrackedChildState {
     restarts_counts: usize,
 }
 
+#[derive(Debug)]
+enum RestartedElement {
+    Supervisor(BastionId),
+    Children(BastionId),
+}
+
 #[derive(Debug, Clone)]
 /// A "reference" to a [`Supervisor`], allowing to
 /// communicate with it.
@@ -1163,12 +1169,17 @@ impl Supervisor {
                 );
                 self.bcast.send_children(env);
             }
+            // TODO: ADD implementation
             Envelope {
-                msg: BastionMessage::Stopped { id },
+                msg: BastionMessage::RestartRequired { id, parent_id },
+                ..
+            } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Stopped { id, .. },
                 ..
             } => self.cleanup_supervised_object(id).await,
             Envelope {
-                msg: BastionMessage::Faulted { id },
+                msg: BastionMessage::Faulted { id, .. },
                 ..
             } => {
                 if self.recover_supervised_object(id).await.is_err() {

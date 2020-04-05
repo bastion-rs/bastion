@@ -340,11 +340,15 @@ impl System {
                 self.bcast.send_children(env);
             }
             Envelope {
-                msg: BastionMessage::Stopped { id },
+                msg: BastionMessage::RestartRequired { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stopped { id, .. },
                 ..
             } => self.restart_supervised_object(id),
             Envelope {
-                msg: BastionMessage::Faulted { id },
+                msg: BastionMessage::Faulted { id, .. },
                 ..
             } => self.restart_supervised_object(id),
         }
