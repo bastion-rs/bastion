@@ -49,6 +49,10 @@ futures-timer = "3.0.0"
 fxhash = "0.2"
 lazy_static = "1.4"
 log = "0.4"
+ipc-channel = "0.14.0"
+serde = { version = "1.0", features = ["derive"] }
+
+
 # TODO: https://github.com/cogciprocate/qutex/pull/5
 # TODO: https://github.com/cogciprocate/qutex/pull/6
 bastion-qutex = { version = "0.2", features = ["async_await"] }
