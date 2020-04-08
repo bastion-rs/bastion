@@ -1,3 +1,4 @@
+use t1ha::{T1haHashSet, T1haHashMap};
 use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, NIL_ID};
@@ -10,7 +11,6 @@ use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
-use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use qutex::Qutex;
@@ -35,9 +35,9 @@ pub(crate) struct GlobalSystem {
 #[derive(Debug)]
 struct System {
     bcast: Broadcast,
-    launched: FxHashMap<BastionId, RecoverableHandle<Supervisor>>,
+    launched: T1haHashMap<BastionId, RecoverableHandle<Supervisor>>,
     // TODO: set limit
-    restart: FxHashSet<BastionId>,
+    restart: T1haHashSet<BastionId>,
     waiting: FuturesUnordered<RecoverableHandle<Supervisor>>,
     pre_start_msgs: Vec<Envelope>,
     started: bool,
@@ -113,8 +113,8 @@ impl System {
         info!("System: Initializing.");
         let parent = Parent::none();
         let bcast = Broadcast::new_root(parent);
-        let launched = FxHashMap::default();
-        let restart = FxHashSet::default();
+        let launched = T1haHashMap::default();
+        let restart = T1haHashSet::default();
         let waiting = FuturesUnordered::new();
         let pre_start_msgs = Vec::new();
         let started = false;
@@ -168,6 +168,7 @@ impl System {
                     debug!("Received dead letter: {:?}", smsg);
                 }
             })
+            .with_state(EmptyState)
         })
     }
 

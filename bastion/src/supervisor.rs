@@ -14,7 +14,7 @@ use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
 use futures_timer::Delay;
-use fxhash::FxHashMap;
+use t1ha::T1haHashMap;
 use lightproc::prelude::*;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
@@ -69,14 +69,14 @@ pub struct Supervisor {
     order: Vec<BastionId>,
     // The currently launched supervised children and supervisors.
     // The last value is the amount of times a given actor has restarted.
-    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>, usize)>,
+    launched: T1haHashMap<BastionId, (usize, RecoverableHandle<Supervised>, usize)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
-    stopped: FxHashMap<BastionId, Supervised>,
+    stopped: T1haHashMap<BastionId, Supervised>,
     // Supervised children and supervisors that were killed.
     // This is used when resetting only.
-    killed: FxHashMap<BastionId, Supervised>,
+    killed: T1haHashMap<BastionId, Supervised>,
     strategy: SupervisionStrategy,
     restart_strategy: RestartStrategy,
     // The callbacks called at the supervisor's different
@@ -197,9 +197,9 @@ impl Supervisor {
     pub(crate) fn new(bcast: Broadcast) -> Self {
         debug!("Supervisor({}): Initializing.", bcast.id());
         let order = Vec::new();
-        let launched = FxHashMap::default();
-        let stopped = FxHashMap::default();
-        let killed = FxHashMap::default();
+        let launched = T1haHashMap::default();
+        let stopped = T1haHashMap::default();
+        let killed = T1haHashMap::default();
         let strategy = SupervisionStrategy::default();
         let restart_strategy = RestartStrategy::default();
         let callbacks = Callbacks::new();

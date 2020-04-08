@@ -10,22 +10,26 @@ use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
-use crate::system::SYSTEM;
+use crate::{state::SharedState, system::SYSTEM};
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
-use fxhash::FxHashMap;
+use t1ha::T1haHashMap;
 use lightproc::prelude::*;
+// use crate::state::{State as CState};
+use lightproc::prelude::State as LPState;
 use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
 use std::iter::FromIterator;
-use std::sync::Arc;
+use std::sync::{Mutex, Arc};
 use std::task::Poll;
+use std::fmt;
+use state::Container;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 /// A children group that will contain a defined number of
 /// elements (set with [`with_redundancy`] or `1` by default)
 /// all running a future (returned by the closure that is set
@@ -71,13 +75,15 @@ use std::task::Poll;
 /// [`with_redundancy`]: #method.with_redundancy
 /// [`with_exec`]: #method.with_exec
 /// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
-pub struct Children {
+pub struct Children
+{
     bcast: Broadcast,
     // The currently launched elements of the group.
-    launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    launched: T1haHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     // The closure returning the future that will be used by
     // every element of the group.
     init: Init,
+    // Redundancy of the closure for replication
     redundancy: usize,
     // The callbacks called at the group's different lifecycle
     // events.
@@ -87,20 +93,40 @@ pub struct Children {
     // is received.
     pre_start_msgs: Vec<Envelope>,
     started: bool,
+    // State shared amongst the children
+    state: SharedState,
     // List of dispatchers attached to each actor in the group.
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
 }
 
-impl Children {
+impl fmt::Debug for Children
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("Children")
+            .field("bcast", &self.bcast)
+            .field("launched", &self.launched)
+            .field("init", &self.init)
+            .field("redundancy", &self.redundancy)
+            .field("callbacks", &self.callbacks)
+            .field("pre_start_msgs", &self.pre_start_msgs)
+            .field("started", &self.started)
+            .field("dispatchers", &self.dispatchers)
+            .finish()
+    }
+}
+
+impl Children
+{
     pub(crate) fn new(bcast: Broadcast) -> Self {
         debug!("Children({}): Initializing.", bcast.id());
-        let launched = FxHashMap::default();
+        let launched = T1haHashMap::default();
         let init = Init::default();
         let redundancy = 1;
         let callbacks = Callbacks::new();
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
+        let state = SharedState::default();
 
         Children {
             bcast,
@@ -110,6 +136,7 @@ impl Children {
             callbacks,
             pre_start_msgs,
             started,
+            state,
             dispatchers,
         }
     }
@@ -301,6 +328,17 @@ impl Children {
             self.redundancy = redundancy.saturating_add(1);
         } else {
             self.redundancy = redundancy;
+        }
+
+        self
+    }
+
+    pub fn with_state<S>(self, state: S) -> Self
+    where
+        S: LPState
+    {
+        if !self.state.set::<S>(state) {
+            error!("This state type is already managed by this children!");
         }
 
         self
@@ -602,8 +640,14 @@ impl Children {
         }
     }
 
-    pub(crate) fn launch_elems(&mut self) {
+    pub(crate) fn launch_elems(&mut self)
+    {
         debug!("Children({}): Launching elements.", self.id());
+        let mut container = Container::new();
+        let st = self.state.get();
+        container.set(st);
+        let shared_state = Arc::new(Mutex::new(SharedState::new(container)));
+
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
             let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
@@ -621,7 +665,7 @@ impl Children {
             let state = Qutex::new(state);
 
             let ctx =
-                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
+                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone(), shared_state.clone());
             let exec = (self.init.0)(ctx);
 
             self.bcast.register(&bcast);

@@ -17,6 +17,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use lightproc::proc_state::State;
 
 /// A trait that any message sent needs to implement (it is
 /// already automatically implemented but forces message to
