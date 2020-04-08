@@ -1,26 +1,36 @@
 use state::Container;
 use core::ops::DerefMut;
 use core::ops::Deref;
-use lightproc::prelude::State as LPState;
+use lightproc::{proc_state::{EmptyState, EmptyProcState}, prelude::State as LPState};
 use crate::context::BastionContext;
 use std::marker::PhantomData as marker;
 
-pub struct SharedState<'s>(&'s Container);
 
-impl<'s> SharedState<'s>
+pub struct SharedState(Container);
+
+impl SharedState
 {
     #[inline(always)]
-    pub fn new(c: Container) -> SharedState<'static>
+    pub fn new(c: Container) -> SharedState
     {
-        SharedState(&c)
+        SharedState(c)
     }
 
     #[inline(always)]
-    pub fn get<S>(&self) -> &'s S
+    pub fn get<S>(&self) -> &S
     where
         S: LPState
     {
         self.0.get::<S>()
+    }
+
+    #[inline(always)]
+    pub fn set<S>(&self, s: S) -> bool
+    where
+        S: LPState
+    {
+        let s = s as dyn LPState;
+        self.0.set(s)
     }
 
     #[inline(always)]
@@ -30,7 +40,15 @@ impl<'s> SharedState<'s>
     {
         let container = Container::new();
         container.set((*ctx.state()).get::<S>());
-        Some(SharedState(&container))
+        Some(SharedState(container))
+    }
+}
+
+impl Default for SharedState {
+    fn default() -> Self {
+        let mut c = Container::new();
+        c.set(EmptyState);
+        Self(c)
     }
 }
 

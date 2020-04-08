@@ -108,7 +108,7 @@ pub struct BastionContext {
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
     state: Qutex<ContextState>,
-    shared_state: Arc<Mutex<SharedState<'static>>>
+    shared_state: Arc<Mutex<SharedState>>
 }
 
 impl fmt::Debug for BastionContext {
@@ -141,7 +141,7 @@ impl BastionContext {
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
         state: Qutex<ContextState>,
-        shared_state: Arc<Mutex<SharedState<'static>>>,
+        shared_state: Arc<Mutex<SharedState>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -222,7 +222,7 @@ impl BastionContext {
         &self.children
     }
 
-    pub fn state(&self) -> &MutexGuard<'_, crate::state::SharedState<'static>>
+    pub fn state(&self) -> &MutexGuard<'_, crate::state::SharedState>
     {
         let ss = self.shared_state.clone();
         &ss.lock().unwrap()

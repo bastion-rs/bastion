@@ -19,6 +19,7 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use t1ha::T1haHashMap;
 use lightproc::prelude::*;
 // use crate::state::{State as CState};
+use lightproc::prelude::State as LPState;
 use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
@@ -93,12 +94,13 @@ pub struct Children
     pre_start_msgs: Vec<Envelope>,
     started: bool,
     // State shared amongst the children
-    state: Container,
+    state: SharedState,
     // List of dispatchers attached to each actor in the group.
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
 }
 
-impl fmt::Debug for Children {
+impl fmt::Debug for Children
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("Children")
             .field("bcast", &self.bcast)
@@ -124,7 +126,7 @@ impl Children
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
-        let state = Container::new();
+        let state = SharedState::default();
 
         Children {
             bcast,
@@ -333,7 +335,7 @@ impl Children
 
     pub fn with_state<S>(self, state: S) -> Self
     where
-        S: State + 'static
+        S: LPState
     {
         if !self.state.set::<S>(state) {
             error!("This state type is already managed by this children!");
@@ -639,9 +641,13 @@ impl Children
         }
     }
 
-    pub(crate) fn launch_elems(&mut self) {
+    pub(crate) fn launch_elems(&mut self)
+    {
         debug!("Children({}): Launching elements.", self.id());
-        let shared_state = Arc::new(Mutex::new(SharedState::new(self.state)));
+        let mut container = Container::new();
+        let st = self.state.get();
+        container.set(st);
+        let shared_state = Arc::new(Mutex::new(SharedState::new(container)));
 
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
