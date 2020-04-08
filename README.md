@@ -4,7 +4,7 @@
 
 -----------------
 
-<h1 align="center">Highly-available Distributed* Fault-tolerant Runtime</h1>
+<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
 
 <table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 <tr>
@@ -131,7 +131,7 @@ For more information please check [Bastion Documentation](https://docs.rs/bastio
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
 
-You can see architecture of the framework [HERE](https://github.com/bastion-rs/bastion/blob/master/img/bastion-arch.png). 
+You can see architecture of the framework [HERE](https://github.com/bastion-rs/bastion/blob/master/img/bastion-arch.png).
 
 ## Projects using Bastion
 If you are using Bastion open a PR so we can include it in our showcase.

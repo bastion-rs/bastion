@@ -29,7 +29,7 @@ jobs:
           cargo miri setup
           cargo clean
           # Do some Bastion shake
-          cd bastion && \
+          cd src/bastion && \
             cargo miri test -- -Zmiri-disable-isolation -- dispatcher && \
             cargo miri test -- -Zmiri-disable-isolation -- path && \
             cargo miri test -- -Zmiri-disable-isolation -- broadcast && \
