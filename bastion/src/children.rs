@@ -24,6 +24,7 @@ use std::future::Future;
 use std::iter::FromIterator;
 use std::sync::Arc;
 use std::task::Poll;
+use std::pin::Pin;
 
 #[derive(Debug)]
 /// A children group that will contain a defined number of
@@ -453,8 +454,11 @@ impl Children {
         // FIXME: Err if false?
         if self.launched.contains_key(&id) {
             debug!("Children({}): Child({}) stopped.", self.id(), id);
-            self.stop().await;
-            self.stopped();
+
+            // TODO: Remove these calls? (because child finished with the success)
+            //self.stop().await;
+            //self.stopped();
+            self.drop_child(id);
 
             return Err(());
         }
@@ -466,6 +470,7 @@ impl Children {
         // FIXME: Err if false?
         if self.launched.contains_key(id) {
             warn!("Children({}): Child({}) faulted.", self.id(), id);
+            // TODO: Remove these calls? (Children works as a proxy)
             self.kill().await;
             self.faulted();
 
@@ -482,6 +487,47 @@ impl Children {
             let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
             self.bcast.send_parent(env).ok();
         }
+    }
+
+    fn restart_child(&mut self, old_id: &BastionId, old_state: &Qutex<Pin<Box<ContextState>>>) {
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(old_id.clone()));
+
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        let state = Qutex::new(Box::pin(ContextState::new()));
+
+        let ctx =
+            BastionContext::new(id.clone(), child_ref.clone(), children, supervisor, state.clone());
+        let exec = (self.init.0)(ctx);
+
+        self.bcast.register(&bcast);
+
+        let msg = BastionMessage::set_state(old_state.clone());
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
+        let child = Child::new(exec, bcast, state, child_ref);
+        debug!("Children({}): Launching faulted Child({}).", self.id(), child.id());
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.launched.insert(id, (sender, launched));
+    }
+
+    fn drop_child(&mut self, id: &BastionId) {
+        debug!("Children({}): Dropping Child({:?}): reached restart limits.", self.id(), id);
+        self.launched.remove_entry(id);
     }
 
     async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
@@ -532,6 +578,18 @@ impl Children {
                 msg: BastionMessage::RestartRequired { id, parent_id },
                 ..
             } => self.request_restarting_child(&id, &parent_id),
+            Envelope {
+                msg: BastionMessage::RestoreChild { id, state},
+                ..
+            } => self.restart_child(&id, &state),
+            Envelope {
+                msg: BastionMessage::DropChild { id },
+                ..
+            } => self.drop_child(&id),
+            Envelope {
+                msg: BastionMessage::SetState { .. },
+                ..
+            } => unreachable!(),
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
@@ -657,7 +715,6 @@ impl Children {
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
             let launched = child.launch();
-
             self.launched.insert(id, (sender, launched));
         }
     }

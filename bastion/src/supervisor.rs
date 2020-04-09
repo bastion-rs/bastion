@@ -19,7 +19,6 @@ use lightproc::prelude::*;
 use qutex::Qutex;
 use log::Level;
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 use std::task::Poll;
@@ -70,13 +69,15 @@ pub struct Supervisor {
     // It is only updated when at least one of those is resat.
     order: Vec<BastionId>,
     // Special wrapper around launched Children and Child that helps
-    // to figure out what and how to restart when it necessary.
+    // to figure out what and how to restart childs when it necessary.
     // The key is the Children's BastionId and the values are
     // represented as Child instances with the same executed closure.
     tracked_groups: FxHashMap<BastionId, Vec<TrackedChildState>>,
+    // Hold the insertion order of the childs.
+    tracked_groups_order: FxHashMap<BastionId, usize>,
     // The currently launched supervised children and supervisors.
     // The last value is the amount of times a given actor has restarted.
-    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>, usize)>,
+    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
@@ -110,7 +111,14 @@ struct TrackedChildState {
 #[derive(Debug)]
 enum RestartedElement {
     Supervisor(BastionId),
-    Children(BastionId),
+    Child { id: BastionId, parent_id: BastionId },
+}
+
+#[derive(Debug)]
+enum ActorSearchMethod {
+    OneActor { id: BastionId, parent_id: BastionId },
+    FromActor { id: BastionId, parent_id: BastionId },
+    All
 }
 
 #[derive(Debug, Clone)]
@@ -218,6 +226,7 @@ impl Supervisor {
         debug!("Supervisor({}): Initializing.", bcast.id());
         let order = Vec::new();
         let tracked_groups = FxHashMap::default();
+        let tracked_groups_order = FxHashMap::default();
         let launched = FxHashMap::default();
         let stopped = FxHashMap::default();
         let killed = FxHashMap::default();
@@ -232,6 +241,7 @@ impl Supervisor {
             bcast,
             order,
             tracked_groups,
+            tracked_groups_order,
             launched,
             stopped,
             killed,
@@ -291,7 +301,8 @@ impl Supervisor {
         self.pre_start_msgs.clear();
         self.pre_start_msgs.shrink_to_fit();
 
-        self.restart(0..self.order.len()).await;
+        let restarted_objects = self.search_restarted_objects(ActorSearchMethod::All);
+        self.restart(restarted_objects).await;
 
         debug!(
             "Supervisor({}): Removing {} stopped elements.",
@@ -794,115 +805,65 @@ impl Supervisor {
         self
     }
 
-    async fn restart(&mut self, range: Range<usize>) {
-        let mut tracked_actors = HashMap::new();
-        for index in range.clone() {
-            let bastion_id = self.order[index].clone();
-            let restart_count = match self.launched.get(&bastion_id) {
-                Some((_, _, count)) => *count,
-                None => 0,
-            };
+    async fn restart(&mut self, objects: Vec<RestartedElement>) {
+        debug!("Supervisor({}): Restarting {:?} elements", self.id(), objects.len());
+        let mut restart_futures = FuturesOrdered::new();
 
-            tracked_actors.insert(bastion_id, restart_count);
-        }
+        for object in objects {
+            match object {
+                // TODO: Add implementation for supervisor restarts
+                RestartedElement::Supervisor(_) => {},
 
-        debug!("Supervisor({}): Restarting range: {:?}", self.id(), range);
-        // TODO: stop or kill?
-        self.kill(range.clone()).await;
+                // FIXME: supervised.callbacks().before_restart() calls for the specific actor?
+                // FIXME: supervised.callbacks().before_start() calls for the specific actor?
+                // FIXME: supervised.callbacks().after_restart() calls for the specific actor?
+                RestartedElement::Child { id, parent_id} => {
+                    let index = match self.tracked_groups_order.get(&id) {
+                        Some(index) => *index,
+                        None => continue,
+                    };
+                    let childs = match self.tracked_groups.get_mut(&parent_id) {
+                        Some(childs) => childs,
+                        None => continue,
+                    };
+                    let tracked_state = match childs.get_mut(index) {
+                        Some(tracked_state) => tracked_state,
+                        None => continue,
+                    };
+                    let restarts_count = tracked_state.restarts_count();
 
-        let restart_strategy = self.restart_strategy.clone();
-        let supervisor_id = &self.id().clone();
-        let parent = Parent::supervisor(self.as_ref());
-        let mut reset = FuturesOrdered::new();
-        for id in self.order.drain(range) {
-            let (killed, supervised) = if let Some(supervised) = self.stopped.remove(&id) {
-                (false, supervised)
-            } else if let Some(supervised) = self.killed.remove(&id) {
-                (true, supervised)
-            } else {
-                // FIXME
-                unimplemented!();
-            };
+                    let restart_required = match self.restart_strategy.restart_policy() {
+                        RestartPolicy::Always => true,
+                        RestartPolicy::Never => false,
+                        RestartPolicy::Tries(max_retries) => restarts_count < max_retries,
+                    };
 
-            if killed {
-                supervised.callbacks().before_restart();
-            }
+                    let msg = match restart_required {
+                        true => {
+                            tracked_state.increase_restarts_counter();
+                            let state = tracked_state.state();
+                            BastionMessage::restore_child(id, state)
+                        }
+                        false => BastionMessage::drop_child(id)
+                    };
+                    let restart_strategy = self.restart_strategy.clone();
 
-            let bcast = Broadcast::new(
-                parent.clone(),
-                supervised.elem().clone().with_id(BastionId::new()),
-            );
+                    restart_futures.push(async move {
+                        if restart_required {
+                            restart_strategy
+                                .apply_strategy(restarts_count)
+                                .await;
+                        }
 
-            let actor_restarts_count = match tracked_actors.get(&id.clone()) {
-                Some(count) => *count + 1,
-                None => 1,
-            };
-
-            let restart_required = match restart_strategy.restart_policy() {
-                RestartPolicy::Always => true,
-                RestartPolicy::Never => false,
-                RestartPolicy::Tries(max_retries) => actor_restarts_count < max_retries,
-            };
-
-            if restart_required {
-                let restart_strategy_inner = restart_strategy.clone();
-
-                reset.push(async move {
-                    debug!(
-                        "Supervisor({}): Resetting Supervised({}) (killed={}) to Supervised({}).",
-                        supervisor_id,
-                        supervised.id(),
-                        killed,
-                        bcast.id()
-                    );
-
-                    let old_bastion_id = supervised.id().clone();
-                    restart_strategy_inner
-                        .apply_strategy(actor_restarts_count)
-                        .await;
-
-                    // FIXME: panics?
-                    let supervised = supervised.reset(bcast).await.unwrap();
-                    // FIXME: might not keep order
-                    if killed {
-                        supervised.callbacks().after_restart();
-                    } else {
-                        supervised.callbacks().before_start();
-                    }
-
-                    (old_bastion_id, supervised)
-                })
+                        (parent_id, msg)
+                    });
+                }
             }
         }
 
-        trace!(
-            "Supervisor({}): Resetting {} elements.",
-            self.id(),
-            reset.len()
-        );
-        while let Some((old_bastion_id, supervised)) = reset.next().await {
-            self.bcast.register(supervised.bcast());
-            if self.started {
-                let msg = BastionMessage::start();
-                let env =
-                    Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-                self.bcast.send_child(supervised.id(), env);
-            }
-
-            debug!(
-                "Supervisor({}): Launching Supervised({}).",
-                self.id(),
-                supervised.id()
-            );
-            let id = supervised.id().clone();
-            let restart_count = match tracked_actors.get(&old_bastion_id) {
-                Some(count) => *count + 1,
-                None => 1,
-            };
-            let launched = supervised.launch();
-            self.launched
-                .insert(id.clone(), (self.order.len(), launched, restart_count));
-            self.order.push(id);
+        for (receiver, msg) in restart_futures.next().await {
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_child(&receiver, env);
         }
     }
 
@@ -922,7 +883,7 @@ impl Supervisor {
         // FIXME: panics?
         for id in self.order.get(range.clone()).unwrap() {
             // TODO: Err if None?
-            if let Some((_, launched, _)) = self.launched.remove(&id) {
+            if let Some((_, launched)) = self.launched.remove(&id) {
                 // TODO: add a "stopped" list and poll from it instead of awaiting
                 supervised.push(launched);
             }
@@ -963,7 +924,7 @@ impl Supervisor {
         // FIXME: panics?
         for id in self.order.get(range.clone()).unwrap() {
             // TODO: Err if None?
-            if let Some((_, launched, _)) = self.launched.remove(&id) {
+            if let Some((_, launched)) = self.launched.remove(&id) {
                 // TODO: add a "stopped" list and poll from it instead of awaiting
                 supervised.push(launched);
             }
@@ -996,35 +957,106 @@ impl Supervisor {
         self.bcast.faulted();
     }
 
-    async fn recover(&mut self, id: BastionId) -> Result<(), ()> {
+    async fn recover(&mut self, id: BastionId, parent_id: BastionId) -> Result<(), ()> {
         debug!(
             "Supervisor({}): Recovering using strategy: {:?}",
             self.id(),
             self.strategy
         );
+
         match self.strategy {
             SupervisionStrategy::OneForOne => {
-                let (start, _, _) = self.launched.get(&id).ok_or(())?;
-                let start = *start;
-
-                self.restart(start..start + 1).await;
+                let search_method = ActorSearchMethod::OneActor { id, parent_id };
+                let objects= self.search_restarted_objects(search_method);
+                self.restart(objects).await;
             }
             SupervisionStrategy::OneForAll => {
-                self.restart(0..self.order.len()).await;
+                let search_method = ActorSearchMethod::All;
+                let objects = self.search_restarted_objects(search_method);
+                self.restart(objects).await;
 
                 // TODO: should be empty
                 self.stopped.shrink_to_fit();
                 self.killed.shrink_to_fit();
             }
             SupervisionStrategy::RestForOne => {
-                let (start, _, _) = self.launched.get(&id).ok_or(())?;
-                let start = *start;
-
-                self.restart(start..self.order.len()).await;
+                let search_method = ActorSearchMethod::FromActor { id, parent_id };
+                let objects = self.search_restarted_objects(search_method);
+                self.restart(objects).await;
             }
         }
 
         Ok(())
+    }
+
+    fn search_restarted_objects(&self, search_method: ActorSearchMethod) -> Vec<RestartedElement> {
+        let mut objects = Vec::new();
+
+        match search_method {
+            ActorSearchMethod::OneActor { id, parent_id } => {
+                let element = match self.tracked_groups.contains_key(&parent_id) {
+                    true => RestartedElement::Child { id, parent_id },
+                    false => RestartedElement::Supervisor(id),
+                };
+                objects.push(element)
+            },
+            ActorSearchMethod::FromActor { id, parent_id } => {
+                let childs = self.tracked_groups.get(&parent_id.clone()).unwrap();
+                let start_index = *self.tracked_groups_order.get(&id).unwrap();
+
+                // Adding all elements in the group from the given actor
+                for index in start_index..childs.len() {
+                    let tracked_state = &childs[index];
+                    let id = tracked_state.id();
+                    let element = RestartedElement::Child { id, parent_id: parent_id.clone() };
+                    objects.push(element)
+                }
+
+                // And then a rest after the failed group
+                let (rest_index, _) = self.launched.get(&parent_id.clone()).unwrap();
+                for index in *rest_index+1..self.order.len() {
+                    let element_id = &self.order[index];
+
+                    match self.tracked_groups.get(element_id) {
+                        Some(childs) => {
+                            for tracked_state in childs {
+                                let restarted_element = RestartedElement::Child {
+                                    id: tracked_state.id(),
+                                    parent_id: element_id.clone(),
+                                };
+                                objects.push(restarted_element);
+                            }
+                        }
+                        None => {
+                            let restarted_element = RestartedElement::Supervisor(id.clone());
+                            objects.push(restarted_element);
+                        }
+                    }
+                }
+
+            },
+            ActorSearchMethod::All => {
+                for id in self.order.iter() {
+                    match self.tracked_groups.get(&id) {
+                        Some(childs) => {
+                            for tracked_state in childs {
+                                let restarted_element = RestartedElement::Child {
+                                    id: tracked_state.id(),
+                                    parent_id: id.clone(),
+                                };
+                                objects.push(restarted_element);
+                            }
+                        }
+                        None => {
+                            let restarted_element = RestartedElement::Supervisor(id.clone());
+                            objects.push(restarted_element);
+                        }
+                    }
+                }
+            }
+        }
+
+        objects
     }
 
     async fn deinit_with_stop(&mut self) {
@@ -1073,14 +1105,13 @@ impl Supervisor {
         );
         let id = supervised.id().clone();
         let launched = supervised.launch();
-        self.launched
-            .insert(id.clone(), (self.order.len(), launched, 0));
+        self.launched.insert(id.clone(), (self.order.len(), launched));
         self.order.push(id);
     }
 
     async fn cleanup_supervised_object(&mut self, id: BastionId) {
         // FIXME: Err if None?
-        if let Some((_, launched, _)) = self.launched.remove(&id) {
+        if let Some((_, launched)) = self.launched.remove(&id) {
             debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
             // TODO: add a "waiting" list an poll from it instead of awaiting
             // FIXME: panics?
@@ -1092,12 +1123,12 @@ impl Supervisor {
         }
     }
 
-    async fn recover_supervised_object(&mut self, id: BastionId) -> Result<(), ()> {
+    async fn recover_supervised_object(&mut self, id: BastionId, parent_id: BastionId) -> Result<(), ()> {
         if self.launched.contains_key(&id) {
             warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
         }
 
-        if self.recover(id).await.is_err() {
+        if self.recover(id, parent_id).await.is_err() {
             // TODO: stop or kill?
             self.kill(0..self.order.len()).await;
             self.faulted();
@@ -1152,10 +1183,16 @@ impl Supervisor {
                 msg: BastionMessage::InstantiatedChild { parent_id, child_id, state },
                 ..
             } => {
-                let child_state = TrackedChildState::new(child_id, state);
+                let child_state = TrackedChildState::new(child_id.clone(), state);
                 match self.tracked_groups.get_mut(&parent_id) {
-                    Some(childs) => { childs.push(child_state); },
-                    None => { self.tracked_groups.insert(parent_id, vec![child_state]); },
+                    Some(childs) => {
+                        childs.push(child_state);
+                        self.tracked_groups_order.insert(child_id, childs.len() - 1);
+                    },
+                    None => {
+                        self.tracked_groups.insert(parent_id, vec![child_state]);
+                        self.tracked_groups_order.insert(child_id, 0);
+                    },
                 }
             }
             Envelope {
@@ -1169,23 +1206,34 @@ impl Supervisor {
                 );
                 self.bcast.send_children(env);
             }
-            // TODO: ADD implementation
             Envelope {
                 msg: BastionMessage::RestartRequired { id, parent_id },
                 ..
-            } => unimplemented!(),
-            Envelope {
-                msg: BastionMessage::Stopped { id, .. },
-                ..
-            } => self.cleanup_supervised_object(id).await,
-            Envelope {
-                msg: BastionMessage::Faulted { id, .. },
-                ..
             } => {
-                if self.recover_supervised_object(id).await.is_err() {
+                if self.recover_supervised_object(id, parent_id).await.is_err() {
                     return Err(());
                 }
             }
+            Envelope {
+                msg: BastionMessage::RestoreChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::DropChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::SetState { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stopped { id },
+                ..
+            } => self.cleanup_supervised_object(id).await,
+            Envelope {
+                msg: BastionMessage::Faulted { id},
+                ..
+            } => self.cleanup_supervised_object(id).await,
         }
 
         Ok(())
@@ -1652,6 +1700,22 @@ impl TrackedChildState {
             state,
             restarts_counts: 0
         }
+    }
+
+    fn id(&self) -> BastionId {
+        self.id.clone()
+    }
+
+    fn state(&self) -> Qutex<Pin<Box<ContextState>>> {
+        self.state.clone()
+    }
+
+    fn restarts_count(&self) -> usize {
+        self.restarts_counts
+    }
+
+    fn increase_restarts_counter(&mut self) {
+        self.restarts_counts += 1;
     }
 }
 

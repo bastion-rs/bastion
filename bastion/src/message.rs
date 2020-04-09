@@ -195,6 +195,9 @@ pub(crate) enum BastionMessage {
     InstantiatedChild { parent_id: BastionId, child_id: BastionId, state: Qutex<Pin<Box<ContextState>>> },
     Message(Msg),
     RestartRequired { id: BastionId, parent_id: BastionId},
+    RestoreChild { id: BastionId, state: Qutex<Pin<Box<ContextState>>> },
+    DropChild { id: BastionId },
+    SetState { state: Qutex<Pin<Box<ContextState>>> },
     Stopped { id: BastionId },
     Faulted { id: BastionId },
 }
@@ -418,6 +421,18 @@ impl BastionMessage {
         BastionMessage::RestartRequired { id, parent_id }
     }
 
+    pub(crate) fn restore_child(id: BastionId, state: Qutex<Pin<Box<ContextState>>>) -> Self {
+        BastionMessage::RestoreChild { id, state }
+    }
+
+    pub(crate) fn drop_child(id: BastionId) -> Self {
+        BastionMessage::DropChild { id }
+    }
+
+    pub(crate) fn set_state(state: Qutex<Pin<Box<ContextState>>>) -> Self {
+        BastionMessage::SetState { state }
+    }
+
     pub(crate) fn stopped(id: BastionId) -> Self {
         BastionMessage::Stopped { id }
     }
@@ -443,6 +458,9 @@ impl BastionMessage {
             }
             BastionMessage::Message(msg) => BastionMessage::Message(msg.try_clone()?),
             BastionMessage::RestartRequired { id, parent_id } => BastionMessage::restart_required(id.clone(), parent_id.clone()),
+            BastionMessage::RestoreChild { id, state } => BastionMessage::restore_child(id.clone(), state.clone()),
+            BastionMessage::DropChild { id } => BastionMessage::drop_child(id.clone()),
+            BastionMessage::SetState { state } => BastionMessage::set_state(state.clone()),
             BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
             BastionMessage::Faulted { id} => BastionMessage::faulted(id.clone()),
         };

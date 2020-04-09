@@ -344,6 +344,18 @@ impl System {
                 ..
             } => unreachable!(),
             Envelope {
+                msg: BastionMessage::RestoreChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::DropChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::SetState { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Stopped { id, .. },
                 ..
             } => self.restart_supervised_object(id),

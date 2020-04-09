@@ -86,12 +86,21 @@ impl Child {
         let path = self.bcast.path().clone();
         let sender = self.bcast.sender().clone();
 
+        let parent_inner = self.bcast.parent().clone().into_children();
+        let child_ref_inner = self.child_ref.clone();
+
         // FIXME: with_pid
         ProcStack::default().with_after_panic(move |_state: &mut EmptyProcState| {
-            // FIXME: clones
-            let id = id.clone();
             warn!("Child({}): Panicked.", id);
 
+            if let Some(parent) = &parent_inner {
+                let used_dispatchers = parent.dispatchers();
+                let global_dispatcher = SYSTEM.dispatcher();
+                global_dispatcher.remove(used_dispatchers, &child_ref_inner);
+            }
+
+            // FIXME: clones
+            let id = id.clone();
             let msg = BastionMessage::restart_required(id, parent.id().clone());
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
@@ -112,7 +121,18 @@ impl Child {
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
         self.remove_from_dispatchers();
-        self.bcast.faulted();
+
+        // TODO: Remove these call? (we're asking here for a restart)
+        //self.bcast.faulted();
+
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+        let path = self.bcast.path().clone();
+        let sender = self.bcast.sender().clone();
+
+        let msg = BastionMessage::restart_required(self.id().clone(), parent.id().clone());
+        let env = Envelope::new(msg, path.clone(), sender.clone());
+        // TODO: handle errors
+        parent.send(env).ok();
     }
 
     async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
@@ -169,6 +189,21 @@ impl Child {
                 msg: BastionMessage::RestartRequired { .. },
                 ..
             } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestoreChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::DropChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::SetState { state },
+                ..
+            } => {
+                debug!("Child({}): Setting new state: {:?}", self.id(), state);
+                self.state = state;
+            }
             // FIXME
             Envelope {
                 msg: BastionMessage::Stopped { .. },
