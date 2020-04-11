@@ -13,8 +13,8 @@ use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 use std::pin::Pin;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Identifier for a root supervisor and dead-letters children.
@@ -587,7 +587,7 @@ impl BastionContext {
 impl ContextState {
     pub(crate) fn new() -> Self {
         ContextState {
-            messages: VecDeque::new()
+            messages: VecDeque::new(),
         }
     }
 

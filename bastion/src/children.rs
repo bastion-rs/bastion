@@ -22,9 +22,9 @@ use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
 use std::iter::FromIterator;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
-use std::pin::Pin;
 
 #[derive(Debug)]
 /// A children group that will contain a defined number of
@@ -503,8 +503,13 @@ impl Children {
 
         let state = Qutex::new(Box::pin(ContextState::new()));
 
-        let ctx =
-            BastionContext::new(id.clone(), child_ref.clone(), children, supervisor, state.clone());
+        let ctx = BastionContext::new(
+            id.clone(),
+            child_ref.clone(),
+            children,
+            supervisor,
+            state.clone(),
+        );
         let exec = (self.init.0)(ctx);
 
         self.bcast.register(&bcast);
@@ -519,14 +524,22 @@ impl Children {
 
         debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
         let child = Child::new(exec, bcast, state, child_ref);
-        debug!("Children({}): Launching faulted Child({}).", self.id(), child.id());
+        debug!(
+            "Children({}): Launching faulted Child({}).",
+            self.id(),
+            child.id(),
+        );
         let id = child.id().clone();
         let launched = child.launch();
         self.launched.insert(id, (sender, launched));
     }
 
     fn drop_child(&mut self, id: &BastionId) {
-        debug!("Children({}): Dropping Child({:?}): reached restart limits.", self.id(), id);
+        debug!(
+            "Children({}): Dropping Child({:?}): reached restart limits.",
+            self.id(),
+            id,
+        );
         self.launched.remove_entry(id);
     }
 
@@ -583,7 +596,7 @@ impl Children {
                 ..
             } => unreachable!(),
             Envelope {
-                msg: BastionMessage::RestoreChild { id, state},
+                msg: BastionMessage::RestoreChild { id, state },
                 ..
             } => self.restart_child(&id, &state),
             Envelope {
@@ -699,8 +712,13 @@ impl Children {
 
             let state = Qutex::new(Box::pin(ContextState::new()));
 
-            let ctx =
-                BastionContext::new(id.clone(), child_ref.clone(), children, supervisor, state.clone());
+            let ctx = BastionContext::new(
+                id.clone(),
+                child_ref.clone(),
+                children,
+                supervisor,
+                state.clone(),
+            );
             let exec = (self.init.0)(ctx);
 
             let parent_id = self.bcast.id().clone();

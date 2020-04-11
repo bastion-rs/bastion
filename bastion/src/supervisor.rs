@@ -16,14 +16,14 @@ use futures::{pending, poll};
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use qutex::Qutex;
 use log::Level;
+use qutex::Qutex;
 use std::cmp::{Eq, PartialEq};
 use std::ops::Range;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use std::pin::Pin;
 
 #[derive(Debug)]
 /// A supervisor that can supervise both [`Children`] and other
@@ -118,7 +118,7 @@ enum RestartedElement {
 enum ActorSearchMethod {
     OneActor { id: BastionId, parent_id: BastionId },
     FromActor { id: BastionId, parent_id: BastionId },
-    All
+    All,
 }
 
 #[derive(Debug, Clone)]
@@ -806,20 +806,25 @@ impl Supervisor {
     }
 
     async fn restart(&mut self, objects: Vec<RestartedElement>) {
-        debug!("Supervisor({}): Restarting {:?} elements", self.id(), objects.len());
+        debug!(
+            "Supervisor({}): Restarting {:?} elements",
+            self.id(),
+            objects.len()
+        );
         let mut restart_futures = FuturesOrdered::new();
 
         for object in objects {
             match object {
                 RestartedElement::Supervisor(supervisor_id) => {
                     let msg = BastionMessage::restart_subtree();
-                    let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    let env =
+                        Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
                     self.bcast.send_child(&supervisor_id, env);
-                },
+                }
                 // FIXME: supervised.callbacks().before_restart() calls for the specific actor?
                 // FIXME: supervised.callbacks().before_start() calls for the specific actor?
                 // FIXME: supervised.callbacks().after_restart() calls for the specific actor?
-                RestartedElement::Child { id, parent_id} => {
+                RestartedElement::Child { id, parent_id } => {
                     let index = match self.tracked_groups_order.get(&id) {
                         Some(index) => *index,
                         None => continue,
@@ -846,15 +851,13 @@ impl Supervisor {
                             let state = tracked_state.state();
                             BastionMessage::restore_child(id, state)
                         }
-                        false => BastionMessage::drop_child(id)
+                        false => BastionMessage::drop_child(id),
                     };
                     let restart_strategy = self.restart_strategy.clone();
 
                     restart_futures.push(async move {
                         if restart_required {
-                            restart_strategy
-                                .apply_strategy(restarts_count)
-                                .await;
+                            restart_strategy.apply_strategy(restarts_count).await;
                         }
 
                         (parent_id, msg)
@@ -969,7 +972,7 @@ impl Supervisor {
         match self.strategy {
             SupervisionStrategy::OneForOne => {
                 let search_method = ActorSearchMethod::OneActor { id, parent_id };
-                let objects= self.search_restarted_objects(search_method);
+                let objects = self.search_restarted_objects(search_method);
                 self.restart(objects).await;
             }
             SupervisionStrategy::OneForAll => {
@@ -1001,7 +1004,7 @@ impl Supervisor {
                     false => RestartedElement::Supervisor(id),
                 };
                 objects.push(element)
-            },
+            }
             ActorSearchMethod::FromActor { id, parent_id } => {
                 let childs = self.tracked_groups.get(&parent_id.clone()).unwrap();
                 let start_index = *self.tracked_groups_order.get(&id).unwrap();
@@ -1010,13 +1013,16 @@ impl Supervisor {
                 for index in start_index..childs.len() {
                     let tracked_state = &childs[index];
                     let id = tracked_state.id();
-                    let element = RestartedElement::Child { id, parent_id: parent_id.clone() };
+                    let element = RestartedElement::Child {
+                        id,
+                        parent_id: parent_id.clone(),
+                    };
                     objects.push(element)
                 }
 
                 // And then a rest after the failed group
                 let (rest_index, _) = self.launched.get(&parent_id.clone()).unwrap();
-                for index in *rest_index+1..self.order.len() {
+                for index in *rest_index + 1..self.order.len() {
                     let element_id = &self.order[index];
 
                     match self.tracked_groups.get(element_id) {
@@ -1035,8 +1041,7 @@ impl Supervisor {
                         }
                     }
                 }
-
-            },
+            }
             ActorSearchMethod::All => {
                 for id in self.order.iter() {
                     match self.tracked_groups.get(&id) {
@@ -1112,7 +1117,8 @@ impl Supervisor {
         );
         let id = supervised.id().clone();
         let launched = supervised.launch();
-        self.launched.insert(id.clone(), (self.order.len(), launched));
+        self.launched
+            .insert(id.clone(), (self.order.len(), launched));
         self.order.push(id);
     }
 
@@ -1130,7 +1136,11 @@ impl Supervisor {
         }
     }
 
-    async fn recover_supervised_object(&mut self, id: BastionId, parent_id: BastionId) -> Result<(), ()> {
+    async fn recover_supervised_object(
+        &mut self,
+        id: BastionId,
+        parent_id: BastionId,
+    ) -> Result<(), ()> {
         if self.launched.contains_key(&id) {
             warn!("Supervisor({}): Supervised({}) faulted.", self.id(), id);
         }
@@ -1187,7 +1197,12 @@ impl Supervisor {
                 self.strategy = strategy;
             }
             Envelope {
-                msg: BastionMessage::InstantiatedChild { parent_id, child_id, state },
+                msg:
+                    BastionMessage::InstantiatedChild {
+                        parent_id,
+                        child_id,
+                        state,
+                    },
                 ..
             } => {
                 let child_state = TrackedChildState::new(child_id.clone(), state);
@@ -1195,11 +1210,11 @@ impl Supervisor {
                     Some(childs) => {
                         childs.push(child_state);
                         self.tracked_groups_order.insert(child_id, childs.len() - 1);
-                    },
+                    }
                     None => {
                         self.tracked_groups.insert(parent_id, vec![child_state]);
                         self.tracked_groups_order.insert(child_id, 0);
-                    },
+                    }
                 }
             }
             Envelope {
@@ -1242,7 +1257,7 @@ impl Supervisor {
                 ..
             } => self.cleanup_supervised_object(id).await,
             Envelope {
-                msg: BastionMessage::Faulted { id},
+                msg: BastionMessage::Faulted { id },
                 ..
             } => self.cleanup_supervised_object(id).await,
         }
@@ -1709,7 +1724,7 @@ impl TrackedChildState {
         TrackedChildState {
             id,
             state,
-            restarts_counts: 0
+            restarts_counts: 0,
         }
     }
 
