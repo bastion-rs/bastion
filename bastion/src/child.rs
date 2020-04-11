@@ -190,6 +190,10 @@ impl Child {
                 ..
             } => unreachable!(),
             Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::RestoreChild { .. },
                 ..
             } => unreachable!(),

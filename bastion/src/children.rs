@@ -579,6 +579,10 @@ impl Children {
                 ..
             } => self.request_restarting_child(&id, &parent_id),
             Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::RestoreChild { id, state},
                 ..
             } => self.restart_child(&id, &state),

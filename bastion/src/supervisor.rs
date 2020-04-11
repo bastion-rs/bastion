@@ -1215,6 +1215,10 @@ impl Supervisor {
                 }
             }
             Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unimplemented!(),
+            Envelope {
                 msg: BastionMessage::RestoreChild { .. },
                 ..
             } => unreachable!(),
