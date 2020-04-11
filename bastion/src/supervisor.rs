@@ -859,7 +859,14 @@ impl Supervisor {
                             let state = tracked_state.state();
                             BastionMessage::restore_child(id, state)
                         }
-                        false => BastionMessage::drop_child(id),
+                        false => {
+                            childs.remove(index);
+                            for (new_index, state) in childs.iter().enumerate() {
+                                let child_id = state.id.clone();
+                                self.tracked_groups_order.insert(child_id, new_index);
+                            };
+                            BastionMessage::drop_child(id)
+                        },
                     };
                     let restart_strategy = self.restart_strategy.clone();
 
