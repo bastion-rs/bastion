@@ -99,6 +99,10 @@ pub struct Supervisor {
     // is received.
     pre_start_msgs: Vec<Envelope>,
     started: bool,
+    // Stores amount of subtree restarts.
+    subtree_restarts: usize,
+    // Store the maximum acceptable restarts for the supervisor.
+    subtree_restarts_limit: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -236,6 +240,8 @@ impl Supervisor {
         let is_system_supervisor = false;
         let pre_start_msgs = Vec::new();
         let started = false;
+        let subtree_restarts = 0;
+        let subtree_restarts_limit = 3;
 
         Supervisor {
             bcast,
@@ -251,6 +257,8 @@ impl Supervisor {
             is_system_supervisor,
             pre_start_msgs,
             started,
+            subtree_restarts,
+            subtree_restarts_limit,
         }
     }
 
@@ -1067,8 +1075,11 @@ impl Supervisor {
     }
 
     async fn restart_subtree(&mut self) {
-        let restarted_objects = self.search_restarted_objects(ActorSearchMethod::All);
-        self.restart(restarted_objects).await;
+        if self.subtree_restarts < self.subtree_restarts_limit {
+            self.subtree_restarts += 1;
+            let restarted_objects = self.search_restarted_objects(ActorSearchMethod::All);
+            self.restart(restarted_objects).await;
+        }
     }
 
     async fn deinit_with_stop(&mut self) {
