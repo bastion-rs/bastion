@@ -811,9 +811,11 @@ impl Supervisor {
 
         for object in objects {
             match object {
-                // TODO: Add implementation for supervisor restarts
-                RestartedElement::Supervisor(_) => {},
-
+                RestartedElement::Supervisor(supervisor_id) => {
+                    let msg = BastionMessage::restart_subtree();
+                    let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+                    self.bcast.send_child(&supervisor_id, env);
+                },
                 // FIXME: supervised.callbacks().before_restart() calls for the specific actor?
                 // FIXME: supervised.callbacks().before_start() calls for the specific actor?
                 // FIXME: supervised.callbacks().after_restart() calls for the specific actor?
@@ -1059,6 +1061,11 @@ impl Supervisor {
         objects
     }
 
+    async fn restart_subtree(&mut self) {
+        let restarted_objects = self.search_restarted_objects(ActorSearchMethod::All);
+        self.restart(restarted_objects).await;
+    }
+
     async fn deinit_with_stop(&mut self) {
         self.stop(0..self.order.len()).await;
         self.stopped();
@@ -1217,7 +1224,7 @@ impl Supervisor {
             Envelope {
                 msg: BastionMessage::RestartSubtree,
                 ..
-            } => unimplemented!(),
+            } => self.restart_subtree().await,
             Envelope {
                 msg: BastionMessage::RestoreChild { .. },
                 ..
