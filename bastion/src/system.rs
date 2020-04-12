@@ -352,6 +352,10 @@ impl System {
                 ..
             } => unreachable!(),
             Envelope {
+                msg: BastionMessage::FinishedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::DropChild { .. },
                 ..
             } => unreachable!(),

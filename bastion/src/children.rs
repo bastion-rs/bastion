@@ -454,13 +454,14 @@ impl Children {
         // FIXME: Err if false?
         if self.launched.contains_key(&id) {
             debug!("Children({}): Child({}) stopped.", self.id(), id);
-
-            // TODO: Remove these calls? (because child finished with the success)
-            //self.stop().await;
-            //self.stopped();
             self.drop_child(id);
 
-            return Err(());
+            let msg = BastionMessage::finished_child(
+                id.clone(),
+                self.bcast.id().clone(),
+            );
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env).ok();
         }
 
         Ok(())
@@ -470,7 +471,6 @@ impl Children {
         // FIXME: Err if false?
         if self.launched.contains_key(id) {
             warn!("Children({}): Child({}) faulted.", self.id(), id);
-            // TODO: Remove these calls? (Children works as a proxy)
             self.kill().await;
             self.faulted();
 
@@ -591,6 +591,10 @@ impl Children {
                 msg: BastionMessage::RestartRequired { id, parent_id },
                 ..
             } => self.request_restarting_child(&id, &parent_id),
+            Envelope {
+                msg: BastionMessage::FinishedChild { .. },
+                ..
+            } => unreachable!(),
             Envelope {
                 msg: BastionMessage::RestartSubtree,
                 ..

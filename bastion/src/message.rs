@@ -204,6 +204,10 @@ pub(crate) enum BastionMessage {
         id: BastionId,
         parent_id: BastionId,
     },
+    FinishedChild {
+        id: BastionId,
+        parent_id: BastionId,
+    },
     RestartSubtree,
     RestoreChild {
         id: BastionId,
@@ -446,6 +450,10 @@ impl BastionMessage {
         BastionMessage::RestartRequired { id, parent_id }
     }
 
+    pub(crate) fn finished_child(id: BastionId, parent_id: BastionId) -> Self {
+        BastionMessage::FinishedChild { id, parent_id }
+    }
+
     pub(crate) fn restart_subtree() -> Self {
         BastionMessage::RestartSubtree
     }
@@ -494,6 +502,9 @@ impl BastionMessage {
             BastionMessage::Message(msg) => BastionMessage::Message(msg.try_clone()?),
             BastionMessage::RestartRequired { id, parent_id } => {
                 BastionMessage::restart_required(id.clone(), parent_id.clone())
+            }
+            BastionMessage::FinishedChild { id, parent_id } => {
+                BastionMessage::finished_child(id.clone(), parent_id.clone())
             }
             BastionMessage::RestartSubtree => BastionMessage::restart_subtree(),
             BastionMessage::RestoreChild { id, state } => {

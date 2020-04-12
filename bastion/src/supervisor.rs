@@ -860,11 +860,7 @@ impl Supervisor {
                             BastionMessage::restore_child(id, state)
                         }
                         false => {
-                            childs.remove(index);
-                            for (new_index, state) in childs.iter().enumerate() {
-                                let child_id = state.id.clone();
-                                self.tracked_groups_order.insert(child_id, new_index);
-                            };
+                            self.remove_child(&id.clone(), &parent_id.clone());
                             BastionMessage::drop_child(id)
                         },
                     };
@@ -885,6 +881,23 @@ impl Supervisor {
             let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
             self.bcast.send_child(&receiver, env);
         }
+    }
+
+    fn remove_child(&mut self, id: &BastionId, parent_id: &BastionId) {
+        let index = match self.tracked_groups_order.get(id) {
+            Some(index) => *index,
+            None => return,
+        };
+        let childs = match self.tracked_groups.get_mut(parent_id) {
+            Some(childs) => childs,
+            None => return,
+        };
+
+        childs.remove(index);
+        for (new_index, state) in childs.iter().enumerate() {
+            let child_id = state.id.clone();
+            self.tracked_groups_order.insert(child_id, new_index);
+        };
     }
 
     async fn stop(&mut self, range: Range<usize>) {
@@ -1254,6 +1267,10 @@ impl Supervisor {
                     return Err(());
                 }
             }
+            Envelope {
+                msg: BastionMessage::FinishedChild { id, parent_id },
+                ..
+            } => self.remove_child(&id, &parent_id),
             Envelope {
                 msg: BastionMessage::RestartSubtree,
                 ..
