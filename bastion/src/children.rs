@@ -15,13 +15,12 @@ use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
-use futures::stream::{FuturesOrdered, FuturesUnordered};
+use futures::stream::FuturesOrdered;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
-use std::iter::FromIterator;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
@@ -119,29 +118,6 @@ impl Children {
         trace!("Children({}): Creating ProcStack.", self.id());
         // FIXME: with_pid
         ProcStack::default()
-    }
-
-    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
-        debug!(
-            "Children({}): Resetting to Children({}).",
-            self.id(),
-            bcast.id()
-        );
-        // TODO: stop or kill?
-        self.kill().await;
-
-        self.bcast = bcast;
-        self.started = false;
-
-        trace!(
-            "Children({}): Removing {} pre-start messages.",
-            self.id(),
-            self.pre_start_msgs.len()
-        );
-        self.pre_start_msgs.clear();
-        self.pre_start_msgs.shrink_to_fit();
-
-        self.launch_elems();
     }
 
     /// Returns this children group's identifier.
@@ -396,18 +372,6 @@ impl Children {
         self
     }
 
-    async fn stop(&mut self) {
-        debug!("Children({}): Stopping.", self.id());
-        self.bcast.stop_children();
-
-        let launched = self.launched.drain().map(|(_, (_, launched))| launched);
-        FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
-            })
-            .await;
-    }
-
     async fn kill(&mut self) {
         debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
@@ -456,10 +420,7 @@ impl Children {
             debug!("Children({}): Child({}) stopped.", self.id(), id);
             self.drop_child(id);
 
-            let msg = BastionMessage::finished_child(
-                id.clone(),
-                self.bcast.id().clone(),
-            );
+            let msg = BastionMessage::finished_child(id.clone(), self.bcast.id().clone());
             let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
             self.bcast.send_parent(env).ok();
         }

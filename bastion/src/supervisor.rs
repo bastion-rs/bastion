@@ -862,7 +862,7 @@ impl Supervisor {
                         false => {
                             self.remove_child(&id.clone(), &parent_id.clone());
                             BastionMessage::drop_child(id)
-                        },
+                        }
                     };
                     let restart_strategy = self.restart_strategy.clone();
 
@@ -897,7 +897,7 @@ impl Supervisor {
         for (new_index, state) in childs.iter().enumerate() {
             let child_id = state.id.clone();
             self.tracked_groups_order.insert(child_id, new_index);
-        };
+        }
     }
 
     async fn stop(&mut self, range: Range<usize>) {
@@ -1795,31 +1795,6 @@ impl Supervised {
         ProcStack::default()
     }
 
-    fn reset(self, bcast: Broadcast) -> RecoverableHandle<Self> {
-        debug!(
-            "Supervised({}): Resetting to Supervised({}).",
-            self.id(),
-            bcast.id()
-        );
-        let stack = self.stack();
-        match self {
-            Supervised::Supervisor(mut supervisor) => pool::spawn(
-                async {
-                    supervisor.reset(Some(bcast)).await;
-                    Supervised::Supervisor(supervisor)
-                },
-                stack,
-            ),
-            Supervised::Children(mut children) => pool::spawn(
-                async {
-                    children.reset(bcast).await;
-                    Supervised::Children(children)
-                },
-                stack,
-            ),
-        }
-    }
-
     fn id(&self) -> &BastionId {
         match self {
             Supervised::Supervisor(supervisor) => supervisor.id(),
@@ -1831,16 +1806,6 @@ impl Supervised {
         match self {
             Supervised::Supervisor(supervisor) => supervisor.bcast(),
             Supervised::Children(children) => children.bcast(),
-        }
-    }
-
-    pub(crate) fn elem(&self) -> &BastionPathElement {
-        match self {
-            // FIXME
-            Supervised::Supervisor(supervisor) => {
-                supervisor.bcast().path().elem().as_ref().unwrap()
-            }
-            Supervised::Children(children) => children.bcast().path().elem().as_ref().unwrap(),
         }
     }
 

@@ -122,9 +122,6 @@ impl Child {
         debug!("Child({}): Faulted.", self.id());
         self.remove_from_dispatchers();
 
-        // TODO: Remove these call? (we're asking here for a restart)
-        //self.bcast.faulted();
-
         let parent = self.bcast.parent().clone().into_children().unwrap();
         let path = self.bcast.path().clone();
         let sender = self.bcast.sender().clone();
