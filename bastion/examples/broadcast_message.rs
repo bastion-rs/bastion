@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use bastion::prelude::*;
@@ -30,50 +29,6 @@ fn main() {
 
     Bastion::start();
     Bastion::block_until_stopped();
-}
-
-// Dispatcher that will do simple round-robin distribution
-struct RoundRobinHandler {
-    index: AtomicU64,
-}
-
-impl RoundRobinHandler {
-    pub fn new() -> Self {
-        RoundRobinHandler {
-            index: AtomicU64::new(0),
-        }
-    }
-}
-
-impl DispatcherHandler for RoundRobinHandler {
-    // Will left this implementation as empty.
-    fn notify(
-        &self,
-        _from_child: &ChildRef,
-        _entries: &DispatcherMap,
-        _notification_type: NotificationType,
-    ) {
-    }
-
-    // In according to the current index value we will select the entry that
-    // will be used as recipient of the message.
-    fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
-        let current_index = self.index.load(Ordering::SeqCst) % entries.len() as u64;
-
-        let mut skipped = 0;
-        for pair in entries.iter() {
-            if skipped != current_index {
-                skipped += 1;
-                continue;
-            }
-
-            let entry = pair.key();
-            entry.tell_anonymously(message.clone()).unwrap();
-            break;
-        }
-
-        self.index.store(current_index + 1, Ordering::SeqCst);
-    }
 }
 
 // Supervisor that tracking only the single actor with input data
@@ -118,9 +73,7 @@ fn process_group(children: Children) -> Children {
             // automatically.
             //
             // If needed to use more than one groups, then do more `with_dispatcher` calls
-            Dispatcher::default()
-                .with_dispatcher_type(DispatcherType::Named("Processing".to_string()))
-                .with_handler(Box::new(RoundRobinHandler::new())),
+            Dispatcher::with_type(DispatcherType::Named("Processing".to_string())),
         )
         .with_exec(move |ctx: BastionContext| async move {
             println!("[Processing] Worker started!");
@@ -166,9 +119,7 @@ fn response_group(children: Children) -> Children {
             // and flexibility in code.
             //
             // The single difference is only the name for Dispatcher for our actor's group.
-            Dispatcher::default()
-                .with_dispatcher_type(DispatcherType::Named("Response".to_string()))
-                .with_handler(Box::new(RoundRobinHandler::new())),
+            Dispatcher::with_type(DispatcherType::Named("Response".to_string())),
         )
         .with_exec(move |ctx: BastionContext| async move {
             println!("[Response] Worker started!");

@@ -1,0 +1,25 @@
+# Anything comes from dynamic affinity pinner and load balancer of
+# Bastion doesn't need concrete guarantees. They are not that crucial.
+race:bastion_executor::blocking
+
+# There is a bug for this. There is a dangling ref in the drop.
+# Read more about it here: https://github.com/rust-lang/rust/issues/55005
+race:Arc*drop
+race:Condvar::*
+race:std::sync::mpsc
+
+# Races of drop for the Receiver guard
+race:crossbeam_channel::counter::Receiver
+
+# OpenSSL FFI
+race:CRYPTO_THREAD*
+race:OPENSSL_*
+
+# Data races of mimalloc
+race:mi*
+race:_mi*
+
+# lazy_static and thread_local has barriers which are not
+# picked-up by TSAN. Like Lazy<T> and Local<T>.
+race:lazy_static
+race:std::thread::local

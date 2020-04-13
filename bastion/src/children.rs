@@ -303,8 +303,7 @@ impl Children {
     /// Bastion::children(|children| {
     ///     children
     ///         .with_dispatcher(
-    ///             Dispatcher::default()
-    ///                 .with_dispatcher_type(DispatcherType::Named("CustomGroup".to_string()))
+    ///             Dispatcher::with_type(DispatcherType::Named("CustomGroup".to_string()))
     ///         )
     /// }).expect("Couldn't create the children group.");
     ///     #
