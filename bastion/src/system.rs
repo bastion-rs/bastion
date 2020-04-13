@@ -329,6 +329,10 @@ impl System {
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::ApplyCallback { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::InstantiatedChild { .. },
                 ..
             } => unreachable!(),

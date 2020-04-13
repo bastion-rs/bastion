@@ -6,6 +6,7 @@
 //! * All message communication relies on at-most-once delivery guarantee.
 //! * Messages are not guaranteed to be ordered, all message's order is causal.
 //!
+use crate::callbacks::CallbackType;
 use crate::children::Children;
 use crate::context::{BastionId, ContextState};
 use crate::envelope::{RefAddr, SignedMessage};
@@ -194,6 +195,7 @@ pub(crate) enum BastionMessage {
         id: BastionId,
     },
     SuperviseWith(SupervisionStrategy),
+    ApplyCallback(CallbackType),
     InstantiatedChild {
         parent_id: BastionId,
         child_id: BastionId,
@@ -419,6 +421,10 @@ impl BastionMessage {
         BastionMessage::SuperviseWith(strategy)
     }
 
+    pub(crate) fn apply_callback(callback_type: CallbackType) -> Self {
+        BastionMessage::ApplyCallback(callback_type)
+    }
+
     pub(crate) fn instantiated_child(
         parent_id: BastionId,
         child_id: BastionId,
@@ -489,6 +495,9 @@ impl BastionMessage {
             BastionMessage::Prune { id } => BastionMessage::prune(id.clone()),
             BastionMessage::SuperviseWith(strategy) => {
                 BastionMessage::supervise_with(strategy.clone())
+            }
+            BastionMessage::ApplyCallback(callback_type) => {
+                BastionMessage::apply_callback(callback_type.clone())
             }
             BastionMessage::InstantiatedChild {
                 parent_id,

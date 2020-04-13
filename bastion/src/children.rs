@@ -1,7 +1,7 @@
 //!
 //! Children are a group of child supervised under a supervisor
 use crate::broadcast::{Broadcast, Parent, Sender};
-use crate::callbacks::Callbacks;
+use crate::callbacks::{CallbackType, Callbacks};
 use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
@@ -479,12 +479,17 @@ impl Children {
         let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
         self.bcast.send_child(&id, env);
 
+        let msg = BastionMessage::apply_callback(CallbackType::AfterRestart);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
         let msg = BastionMessage::start();
         let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
         self.bcast.send_child(&id, env);
 
         debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
-        let child = Child::new(exec, bcast, state, child_ref);
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
         debug!(
             "Children({}): Launching faulted Child({}).",
             self.id(),
@@ -533,6 +538,10 @@ impl Children {
                 msg: BastionMessage::SuperviseWith(_),
                 ..
             } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::ApplyCallback { .. },
+                ..
+            } => unreachable!(),
             Envelope {
                 msg: BastionMessage::InstantiatedChild { .. },
                 ..
@@ -698,7 +707,8 @@ impl Children {
                 self.id(),
                 bcast.id()
             );
-            let child = Child::new(exec, bcast, state, child_ref);
+            let callbacks = self.callbacks.clone();
+            let child = Child::new(exec, callbacks, bcast, state, child_ref);
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
             let launched = child.launch();

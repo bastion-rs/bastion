@@ -1,6 +1,7 @@
 //!
 //! Child is a element of Children group executing user-defined computation
 use crate::broadcast::Broadcast;
+use crate::callbacks::{CallbackType, Callbacks};
 use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
@@ -24,6 +25,9 @@ pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 #[derive(Debug)]
 pub(crate) struct Child {
     bcast: Broadcast,
+    // The callbacks called at the group's different lifecycle
+    // events.
+    callbacks: Callbacks,
     // The future that this child is executing.
     exec: Exec,
     // A lock behind which is the child's context state.
@@ -60,6 +64,7 @@ impl Init {
 impl Child {
     pub(crate) fn new(
         exec: Exec,
+        callbacks: Callbacks,
         bcast: Broadcast,
         state: Qutex<Pin<Box<ContextState>>>,
         child_ref: ChildRef,
@@ -70,6 +75,7 @@ impl Child {
 
         Child {
             bcast,
+            callbacks,
             exec,
             state,
             pre_start_msgs,
@@ -99,7 +105,6 @@ impl Child {
                 global_dispatcher.remove(used_dispatchers, &child_ref_inner);
             }
 
-            // FIXME: clones
             let id = id.clone();
             let msg = BastionMessage::restart_required(id, parent.id().clone());
             let env = Envelope::new(msg, path.clone(), sender.clone());
@@ -143,7 +148,7 @@ impl Child {
                 ..
             } => {
                 self.stopped();
-
+                self.callbacks.after_stop();
                 return Err(());
             }
             Envelope {
@@ -151,7 +156,7 @@ impl Child {
                 ..
             } => {
                 self.stopped();
-
+                self.callbacks.before_restart();
                 return Err(());
             }
             // FIXME
@@ -164,6 +169,10 @@ impl Child {
                 msg: BastionMessage::Prune { .. },
                 ..
             } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::ApplyCallback(callback_type),
+                ..
+            } => self.apply_callback(callback_type),
             // FIXME
             Envelope {
                 msg: BastionMessage::SuperviseWith(_),
@@ -231,6 +240,7 @@ impl Child {
             BastionMessage::Start
         );
         debug!("Child({}): Starting.", self.id());
+        self.callbacks.before_start();
         self.started = true;
 
         let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
@@ -248,6 +258,15 @@ impl Child {
         }
 
         Ok(())
+    }
+
+    fn apply_callback(&mut self, callback_type: CallbackType) {
+        match callback_type {
+            CallbackType::BeforeStart => self.callbacks.before_start(),
+            CallbackType::BeforeRestart => self.callbacks.before_restart(),
+            CallbackType::AfterRestart => self.callbacks.after_restart(),
+            CallbackType::AfterStop => self.callbacks.after_stop(),
+        }
     }
 
     async fn run(mut self) {

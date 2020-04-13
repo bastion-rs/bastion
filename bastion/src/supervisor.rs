@@ -829,9 +829,6 @@ impl Supervisor {
                         Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
                     self.bcast.send_child(&supervisor_id, env);
                 }
-                // FIXME: supervised.callbacks().before_restart() calls for the specific actor?
-                // FIXME: supervised.callbacks().before_start() calls for the specific actor?
-                // FIXME: supervised.callbacks().after_restart() calls for the specific actor?
                 RestartedElement::Child { id, parent_id } => {
                     let index = match self.tracked_groups_order.get(&id) {
                         Some(index) => *index,
@@ -1227,6 +1224,10 @@ impl Supervisor {
                 );
                 self.strategy = strategy;
             }
+            Envelope {
+                msg: BastionMessage::ApplyCallback { .. },
+                ..
+            } => unreachable!(),
             Envelope {
                 msg:
                     BastionMessage::InstantiatedChild {
