@@ -102,7 +102,7 @@ You can use this to launch automatically supervised tasks.
 * Completely asynchronous system design.
 * Asynchronous program boundaries with [fort](https://github.com/bastion-rs/fort).
 * Dynamic supervision of supervisors (adding a subtree later during the execution)
-* Lifecycle management both at `futures` and [lightproc](https://github.com/bastion-rs/bastion/tree/master/lightproc) layers.
+* Lifecycle management both at `futures` and [lightproc](https://github.com/bastion-rs/bastion/tree/master/src/lightproc) layers.
 * Faster middleware development.
 * Fault tolerance above all.
 
@@ -116,9 +116,9 @@ If you answer any of the questions below with yes, then Bastion is just for you:
 * Do I want to implement my own application lifecycle?
 
 ### Get Started
-Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
+Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
 
-[Examples](https://github.com/bastion-rs/bastion/blob/master/bastion/examples) cover possible use cases of the crate.
+[Examples](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples) cover possible use cases of the crate.
 
 Include bastion to your project with:
 ```toml
