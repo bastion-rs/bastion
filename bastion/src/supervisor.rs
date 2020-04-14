@@ -874,7 +874,7 @@ impl Supervisor {
             }
         }
 
-        for (receiver, msg) in restart_futures.next().await {
+        while let Some((receiver, msg)) = restart_futures.next().await {
             let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
             self.bcast.send_child(&receiver, env);
         }
