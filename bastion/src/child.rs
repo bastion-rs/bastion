@@ -1,6 +1,7 @@
 //!
 //! Child is a element of Children group executing user-defined computation
 use crate::broadcast::Broadcast;
+use crate::callbacks::{CallbackType, Callbacks};
 use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
@@ -24,13 +25,16 @@ pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 #[derive(Debug)]
 pub(crate) struct Child {
     bcast: Broadcast,
+    // The callbacks called at the group's different lifecycle
+    // events.
+    callbacks: Callbacks,
     // The future that this child is executing.
     exec: Exec,
     // A lock behind which is the child's context state.
     // This is used to store the messages that were received
     // for the child's associated future to be able to
     // retrieve them.
-    state: Qutex<ContextState>,
+    state: Qutex<Pin<Box<ContextState>>>,
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -60,8 +64,9 @@ impl Init {
 impl Child {
     pub(crate) fn new(
         exec: Exec,
+        callbacks: Callbacks,
         bcast: Broadcast,
-        state: Qutex<ContextState>,
+        state: Qutex<Pin<Box<ContextState>>>,
         child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
@@ -70,6 +75,7 @@ impl Child {
 
         Child {
             bcast,
+            callbacks,
             exec,
             state,
             pre_start_msgs,
@@ -86,13 +92,21 @@ impl Child {
         let path = self.bcast.path().clone();
         let sender = self.bcast.sender().clone();
 
+        let parent_inner = self.bcast.parent().clone().into_children();
+        let child_ref_inner = self.child_ref.clone();
+
         // FIXME: with_pid
         ProcStack::default().with_after_panic(move |_state: &mut EmptyProcState| {
-            // FIXME: clones
-            let id = id.clone();
             warn!("Child({}): Panicked.", id);
 
-            let msg = BastionMessage::faulted(id);
+            if let Some(parent) = &parent_inner {
+                let used_dispatchers = parent.dispatchers();
+                let global_dispatcher = SYSTEM.dispatcher();
+                global_dispatcher.remove(used_dispatchers, &child_ref_inner);
+            }
+
+            let id = id.clone();
+            let msg = BastionMessage::restart_required(id, parent.id().clone());
             let env = Envelope::new(msg, path.clone(), sender.clone());
             // TODO: handle errors
             parent.send(env).ok();
@@ -112,7 +126,15 @@ impl Child {
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
         self.remove_from_dispatchers();
-        self.bcast.faulted();
+
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+        let path = self.bcast.path().clone();
+        let sender = self.bcast.sender().clone();
+
+        let msg = BastionMessage::restart_required(self.id().clone(), parent.id().clone());
+        let env = Envelope::new(msg, path.clone(), sender.clone());
+        // TODO: handle errors
+        parent.send(env).ok();
     }
 
     async fn handle(&mut self, env: Envelope) -> Result<(), ()> {
@@ -126,7 +148,7 @@ impl Child {
                 ..
             } => {
                 self.stopped();
-
+                self.callbacks.after_stop();
                 return Err(());
             }
             Envelope {
@@ -134,7 +156,7 @@ impl Child {
                 ..
             } => {
                 self.stopped();
-
+                self.callbacks.before_restart();
                 return Err(());
             }
             // FIXME
@@ -147,18 +169,54 @@ impl Child {
                 msg: BastionMessage::Prune { .. },
                 ..
             } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::ApplyCallback(callback_type),
+                ..
+            } => self.apply_callback(callback_type),
             // FIXME
             Envelope {
                 msg: BastionMessage::SuperviseWith(_),
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::InstantiatedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Message(msg),
                 sign,
             } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
-                let mut state = self.state.clone().lock_async().await.map_err(|_| ())?;
-                state.push_msg(msg, sign);
+                let mut guard = self.state.clone().lock_async().await.map_err(|_| ())?;
+                let mut state = guard.as_mut();
+                state.push_message(msg, sign);
+            }
+            Envelope {
+                msg: BastionMessage::RestartRequired { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestoreChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::FinishedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::DropChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::SetState { state },
+                ..
+            } => {
+                debug!("Child({}): Setting new state: {:?}", self.id(), state);
+                self.state = state;
             }
             // FIXME
             Envelope {
@@ -182,6 +240,7 @@ impl Child {
             BastionMessage::Start
         );
         debug!("Child({}): Starting.", self.id());
+        self.callbacks.before_start();
         self.started = true;
 
         let msgs = self.pre_start_msgs.drain(..).collect::<Vec<_>>();
@@ -199,6 +258,15 @@ impl Child {
         }
 
         Ok(())
+    }
+
+    fn apply_callback(&mut self, callback_type: CallbackType) {
+        match callback_type {
+            CallbackType::BeforeStart => self.callbacks.before_start(),
+            CallbackType::BeforeRestart => self.callbacks.before_restart(),
+            CallbackType::AfterRestart => self.callbacks.after_restart(),
+            CallbackType::AfterStop => self.callbacks.after_stop(),
+        }
     }
 
     async fn run(mut self) {

@@ -6,11 +6,13 @@
 //! * All message communication relies on at-most-once delivery guarantee.
 //! * Messages are not guaranteed to be ordered, all message's order is causal.
 //!
+use crate::callbacks::CallbackType;
 use crate::children::Children;
-use crate::context::BastionId;
+use crate::context::{BastionId, ContextState};
 use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
 use futures::channel::oneshot::{self, Receiver};
+use qutex::Qutex;
 use std::any::{type_name, Any};
 use std::fmt::Debug;
 use std::future::Future;
@@ -189,11 +191,42 @@ pub(crate) enum BastionMessage {
     Stop,
     Kill,
     Deploy(Deployment),
-    Prune { id: BastionId },
+    Prune {
+        id: BastionId,
+    },
     SuperviseWith(SupervisionStrategy),
+    ApplyCallback(CallbackType),
+    InstantiatedChild {
+        parent_id: BastionId,
+        child_id: BastionId,
+        state: Qutex<Pin<Box<ContextState>>>,
+    },
     Message(Msg),
-    Stopped { id: BastionId },
-    Faulted { id: BastionId },
+    RestartRequired {
+        id: BastionId,
+        parent_id: BastionId,
+    },
+    FinishedChild {
+        id: BastionId,
+        parent_id: BastionId,
+    },
+    RestartSubtree,
+    RestoreChild {
+        id: BastionId,
+        state: Qutex<Pin<Box<ContextState>>>,
+    },
+    DropChild {
+        id: BastionId,
+    },
+    SetState {
+        state: Qutex<Pin<Box<ContextState>>>,
+    },
+    Stopped {
+        id: BastionId,
+    },
+    Faulted {
+        id: BastionId,
+    },
 }
 
 #[derive(Debug)]
@@ -388,6 +421,22 @@ impl BastionMessage {
         BastionMessage::SuperviseWith(strategy)
     }
 
+    pub(crate) fn apply_callback(callback_type: CallbackType) -> Self {
+        BastionMessage::ApplyCallback(callback_type)
+    }
+
+    pub(crate) fn instantiated_child(
+        parent_id: BastionId,
+        child_id: BastionId,
+        state: Qutex<Pin<Box<ContextState>>>,
+    ) -> Self {
+        BastionMessage::InstantiatedChild {
+            parent_id,
+            child_id,
+            state,
+        }
+    }
+
     pub(crate) fn broadcast<M: Message>(msg: M) -> Self {
         let msg = Msg::broadcast(msg);
         BastionMessage::Message(msg)
@@ -401,6 +450,30 @@ impl BastionMessage {
     pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
         let (msg, answer) = Msg::ask(msg);
         (BastionMessage::Message(msg), answer)
+    }
+
+    pub(crate) fn restart_required(id: BastionId, parent_id: BastionId) -> Self {
+        BastionMessage::RestartRequired { id, parent_id }
+    }
+
+    pub(crate) fn finished_child(id: BastionId, parent_id: BastionId) -> Self {
+        BastionMessage::FinishedChild { id, parent_id }
+    }
+
+    pub(crate) fn restart_subtree() -> Self {
+        BastionMessage::RestartSubtree
+    }
+
+    pub(crate) fn restore_child(id: BastionId, state: Qutex<Pin<Box<ContextState>>>) -> Self {
+        BastionMessage::RestoreChild { id, state }
+    }
+
+    pub(crate) fn drop_child(id: BastionId) -> Self {
+        BastionMessage::DropChild { id }
+    }
+
+    pub(crate) fn set_state(state: Qutex<Pin<Box<ContextState>>>) -> Self {
+        BastionMessage::SetState { state }
     }
 
     pub(crate) fn stopped(id: BastionId) -> Self {
@@ -423,7 +496,31 @@ impl BastionMessage {
             BastionMessage::SuperviseWith(strategy) => {
                 BastionMessage::supervise_with(strategy.clone())
             }
+            BastionMessage::ApplyCallback(callback_type) => {
+                BastionMessage::apply_callback(callback_type.clone())
+            }
+            BastionMessage::InstantiatedChild {
+                parent_id,
+                child_id,
+                state,
+            } => BastionMessage::instantiated_child(
+                parent_id.clone(),
+                child_id.clone(),
+                state.clone(),
+            ),
             BastionMessage::Message(msg) => BastionMessage::Message(msg.try_clone()?),
+            BastionMessage::RestartRequired { id, parent_id } => {
+                BastionMessage::restart_required(id.clone(), parent_id.clone())
+            }
+            BastionMessage::FinishedChild { id, parent_id } => {
+                BastionMessage::finished_child(id.clone(), parent_id.clone())
+            }
+            BastionMessage::RestartSubtree => BastionMessage::restart_subtree(),
+            BastionMessage::RestoreChild { id, state } => {
+                BastionMessage::restore_child(id.clone(), state.clone())
+            }
+            BastionMessage::DropChild { id } => BastionMessage::drop_child(id.clone()),
+            BastionMessage::SetState { state } => BastionMessage::set_state(state.clone()),
             BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
             BastionMessage::Faulted { id } => BastionMessage::faulted(id.clone()),
         };

@@ -1,7 +1,16 @@
 use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
-#[derive(Default)]
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub(crate) enum CallbackType {
+    AfterRestart,
+    AfterStop,
+    BeforeRestart,
+    BeforeStart,
+}
+
+#[derive(Default, Clone)]
 /// A set of methods that will get called at different states of
 /// a [`Supervisor`] or [`Children`] life.
 ///

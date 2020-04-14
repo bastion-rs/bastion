@@ -318,14 +318,6 @@ impl BastionPathElement {
         }
     }
 
-    pub(crate) fn with_id(self, id: BastionId) -> Self {
-        match self {
-            BastionPathElement::Supervisor(_) => BastionPathElement::Supervisor(id),
-            BastionPathElement::Children(_) => BastionPathElement::Children(id),
-            BastionPathElement::Child(_) => BastionPathElement::Child(id),
-        }
-    }
-
     #[doc(hidden)]
     /// Checks whether the BastionPath identifies a supervisor.
     pub fn is_supervisor(&self) -> bool {

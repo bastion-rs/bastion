@@ -1,7 +1,7 @@
 //!
 //! Children are a group of child supervised under a supervisor
 use crate::broadcast::{Broadcast, Parent, Sender};
-use crate::callbacks::Callbacks;
+use crate::callbacks::{CallbackType, Callbacks};
 use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
@@ -15,13 +15,13 @@ use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
-use futures::stream::{FuturesOrdered, FuturesUnordered};
+use futures::stream::FuturesOrdered;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
-use std::iter::FromIterator;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
 
@@ -118,29 +118,6 @@ impl Children {
         trace!("Children({}): Creating ProcStack.", self.id());
         // FIXME: with_pid
         ProcStack::default()
-    }
-
-    pub(crate) async fn reset(&mut self, bcast: Broadcast) {
-        debug!(
-            "Children({}): Resetting to Children({}).",
-            self.id(),
-            bcast.id()
-        );
-        // TODO: stop or kill?
-        self.kill().await;
-
-        self.bcast = bcast;
-        self.started = false;
-
-        trace!(
-            "Children({}): Removing {} pre-start messages.",
-            self.id(),
-            self.pre_start_msgs.len()
-        );
-        self.pre_start_msgs.clear();
-        self.pre_start_msgs.shrink_to_fit();
-
-        self.launch_elems();
     }
 
     /// Returns this children group's identifier.
@@ -394,18 +371,6 @@ impl Children {
         self
     }
 
-    async fn stop(&mut self) {
-        debug!("Children({}): Stopping.", self.id());
-        self.bcast.stop_children();
-
-        let launched = self.launched.drain().map(|(_, (_, launched))| launched);
-        FuturesUnordered::from_iter(launched)
-            .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
-            })
-            .await;
-    }
-
     async fn kill(&mut self) {
         debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
@@ -452,10 +417,11 @@ impl Children {
         // FIXME: Err if false?
         if self.launched.contains_key(&id) {
             debug!("Children({}): Child({}) stopped.", self.id(), id);
-            self.stop().await;
-            self.stopped();
+            self.drop_child(id);
 
-            return Err(());
+            let msg = BastionMessage::finished_child(id.clone(), self.bcast.id().clone());
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env).ok();
         }
 
         Ok(())
@@ -474,6 +440,74 @@ impl Children {
         Ok(())
     }
 
+    fn request_restarting_child(&mut self, id: &BastionId, parent_id: &BastionId) {
+        if parent_id == self.bcast.id() && self.launched.contains_key(id) {
+            let parent_id = self.bcast.id().clone();
+            let msg = BastionMessage::restart_required(id.clone(), parent_id);
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env).ok();
+        }
+    }
+
+    fn restart_child(&mut self, old_id: &BastionId, old_state: &Qutex<Pin<Box<ContextState>>>) {
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(old_id.clone()));
+
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        let state = Qutex::new(Box::pin(ContextState::new()));
+
+        let ctx = BastionContext::new(
+            id.clone(),
+            child_ref.clone(),
+            children,
+            supervisor,
+            state.clone(),
+        );
+        let exec = (self.init.0)(ctx);
+
+        self.bcast.register(&bcast);
+
+        let msg = BastionMessage::set_state(old_state.clone());
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        let msg = BastionMessage::apply_callback(CallbackType::AfterRestart);
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
+        debug!(
+            "Children({}): Launching faulted Child({}).",
+            self.id(),
+            child.id(),
+        );
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.launched.insert(id, (sender, launched));
+    }
+
+    fn drop_child(&mut self, id: &BastionId) {
+        debug!(
+            "Children({}): Dropping Child({:?}): reached restart limits.",
+            self.id(),
+            id,
+        );
+        self.launched.remove_entry(id);
+    }
+
     async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
         match envelope {
             Envelope {
@@ -483,11 +517,11 @@ impl Children {
             Envelope {
                 msg: BastionMessage::Stop,
                 ..
-            } => self.kill_children().await?,
+            } => self.stop_children().await?,
             Envelope {
                 msg: BastionMessage::Kill,
                 ..
-            } => self.stop_children().await?,
+            } => self.kill_children().await?,
             // FIXME
             Envelope {
                 msg: BastionMessage::Deploy(_),
@@ -504,6 +538,14 @@ impl Children {
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::ApplyCallback { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::InstantiatedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Message(ref message),
                 ..
             } => {
@@ -514,6 +556,30 @@ impl Children {
                 );
                 self.bcast.send_children(envelope);
             }
+            Envelope {
+                msg: BastionMessage::RestartRequired { id, parent_id },
+                ..
+            } => self.request_restarting_child(&id, &parent_id),
+            Envelope {
+                msg: BastionMessage::FinishedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestoreChild { id, state },
+                ..
+            } => self.restart_child(&id, &state),
+            Envelope {
+                msg: BastionMessage::DropChild { id },
+                ..
+            } => self.drop_child(&id),
+            Envelope {
+                msg: BastionMessage::SetState { .. },
+                ..
+            } => unreachable!(),
             Envelope {
                 msg: BastionMessage::Stopped { id },
                 ..
@@ -617,12 +683,21 @@ impl Children {
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
 
-            let state = ContextState::new();
-            let state = Qutex::new(state);
+            let state = Qutex::new(Box::pin(ContextState::new()));
 
-            let ctx =
-                BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
+            let ctx = BastionContext::new(
+                id.clone(),
+                child_ref.clone(),
+                children,
+                supervisor,
+                state.clone(),
+            );
             let exec = (self.init.0)(ctx);
+
+            let parent_id = self.bcast.id().clone();
+            let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
+            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+            self.bcast.send_parent(env).ok();
 
             self.bcast.register(&bcast);
 
@@ -631,11 +706,11 @@ impl Children {
                 self.id(),
                 bcast.id()
             );
-            let child = Child::new(exec, bcast, state, child_ref);
+            let callbacks = self.callbacks.clone();
+            let child = Child::new(exec, callbacks, bcast, state, child_ref);
             debug!("Children({}): Launching Child({}).", self.id(), child.id());
             let id = child.id().clone();
             let launched = child.launch();
-
             self.launched.insert(id, (sender, launched));
         }
     }

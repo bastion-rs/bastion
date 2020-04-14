@@ -13,6 +13,7 @@ use futures::pending;
 use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
+use std::pin::Pin;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -105,12 +106,12 @@ pub struct BastionContext {
     child: ChildRef,
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
-    state: Qutex<ContextState>,
+    state: Qutex<Pin<Box<ContextState>>>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ContextState {
-    msgs: VecDeque<SignedMessage>,
+    messages: VecDeque<SignedMessage>,
 }
 
 impl BastionId {
@@ -127,7 +128,7 @@ impl BastionContext {
         child: ChildRef,
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
-        state: Qutex<ContextState>,
+        state: Qutex<Pin<Box<ContextState>>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -304,9 +305,10 @@ impl BastionContext {
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         debug!("BastionContext({}): Trying to receive message.", self.id);
         // TODO: Err(Error)
-        let mut state = self.state.clone().lock_async().await.ok()?;
+        let mut guard = self.state.clone().lock_async().await.ok()?;
+        let mut state = guard.as_mut();
 
-        if let Some(msg) = state.msgs.pop_front() {
+        if let Some(msg) = state.pop_message() {
             trace!("BastionContext({}): Received message: {:?}", self.id, msg);
             Some(msg)
         } else {
@@ -356,15 +358,15 @@ impl BastionContext {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
             // TODO: Err(Error)
-            let mut state = self.state.clone().lock_async().await.unwrap();
+            let mut guard = self.state.clone().lock_async().await.unwrap();
+            let mut state = guard.as_mut();
 
-            if let Some(msg) = state.msgs.pop_front() {
+            if let Some(msg) = state.pop_message() {
                 trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
 
-            Guard::unlock(state);
-
+            Guard::unlock(guard);
             pending!();
         }
     }
@@ -584,13 +586,17 @@ impl BastionContext {
 
 impl ContextState {
     pub(crate) fn new() -> Self {
-        let msgs = VecDeque::new();
-
-        ContextState { msgs }
+        ContextState {
+            messages: VecDeque::new(),
+        }
     }
 
-    pub(crate) fn push_msg(&mut self, msg: Msg, sign: RefAddr) {
-        self.msgs.push_back(SignedMessage::new(msg, sign))
+    pub(crate) fn push_message(&mut self, msg: Msg, sign: RefAddr) {
+        self.messages.push_back(SignedMessage::new(msg, sign))
+    }
+
+    pub(crate) fn pop_message(&mut self) -> Option<SignedMessage> {
+        self.messages.pop_front()
     }
 }
 

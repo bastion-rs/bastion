@@ -329,6 +329,14 @@ impl System {
                 ..
             } => unimplemented!(),
             Envelope {
+                msg: BastionMessage::ApplyCallback { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::InstantiatedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
                 msg: BastionMessage::Message(ref message),
                 ..
             } => {
@@ -336,11 +344,35 @@ impl System {
                 self.bcast.send_children(env);
             }
             Envelope {
-                msg: BastionMessage::Stopped { id },
+                msg: BastionMessage::RestartRequired { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestartSubtree,
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::RestoreChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::FinishedChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::DropChild { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::SetState { .. },
+                ..
+            } => unreachable!(),
+            Envelope {
+                msg: BastionMessage::Stopped { id, .. },
                 ..
             } => self.restart_supervised_object(id),
             Envelope {
-                msg: BastionMessage::Faulted { id },
+                msg: BastionMessage::Faulted { id, .. },
                 ..
             } => self.restart_supervised_object(id),
         }
