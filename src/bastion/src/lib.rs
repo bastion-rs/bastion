@@ -65,6 +65,7 @@ mod broadcast;
 mod callbacks;
 mod child;
 mod config;
+mod resizer;
 mod system;
 
 pub mod child_ref;
