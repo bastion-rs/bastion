@@ -65,7 +65,6 @@ mod broadcast;
 mod callbacks;
 mod child;
 mod config;
-mod resizer;
 mod system;
 
 pub mod child_ref;
@@ -77,6 +76,7 @@ pub mod envelope;
 pub mod executor;
 pub mod message;
 pub mod path;
+pub mod resizer;
 pub mod supervisor;
 
 distributed_api! {
@@ -102,6 +102,7 @@ pub mod prelude {
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
+    pub use crate::resizer::{Resizer, UpperBoundLimit, UpscaleStrategy};
     pub use crate::supervisor::{
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,

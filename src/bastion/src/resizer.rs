@@ -1,5 +1,5 @@
 //!
-//! Special kind of structs for providing dynamically resizable actors group.
+//! Special kind of structs for resizable actor groups in runtime.
 //!
 //! Features:
 //! * Configuring limits and used strategies for resizers.

@@ -1315,6 +1315,8 @@ impl Supervisor {
     async fn run(mut self) -> Self {
         debug!("Supervisor({}): Launched.", self.id());
         loop {
+            self.resizer.scale();
+
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(Envelope {
@@ -1349,6 +1351,8 @@ impl Supervisor {
                 Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
+
+            self.resizer.scale();
         }
     }
 
