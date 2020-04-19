@@ -166,8 +166,8 @@ impl ActorGroupStats {
         let average_mailbox_size_mask = ActorGroupStats::average_mailbox_size_mask();
 
         let mut value: u64 = 0;
-        value |= ((self.average_mailbox_size() as u64) & actors_count_mask);
-        value |= ((self.actors_count() as u64) & actors_count_mask) << 32;
+        value |= (self.average_mailbox_size() as u64) & average_mailbox_size_mask;
+        value |= ((self.actors_count() as u64) << 32) & actors_count_mask;
 
         storage.store(value, Ordering::Relaxed);
     }
@@ -194,4 +194,58 @@ impl ActorGroupStats {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::resizer::{ActorGroupStats, Resizer};
+
+    #[test]
+    fn test_resizer_stores_empty_stats_by_default() {
+        let resizer = Resizer::default();
+
+        let stats = ActorGroupStats::load(resizer.stats);
+        assert_eq!(stats.actors_count, 0);
+        assert_eq!(stats.average_mailbox_size, 0);
+    }
+
+    #[test]
+    fn test_resizer_returns_refreshed_stats_after_actors_count_update() {
+        let resizer = Resizer::default();
+        let atomic_stats = resizer.stats();
+
+        let mut stats = ActorGroupStats::load(atomic_stats.clone());
+        stats.update_actors_count(10);
+        stats.store(atomic_stats);
+
+        let updated_stats = ActorGroupStats::load(resizer.stats);
+        assert_eq!(updated_stats.actors_count, 10);
+        assert_eq!(updated_stats.average_mailbox_size, 0);
+    }
+
+    #[test]
+    fn test_resizer_returns_refreshed_stats_after_avg_mailbox_size_update() {
+        let resizer = Resizer::default();
+        let atomic_stats = resizer.stats();
+
+        let mut stats = ActorGroupStats::load(atomic_stats.clone());
+        stats.update_average_mailbox_size(100);
+        stats.store(atomic_stats);
+
+        let updated_stats = ActorGroupStats::load(resizer.stats);
+        assert_eq!(updated_stats.actors_count, 0);
+        assert_eq!(updated_stats.average_mailbox_size, 50);
+    }
+
+    #[test]
+    fn test_resizer_returns_refreshed_stats_after_actor_count_and_avg_mailbox_size_update() {
+        let resizer = Resizer::default();
+        let atomic_stats = resizer.stats();
+
+        let mut stats = ActorGroupStats::load(atomic_stats.clone());
+        stats.update_actors_count(10);
+        stats.update_average_mailbox_size(100);
+        stats.store(atomic_stats);
+
+        let updated_stats = ActorGroupStats::load(resizer.stats);
+        assert_eq!(updated_stats.actors_count, 10);
+        assert_eq!(updated_stats.average_mailbox_size, 50);
+    }
+}
