@@ -10,6 +10,7 @@ use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
+#[cfg(feature = "scaling")]
 use crate::resizer::Resizer;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
@@ -92,8 +93,9 @@ pub struct Children {
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
     // The name of children
     name: Option<String>,
+    #[cfg(feature = "scaling")]
     // Resizer for dynamic actor group scaling up/down.
-    resizer: Resizer,
+    resizer: Box<Resizer>,
 }
 
 impl Children {
@@ -106,6 +108,8 @@ impl Children {
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
+        #[cfg(feature = "scaling")]
+        let resizer = Box::new(Resizer::default());
         let name = None;
         let resizer = Resizer::default();
 
@@ -119,6 +123,7 @@ impl Children {
             started,
             dispatchers,
             name,
+            #[cfg(feature = "scaling")]
             resizer,
         }
     }
@@ -297,6 +302,9 @@ impl Children {
             self.redundancy = redundancy;
         }
 
+        #[cfg(feature = "scaling")]
+        self.resizer.set_lower_bound(self.redundancy as u64);
+
         self
     }
 
@@ -333,6 +341,7 @@ impl Children {
         self
     }
 
+    #[cfg(feature = "scaling")]
     /// Sets a custom resizer for the Children.
     ///
     /// This method is available only with the `scaling` feature flag.
@@ -365,7 +374,7 @@ impl Children {
     /// ```
     /// [`Resizer`]: ../resizer/struct.Resizer.html
     pub fn with_resizer(mut self, resizer: Resizer) -> Self {
-        self.resizer = resizer;
+        self.resizer = Box::new(resizer);
         self
     }
 
@@ -681,7 +690,8 @@ impl Children {
         debug!("Children({}): Launched.", self.id());
 
         loop {
-            self.resizer.scale();
+            #[cfg(feature = "scaling")]
+            self.resizer.scale().await;
 
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
@@ -722,7 +732,8 @@ impl Children {
                 Poll::Pending => pending!(),
             }
 
-            self.resizer.scale();
+            #[cfg(feature = "scaling")]
+            self.resizer.scale().await;
         }
     }
 

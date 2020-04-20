@@ -7,6 +7,7 @@ use crate::children_ref::ChildrenRef;
 use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
+#[cfg(feature = "scaling")]
 use crate::resizer::ActorGroupStats;
 use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
@@ -15,6 +16,7 @@ use futures::pending;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
+#[cfg(feature = "scaling")]
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tracing::{debug, trace};
@@ -111,6 +113,7 @@ pub struct BastionContext {
 #[derive(Debug)]
 pub(crate) struct ContextState {
     messages: VecDeque<SignedMessage>,
+    #[cfg(feature = "scaling")]
     stats: Arc<AtomicU64>,
 }
 
@@ -572,6 +575,7 @@ impl ContextState {
     pub(crate) fn new() -> Self {
         ContextState {
             messages: VecDeque::new(),
+            #[cfg(feature = "scaling")]
             stats: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -584,10 +588,12 @@ impl ContextState {
         self.messages.pop_front()
     }
 
+    #[cfg(feature = "scaling")]
     pub(crate) fn load_stats(&self) -> ActorGroupStats {
         ActorGroupStats::load(self.stats.clone())
     }
 
+    #[cfg(feature = "scaling")]
     pub(crate) fn store_stats(&self, stats: ActorGroupStats) {
         stats.store(self.stats.clone())
     }

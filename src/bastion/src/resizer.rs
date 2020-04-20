@@ -9,6 +9,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+#[derive(Debug)]
 /// Special struct for scaling up and down actor groups in runtime.
 pub struct Resizer {
     // Storage for actors statistics. The statistics struct is
@@ -32,6 +33,7 @@ pub struct Resizer {
     downscale_rate: f64,
 }
 
+#[derive(Debug)]
 /// Special wrapper for Arc<AtomicU64> type, that actually
 /// represented as struct for storing statistical information
 /// about the certain actor group.
@@ -55,6 +57,7 @@ pub(crate) struct ActorGroupStats {
     average_mailbox_size: u32,
 }
 
+#[derive(Debug)]
 /// An enumeration that describe acceptable upper boundaries
 /// for the spawned actors in runtime.
 pub enum UpperBoundLimit {
@@ -64,20 +67,18 @@ pub enum UpperBoundLimit {
     Unlimited,
 }
 
+#[derive(Debug)]
 /// Determines the strategy for scaling up in runtime.
 pub enum UpscaleStrategy {
-    /// Scaling up based on how much of actors are busy.
-    ActorsAreBusy,
-    /// Scaling up based on how many actors are busy and
-    /// have accumulating messages in a mailbox. If actor
-    /// is busy and has more message than the limit, then
-    /// needs to consider re-scaling.
-    ActorsUnderPressure,
     /// Scaling up based on the size of the actor's mailbox.
     MailboxSizeThreshold(u32),
 }
 
 impl Resizer {
+    pub(crate) fn set_lower_bound(&mut self, lower_bound: u64) {
+        self.lower_bound = lower_bound
+    }
+
     /// Overrides the minimal amount of actors available to use.
     pub fn with_lower_bound(mut self, lower_bound: u64) -> Self {
         self.lower_bound = lower_bound;
@@ -130,7 +131,7 @@ impl Default for Resizer {
             stats: Arc::new(AtomicU64::new(0)),
             lower_bound: 1,
             upper_bound: UpperBoundLimit::Limit(10),
-            upscale_strategy: UpscaleStrategy::ActorsAreBusy,
+            upscale_strategy: UpscaleStrategy::MailboxSizeThreshold(3),
             upscale_rate: 0.1,
             downscale_threshold: 0.3,
             downscale_rate: 0.1,
