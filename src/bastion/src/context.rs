@@ -580,6 +580,12 @@ impl ContextState {
         }
     }
 
+    #[cfg(feature = "scaling")]
+    pub(crate) fn with_stats(mut self, stats: Arc<AtomicU64>) -> Self {
+        self.stats = stats;
+        self
+    }
+
     pub(crate) fn push_message(&mut self, msg: Msg, sign: RefAddr) {
         self.messages.push_back(SignedMessage::new(msg, sign))
     }

@@ -747,52 +747,56 @@ impl Children {
         }
     }
 
+    pub(crate) fn launch_child(&mut self) {
+        let name = self.name();
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
+
+        // TODO: clone or ref?
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        let state = ContextState::new().with_stats(self.resizer.stats());
+        let state = Arc::new(Mutex::new(Box::pin(state)));
+
+        let ctx = BastionContext::new(
+            id.clone(),
+            child_ref.clone(),
+            children,
+            supervisor,
+            state.clone(),
+        );
+        let exec = (self.init.0)(ctx);
+
+        let parent_id = self.bcast.id().clone();
+        let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_parent(env).ok();
+
+        self.bcast.register(&bcast);
+
+        debug!(
+            "Children({}): Initializing Child({}).",
+            self.id(),
+            bcast.id()
+        );
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
+        debug!("Children({}): Launching Child({}).", self.id(), child.id());
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.launched.insert(id, (sender, launched));
+    }
+
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
-
-        let name = self.name();
         for _ in 0..self.redundancy {
-            let parent = Parent::children(self.as_ref());
-            let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
-
-            // TODO: clone or ref?
-            let id = bcast.id().clone();
-            let sender = bcast.sender().clone();
-            let path = bcast.path().clone();
-            let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
-
-            let children = self.as_ref();
-            let supervisor = self.bcast.parent().clone().into_supervisor();
-
-            let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
-
-            let ctx = BastionContext::new(
-                id.clone(),
-                child_ref.clone(),
-                children,
-                supervisor,
-                state.clone(),
-            );
-            let exec = (self.init.0)(ctx);
-
-            let parent_id = self.bcast.id().clone();
-            let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
-            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-            self.bcast.send_parent(env).ok();
-
-            self.bcast.register(&bcast);
-
-            debug!(
-                "Children({}): Initializing Child({}).",
-                self.id(),
-                bcast.id()
-            );
-            let callbacks = self.callbacks.clone();
-            let child = Child::new(exec, callbacks, bcast, state, child_ref);
-            debug!("Children({}): Launching Child({}).", self.id(), child.id());
-            let id = child.id().clone();
-            let launched = child.launch();
-            self.launched.insert(id, (sender, launched));
+            self.launch_child();
         }
     }
 
