@@ -75,6 +75,12 @@ pub enum UpscaleStrategy {
 }
 
 impl Resizer {
+    /// Return the lower bound (the minimal amount of actors).
+    pub(crate) fn lower_bound(&self) -> u64 {
+        self.lower_bound
+    }
+
+    /// Overrides the lower bound,
     pub(crate) fn set_lower_bound(&mut self, lower_bound: u64) {
         self.lower_bound = lower_bound
     }
@@ -148,7 +154,7 @@ impl ActorGroupStats {
         0x00000000_FFFFFFFF
     }
 
-    /// Extract statistics from Arc<AtomicU64>
+    /// Extract statistics from Arc<AtomicU64>.
     pub(crate) fn load(storage: Arc<AtomicU64>) -> Self {
         let actors_count_mask = ActorGroupStats::actors_count_mask();
         let average_mailbox_size_mask = ActorGroupStats::average_mailbox_size_mask();
@@ -161,7 +167,7 @@ impl ActorGroupStats {
         }
     }
 
-    /// Write the changes in Arc<AtomicU64>
+    /// Write the changes in Arc<AtomicU64>.
     pub(crate) fn store(&self, storage: Arc<AtomicU64>) {
         let actors_count_mask = ActorGroupStats::actors_count_mask();
         let average_mailbox_size_mask = ActorGroupStats::average_mailbox_size_mask();

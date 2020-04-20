@@ -569,6 +569,9 @@ impl Children {
             id,
         );
         self.launched.remove_entry(id);
+
+        #[cfg(feature = "scaling")]
+        self.update_actors_count_stats();
     }
 
     async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
@@ -687,7 +690,7 @@ impl Children {
     }
 
     #[cfg(feature = "scaling")]
-    fn collect_preliminary_stats(&self) {
+    fn update_actors_count_stats(&self) {
         let mut stats = ActorGroupStats::load(self.resizer.stats());
         stats.update_actors_count(self.launched.len() as u32);
         stats.store(self.resizer.stats());
@@ -697,7 +700,7 @@ impl Children {
         debug!("Children({}): Launched.", self.id());
 
         #[cfg(feature = "scaling")]
-        self.collect_preliminary_stats();
+        self.update_actors_count_stats();
 
         loop {
             #[cfg(feature = "scaling")]
@@ -793,8 +796,23 @@ impl Children {
         self.launched.insert(id, (sender, launched));
     }
 
+    #[cfg(feature = "scaling")]
+    // Because developers have two ways to declare how many actors
+    // needed to start at the beginning, we need somehow to make
+    // sure the numbers are consistent.
+    // For this particular case, we're calling this method if someone
+    // declaring the group with the `Resizer::with_lower_bound()` call
+    // and skipping the `.with_redundancy` call.
+    pub(crate) fn update_redundancy(&mut self) {
+        self.redundancy = self.resizer.lower_bound() as usize;
+    }
+
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
+
+        #[cfg(feature = "scaling")]
+        self.update_redundancy();
+
         for _ in 0..self.redundancy {
             self.launch_child();
         }
