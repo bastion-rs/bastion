@@ -11,7 +11,7 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
-use crate::resizer::Resizer;
+use crate::resizer::{ActorGroupStats, Resizer};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
@@ -686,8 +686,18 @@ impl Children {
         Ok(())
     }
 
+    #[cfg(feature = "scaling")]
+    fn collect_preliminary_stats(&self) {
+        let mut stats = ActorGroupStats::load(self.resizer.stats());
+        stats.update_actors_count(self.launched.len() as u32);
+        stats.store(self.resizer.stats());
+    }
+
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
+
+        #[cfg(feature = "scaling")]
+        self.collect_preliminary_stats();
 
         loop {
             #[cfg(feature = "scaling")]
