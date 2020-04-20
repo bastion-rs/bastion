@@ -20,7 +20,7 @@ pub struct Resizer {
     // The minimal amount of actors that must be active.
     lower_bound: u64,
     // The maximal amount of actors acceptable for usage.
-    upper_bound: UpperBoundLimit,
+    upper_bound: UpperBound,
     // The usage strategy for scaling up actors in runtime.
     upscale_strategy: UpscaleStrategy,
     // Determines how much more actors needs to be created (in percentages
@@ -60,7 +60,7 @@ pub(crate) struct ActorGroupStats {
 #[derive(Debug)]
 /// An enumeration that describe acceptable upper boundaries
 /// for the spawned actors in runtime.
-pub enum UpperBoundLimit {
+pub enum UpperBound {
     /// Sets the limit for maximum available actors to use.   
     Limit(u64),
     /// No limits for spawning new actors.
@@ -92,7 +92,7 @@ impl Resizer {
     }
 
     /// Overrides the maximum amount of actors available to use.
-    pub fn with_upper_bound(mut self, upper_bound: UpperBoundLimit) -> Self {
+    pub fn with_upper_bound(mut self, upper_bound: UpperBound) -> Self {
         self.upper_bound = upper_bound;
         self
     }
@@ -136,7 +136,7 @@ impl Default for Resizer {
         Resizer {
             stats: Arc::new(AtomicU64::new(0)),
             lower_bound: 1,
-            upper_bound: UpperBoundLimit::Limit(10),
+            upper_bound: UpperBound::Limit(10),
             upscale_strategy: UpscaleStrategy::MailboxSizeThreshold(3),
             upscale_rate: 0.1,
             downscale_threshold: 0.3,
