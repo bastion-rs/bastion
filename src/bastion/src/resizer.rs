@@ -6,6 +6,10 @@
 //! * Strategy based on statistics given by spawned actors.
 //! * Auto-creation / deletion actors on demand.
 //!
+use crate::broadcast::Sender;
+use crate::context::BastionId;
+use fxhash::FxHashMap;
+use lightproc::recoverable_handle::RecoverableHandle;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -57,7 +61,7 @@ pub(crate) struct ActorGroupStats {
     average_mailbox_size: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// An enumeration that describe acceptable upper boundaries
 /// for the spawned actors in runtime.
 pub enum UpperBound {
@@ -67,22 +71,29 @@ pub enum UpperBound {
     Unlimited,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Determines the strategy for scaling up in runtime.
 pub enum UpscaleStrategy {
     /// Scaling up based on the size of the actor's mailbox.
     MailboxSizeThreshold(u32),
 }
 
-impl Resizer {
-    /// Return the lower bound (the minimal amount of actors).
-    pub(crate) fn lower_bound(&self) -> u64 {
-        self.lower_bound
-    }
+#[derive(Debug)]
+/// Determines what action needs to be applied by the caller
+/// after Resizer checks.
+pub(crate) enum ScalingRule {
+    /// Specifies how much more actors must be instantiated.
+    Upscale(u64),
+    /// Defines what actors must be stopped or removed.
+    Downscale(Vec<BastionId>),
+    /// Special result kind that defines that no needed to scale up/down.
+    DoNothing,
+}
 
-    /// Overrides the lower bound,
-    pub(crate) fn set_lower_bound(&mut self, lower_bound: u64) {
-        self.lower_bound = lower_bound
+impl Resizer {
+    /// Returns an atomic reference to data with actor statistics.
+    pub(crate) fn stats(&self) -> Arc<AtomicU64> {
+        self.stats.clone()
     }
 
     /// Overrides the minimal amount of actors available to use.
@@ -121,14 +132,24 @@ impl Resizer {
         self
     }
 
-    /// Returns an atomic reference to data with actor statistics.
-    pub(crate) fn stats(&self) -> Arc<AtomicU64> {
-        self.stats.clone()
-    }
-
     /// Applies checks and does scaling up/down depends on stats.
-    /// TODO: Measure the execution time?
-    pub(crate) async fn scale(&self) {}
+    pub(crate) async fn scale(
+        &self,
+        _actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    ) -> ScalingRule {
+        let stats = ActorGroupStats::load(self.stats.clone());
+
+        match self.upscale_strategy {
+            UpscaleStrategy::MailboxSizeThreshold(threshold) => {
+                if stats.average_mailbox_size > threshold {
+                    let count = stats.actors_count as f64 * self.downscale_threshold;
+                    return ScalingRule::Upscale(count.floor() as u64);
+                }
+            }
+        };
+
+        ScalingRule::DoNothing
+    }
 }
 
 impl Default for Resizer {

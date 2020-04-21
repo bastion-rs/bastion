@@ -11,7 +11,7 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
-use crate::resizer::{ActorGroupStats, Resizer};
+use crate::resizer::{ActorGroupStats, Resizer, ScalingRule};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
@@ -301,9 +301,6 @@ impl Children {
         } else {
             self.redundancy = redundancy;
         }
-
-        #[cfg(feature = "scaling")]
-        self.resizer.set_lower_bound(self.redundancy as u64);
 
         self
     }
@@ -696,6 +693,25 @@ impl Children {
         stats.store(self.resizer.stats());
     }
 
+    #[cfg(feature = "scaling")]
+    async fn autoresize_group(&mut self) {
+        match self.resizer.scale(&self.launched).await {
+            ScalingRule::Upscale(count) => {
+                for _ in 0..count {
+                    self.launch_child();
+                }
+            }
+            ScalingRule::Downscale(actors_to_shutdown) => {
+                for id in actors_to_shutdown {
+                    self.drop_child(&id);
+                }
+            }
+            ScalingRule::DoNothing => {}
+        }
+
+        self.update_actors_count_stats();
+    }
+
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
 
@@ -704,7 +720,7 @@ impl Children {
 
         loop {
             #[cfg(feature = "scaling")]
-            self.resizer.scale().await;
+            self.autoresize_group().await;
 
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
@@ -746,7 +762,7 @@ impl Children {
             }
 
             #[cfg(feature = "scaling")]
-            self.resizer.scale().await;
+            self.autoresize_group().await;
         }
     }
 
@@ -796,23 +812,8 @@ impl Children {
         self.launched.insert(id, (sender, launched));
     }
 
-    #[cfg(feature = "scaling")]
-    // Because developers have two ways to declare how many actors
-    // needed to start at the beginning, we need somehow to make
-    // sure the numbers are consistent.
-    // For this particular case, we're calling this method if someone
-    // declaring the group with the `Resizer::with_lower_bound()` call
-    // and skipping the `.with_redundancy` call.
-    pub(crate) fn update_redundancy(&mut self) {
-        self.redundancy = self.resizer.lower_bound() as usize;
-    }
-
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
-
-        #[cfg(feature = "scaling")]
-        self.update_redundancy();
-
         for _ in 0..self.redundancy {
             self.launch_child();
         }
