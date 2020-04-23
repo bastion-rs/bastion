@@ -64,7 +64,7 @@ fn auto_resize_group(children: Children) -> Children {
     children
         .with_redundancy(3)                                // Start with 3 actors
         .with_resizer(
-            Resizer::default()
+            OptimalSizeExploringResizer::default()
                 .with_lower_bound(0)                       // A minimal acceptable size of group
                 .with_upper_bound(UpperBound::Limit(10))   // Max 10 actors in runtime
                 .with_upscale_strategy(UpscaleStrategy::MailboxSizeThreshold(3)) // Scale up when a half of actors have more then 3 messages

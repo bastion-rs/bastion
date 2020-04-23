@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 /// Special struct for scaling up and down actor groups in runtime.
-pub struct Resizer {
+pub struct OptimalSizeExploringResizer {
     // Storage for actors statistics. The statistics struct is
     // represented as a sequence of bits stored in u64 value with
     // the big-endian endianness. Currently stores the amount of
@@ -90,7 +90,7 @@ pub(crate) enum ScalingRule {
     DoNothing,
 }
 
-impl Resizer {
+impl OptimalSizeExploringResizer {
     /// Returns an atomic reference to data with actor statistics.
     pub(crate) fn stats(&self) -> Arc<AtomicU64> {
         self.stats.clone()
@@ -152,9 +152,9 @@ impl Resizer {
     }
 }
 
-impl Default for Resizer {
+impl Default for OptimalSizeExploringResizer {
     fn default() -> Self {
-        Resizer {
+        OptimalSizeExploringResizer {
             stats: Arc::new(AtomicU64::new(0)),
             lower_bound: 1,
             upper_bound: UpperBound::Limit(10),
@@ -223,11 +223,11 @@ impl ActorGroupStats {
 
 #[cfg(test)]
 mod tests {
-    use crate::resizer::{ActorGroupStats, Resizer};
+    use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer};
 
     #[test]
     fn test_resizer_stores_empty_stats_by_default() {
-        let resizer = Resizer::default();
+        let resizer = OptimalSizeExploringResizer::default();
 
         let stats = ActorGroupStats::load(resizer.stats);
         assert_eq!(stats.actors_count, 0);
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_resizer_returns_refreshed_stats_after_actors_count_update() {
-        let resizer = Resizer::default();
+        let resizer = OptimalSizeExploringResizer::default();
         let atomic_stats = resizer.stats();
 
         let mut stats = ActorGroupStats::load(atomic_stats.clone());
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_resizer_returns_refreshed_stats_after_avg_mailbox_size_update() {
-        let resizer = Resizer::default();
+        let resizer = OptimalSizeExploringResizer::default();
         let atomic_stats = resizer.stats();
 
         let mut stats = ActorGroupStats::load(atomic_stats.clone());
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_resizer_returns_refreshed_stats_after_actor_count_and_avg_mailbox_size_update() {
-        let resizer = Resizer::default();
+        let resizer = OptimalSizeExploringResizer::default();
         let atomic_stats = resizer.stats();
 
         let mut stats = ActorGroupStats::load(atomic_stats.clone());

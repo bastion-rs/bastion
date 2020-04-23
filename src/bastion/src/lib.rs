@@ -103,7 +103,7 @@ pub mod prelude {
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
     #[cfg(feature = "scaling")]
-    pub use crate::resizer::{Resizer, UpperBound, UpscaleStrategy};
+    pub use crate::resizer::{OptimalSizeExploringResizer, UpperBound, UpscaleStrategy};
     pub use crate::supervisor::{
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,

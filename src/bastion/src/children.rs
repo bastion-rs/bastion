@@ -11,7 +11,7 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
-use crate::resizer::{ActorGroupStats, Resizer, ScalingRule};
+use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
@@ -95,7 +95,7 @@ pub struct Children {
     name: Option<String>,
     #[cfg(feature = "scaling")]
     // Resizer for dynamic actor group scaling up/down.
-    resizer: Box<Resizer>,
+    resizer: Box<OptimalSizeExploringResizer>,
 }
 
 impl Children {
@@ -108,10 +108,9 @@ impl Children {
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
-        #[cfg(feature = "scaling")]
-        let resizer = Box::new(Resizer::default());
         let name = None;
-        let resizer = Resizer::default();
+        #[cfg(feature = "scaling")]
+        let resizer = Box::new(OptimalSizeExploringResizer::default());
 
         Children {
             bcast,
@@ -358,9 +357,9 @@ impl Children {
     /// Bastion::children(|children| {
     ///     children
     ///         .with_resizer(
-    ///             Resizer::default()
+    ///             OptimalSizeExploringResizer::default()
     ///                 .with_lower_bound(10)
-    ///                 .with_upper_bound(UpperBoundLimit::Limit(100))
+    ///                 .with_upper_bound(UpperBound::Limit(100))
     ///         )
     /// }).expect("Couldn't create the children group.");
     ///     #
@@ -370,7 +369,7 @@ impl Children {
     /// # }
     /// ```
     /// [`Resizer`]: ../resizer/struct.Resizer.html
-    pub fn with_resizer(mut self, resizer: Resizer) -> Self {
+    pub fn with_resizer(mut self, resizer: OptimalSizeExploringResizer) -> Self {
         self.resizer = Box::new(resizer);
         self
     }
