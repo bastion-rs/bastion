@@ -121,38 +121,40 @@ fn response_group(children: Children) -> Children {
             // The single difference is only the name for Dispatcher for our actor's group.
             Dispatcher::with_type(DispatcherType::Named("Response".to_string())),
         )
-        .with_exec(move |ctx: BastionContext| async move {
-            println!("[Response] Worker started!");
+        .with_exec(move |ctx: BastionContext| {
+            async move {
+                println!("[Response] Worker started!");
 
-            let mut received_messages = 0;
-            let expected_messages = 3;
-            let mut counter: HashMap<&str, u32> = HashMap::new();
+                let mut received_messages = 0;
+                let expected_messages = 3;
+                let mut counter: HashMap<&str, u32> = HashMap::new();
 
-            while received_messages != expected_messages {
-                msg! { ctx.recv().await?,
-                    // We received the message from other actor wrapped in Arc<T>
-                    // Let's unwrap it and do regular matching.
-                    raw_message: Arc<SignedMessage> => {
-                        let message = Arc::try_unwrap(raw_message).unwrap();
-                        msg! { message,
-                            ref data: HashMap<&str, u32> => {
-                                println!("[Response] Worker received `{:?}`", data);
+                while received_messages != expected_messages {
+                    msg! { ctx.recv().await?,
+                        // We received the message from other actor wrapped in Arc<T>
+                        // Let's unwrap it and do regular matching.
+                        raw_message: Arc<SignedMessage> => {
+                            let message = Arc::try_unwrap(raw_message).unwrap();
+                            msg! { message,
+                                ref data: HashMap<&str, u32> => {
+                                    println!("[Response] Worker received `{:?}`", data);
 
-                                for (key, value) in data.iter() {
-                                    let current_value = counter.entry(key).or_insert(0);
-                                    *current_value+= value;
-                                }
+                                    for (key, value) in data.iter() {
+                                        let current_value = counter.entry(key).or_insert(0);
+                                        *current_value+= value;
+                                    }
 
-                                received_messages += 1;
-                            };
-                            _: _ => ();
-                        }
-                    };
-                    _: _ => ();
+                                    received_messages += 1;
+                                };
+                                _: _ => ();
+                            }
+                        };
+                        _: _ => ();
+                    }
                 }
-            }
 
-            println!("[Response] Aggregated data: `{:?}`", counter);
-            Ok(())
+                println!("[Response] Aggregated data: `{:?}`", counter);
+                Ok(())
+            }
         })
 }
