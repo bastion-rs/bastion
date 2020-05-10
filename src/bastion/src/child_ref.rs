@@ -16,12 +16,23 @@ use std::sync::Arc;
 pub struct ChildRef {
     id: BastionId,
     sender: Sender,
+    name: String,
     path: Arc<BastionPath>,
 }
 
 impl ChildRef {
-    pub(crate) fn new(id: BastionId, sender: Sender, path: Arc<BastionPath>) -> ChildRef {
-        ChildRef { id, sender, path }
+    pub(crate) fn new(
+        id: BastionId,
+        sender: Sender,
+        name: String,
+        path: Arc<BastionPath>,
+    ) -> ChildRef {
+        ChildRef {
+            id,
+            sender,
+            name,
+            path,
+        }
     }
 
     /// Returns the identifier of the children group element this
@@ -283,6 +294,11 @@ impl ChildRef {
     /// Returns the [`BastionPath`] of the child
     pub fn path(&self) -> &Arc<BastionPath> {
         &self.path
+    }
+
+    /// Return the [`name`] of the child
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 

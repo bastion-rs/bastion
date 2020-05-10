@@ -164,7 +164,7 @@ pub fn stats() -> &'static Stats {
 #[inline]
 pub fn core_retrieval() -> &'static usize {
     lazy_static! {
-        static ref CORE_COUNT: usize = { placement::get_core_ids().unwrap().len() };
+        static ref CORE_COUNT: usize = placement::get_core_ids().unwrap().len();
     }
 
     &*CORE_COUNT

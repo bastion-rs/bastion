@@ -89,6 +89,8 @@ pub struct Children {
     started: bool,
     // List of dispatchers attached to each actor in the group.
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
+    // The name of children
+    name: Option<String>,
 }
 
 impl Children {
@@ -101,6 +103,7 @@ impl Children {
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
+        let name = None;
 
         Children {
             bcast,
@@ -111,6 +114,7 @@ impl Children {
             pre_start_msgs,
             started,
             dispatchers,
+            name,
         }
     }
 
@@ -156,6 +160,14 @@ impl Children {
         &self.callbacks
     }
 
+    pub(crate) fn name(&self) -> String {
+        if let Some(name) = &self.name {
+            name.clone()
+        } else {
+            "__Anonymous__".into()
+        }
+    }
+
     pub(crate) fn as_ref(&self) -> ChildrenRef {
         trace!(
             "Children({}): Creating new ChildrenRef({}).",
@@ -171,7 +183,7 @@ impl Children {
         for (id, (sender, _)) in &self.launched {
             trace!("Children({}): Creating new ChildRef({}).", self.id(), id);
             // TODO: clone or ref?
-            let child = ChildRef::new(id.clone(), sender.clone(), path.clone());
+            let child = ChildRef::new(id.clone(), sender.clone(), self.name(), path.clone());
             children.push(child);
         }
 
@@ -182,6 +194,12 @@ impl Children {
             .collect();
 
         ChildrenRef::new(id, sender, path, children, dispatchers)
+    }
+
+    /// Sets the name of this children group.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
     }
 
     /// Sets the closure taking a [`BastionContext`] and returning a
@@ -237,7 +255,7 @@ impl Children {
         self
     }
 
-    /// Sets the number of number of elements this children group will
+    /// Sets the number of elements this children group will
     /// contain. Each element will call the closure passed in
     /// [`with_exec`] and run the returned future until it stops,
     /// panics or another element in the group stops or panics.
@@ -456,7 +474,7 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), self.name(), path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
@@ -670,6 +688,8 @@ impl Children {
 
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
+
+        let name = self.name();
         for _ in 0..self.redundancy {
             let parent = Parent::children(self.as_ref());
             let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
@@ -678,7 +698,7 @@ impl Children {
             let id = bcast.id().clone();
             let sender = bcast.sender().clone();
             let path = bcast.path().clone();
-            let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+            let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
 
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
