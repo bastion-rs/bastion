@@ -47,9 +47,8 @@ fn response_supervisor(supervisor: Supervisor) -> Supervisor {
 }
 
 fn input_group(children: Children) -> Children {
-    children
-        .with_redundancy(1)
-        .with_exec(move |ctx: BastionContext| async move {
+    children.with_name("input").with_redundancy(1).with_exec(
+        move |ctx: BastionContext| async move {
             println!("[Input] Worker started!");
 
             let data = vec!["A B C", "A C C", "B C C"];
@@ -61,11 +60,13 @@ fn input_group(children: Children) -> Children {
             }
 
             Ok(())
-        })
+        },
+    )
 }
 
 fn process_group(children: Children) -> Children {
     children
+        .with_name("process")
         .with_redundancy(3)
         .with_dispatcher(
             // Declare a dispatcher to use. All instantiated actors will be registered in
@@ -94,7 +95,7 @@ fn process_group(children: Children) -> Children {
                                 *value += 1;
                             }
 
-                            println!("[Processing] Worker #{:?} processed data. Result: `{:?}`", ctx.current().id(), counter);
+                            println!("[Processing] Worker {} #{:?} processed data. Result: `{:?}`", ctx.current().name(), ctx.current().id(), counter);
 
                             // Push hashmap with data to the next actor group
                             let group_name = "Response".to_string();
@@ -113,6 +114,7 @@ fn process_group(children: Children) -> Children {
 
 fn response_group(children: Children) -> Children {
     children
+        .with_name("response")
         .with_redundancy(1)
         .with_dispatcher(
             // We will re-use the dispatcher to make the example easier to understand
@@ -137,7 +139,7 @@ fn response_group(children: Children) -> Children {
                             let message = Arc::try_unwrap(raw_message).unwrap();
                             msg! { message,
                                 ref data: HashMap<&str, u32> => {
-                                    println!("[Response] Worker received `{:?}`", data);
+                                    println!("[Response] Worker {} received `{:?}`", ctx.current().name(), data);
 
                                     for (key, value) in data.iter() {
                                         let current_value = counter.entry(key).or_insert(0);

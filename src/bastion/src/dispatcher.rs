@@ -443,7 +443,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         assert_eq!(instance.actors.contains_key(&child_ref), false);
 
@@ -457,7 +458,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         instance.register(&child_ref, "my::test::module".to_string());
         assert_eq!(instance.actors.contains_key(&child_ref), true);
@@ -473,7 +475,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         instance.notify(&child_ref, NotificationType::Register);
         let handler_was_called = handler.was_called();
@@ -540,7 +543,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
@@ -561,7 +565,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
@@ -583,7 +588,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let handler = Box::new(CustomHandler::new(false));
@@ -607,7 +613,8 @@ mod tests {
         let bastion_id = BastionId::new();
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        let child_ref = ChildRef::new(bastion_id, sender, path);
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
         let dispatcher_type = DispatcherType::Named("test".to_string());
         let handler = Box::new(CustomHandler::new(false));
