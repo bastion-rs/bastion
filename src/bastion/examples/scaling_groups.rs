@@ -45,12 +45,12 @@ fn input_group(children: Children) -> Children {
             let group_name = "Processing".to_string();
             let target = BroadcastTarget::Group(group_name);
 
-            while messages_sent != 25 {
+            while messages_sent != 10000 {
                 // Emulate the workload. The number means how
                 // long it must wait before processing.
                 for value in INPUT.iter() {
                     ctx.broadcast_message(target.clone(), value);
-                    Delay::new(Duration::from_millis(500)).await;
+                    Delay::new(Duration::from_millis(500 * value)).await;
                 }
 
                 messages_sent += INPUT.len();
@@ -78,7 +78,7 @@ fn auto_resize_group(children: Children) -> Children {
             println!("[Processing] Worker started!");
 
             let mut messages_received = 0;
-            let messages_limit = 10;
+            let messages_limit = 25;
 
             while messages_received != messages_limit {
                 msg! { ctx.recv().await?,
@@ -100,6 +100,11 @@ fn auto_resize_group(children: Children) -> Children {
                 }
 
                 messages_received += 1;
+                println!(
+                    "[Processing] Worker #{:?} processed {} message(s)",
+                    ctx.current().id(),
+                    messages_received
+                );
             }
 
             Ok(())
