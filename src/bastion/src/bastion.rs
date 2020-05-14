@@ -10,6 +10,7 @@ use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
 
 use core::future::Future;
+use tracing::{debug, trace};
 
 use std::fmt::{self, Debug, Formatter};
 

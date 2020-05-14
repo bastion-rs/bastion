@@ -11,6 +11,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
+use tracing::{trace, warn};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.

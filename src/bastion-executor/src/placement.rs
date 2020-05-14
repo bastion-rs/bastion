@@ -185,7 +185,7 @@ mod windows {
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
-    use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
+    use winapi::shared::basetsd::{DWORD64, PDWORD64};
 
     use super::CoreId;
 

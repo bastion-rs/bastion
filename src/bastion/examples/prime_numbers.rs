@@ -1,7 +1,6 @@
 use bastion::prelude::*;
 
-#[macro_use]
-extern crate log;
+use tracing::error;
 
 // prime_number contains all the required functions
 // and structures to generate a prime number and return it.
@@ -158,6 +157,7 @@ mod client {
     use bastion::prelude::*;
     use lightproc::prelude::*;
     use rayon::prelude::*;
+    use tracing::{error, info};
 
     pub struct Result {
         pub child_id: usize,

@@ -48,11 +48,15 @@ futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0.0"
 fxhash = "0.2"
 lazy_static = "1.4"
-log = "0.4"
+
 # TODO: https://github.com/cogciprocate/qutex/pull/5
 # TODO: https://github.com/cogciprocate/qutex/pull/6
 bastion-qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
+
+# Log crates
+tracing-subscriber = "0.2.5"
+tracing = "0.1.13"
 
 [dev-dependencies]
 env_logger = "0.7"

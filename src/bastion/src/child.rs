@@ -18,6 +18,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use tracing::{debug, trace, warn};
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
 pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);

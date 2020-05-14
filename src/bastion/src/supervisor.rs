@@ -16,7 +16,6 @@ use futures::{pending, poll};
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use log::Level;
 use qutex::Qutex;
 use std::cmp::{Eq, PartialEq};
 use std::ops::Range;
@@ -24,6 +23,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
+use tracing::{debug, trace, warn};
 
 #[derive(Debug)]
 /// A supervisor that can supervise both [`Children`] and other
@@ -276,20 +276,18 @@ impl Supervisor {
     }
 
     pub(crate) async fn reset(&mut self, bcast: Option<Broadcast>) {
-        if log_enabled!(Level::Debug) {
-            if let Some(bcast) = &bcast {
-                debug!(
-                    "Supervisor({}): Resetting to Supervisor({}).",
-                    self.id(),
-                    bcast.id()
-                );
-            } else {
-                debug!(
-                    "Supervisor({}): Resetting to Supervisor({}).",
-                    self.id(),
-                    self.id()
-                );
-            }
+        if let Some(bcast) = &bcast {
+            debug!(
+                "Supervisor({}): Resetting to Supervisor({}).",
+                self.id(),
+                bcast.id()
+            );
+        } else {
+            debug!(
+                "Supervisor({}): Resetting to Supervisor({}).",
+                self.id(),
+                self.id()
+            );
         }
 
         // TODO: stop or kill?

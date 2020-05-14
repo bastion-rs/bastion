@@ -15,6 +15,7 @@ use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
+use tracing::{debug, trace};
 use uuid::Uuid;
 
 /// Identifier for a root supervisor and dead-letters children.

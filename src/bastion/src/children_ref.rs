@@ -10,6 +10,7 @@ use crate::path::BastionPath;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::sync::Arc;
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone)]
 /// A "reference" to a children group, allowing to communicate
