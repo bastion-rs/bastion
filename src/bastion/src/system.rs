@@ -377,6 +377,10 @@ impl System {
                 msg: BastionMessage::Faulted { id, .. },
                 ..
             } => self.restart_supervised_object(id),
+            Envelope {
+                msg: BastionMessage::Heartbeat,
+                ..
+            } => unreachable!(),
         }
 
         Ok(())

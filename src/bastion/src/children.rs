@@ -20,6 +20,7 @@ use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
+use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use std::fmt::Debug;
@@ -27,6 +28,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use std::time::Duration;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug)]
@@ -96,6 +98,13 @@ pub struct Children {
     #[cfg(feature = "scaling")]
     // Resizer for dynamic actor group scaling up/down.
     resizer: Box<OptimalSizeExploringResizer>,
+    // Defines how ofter do heartbeat checks.
+    hearbeat_tick: Duration,
+    // Special kind for actors that not going to be visible for others
+    // parts of the cluster, but required for extra behaviour for the
+    // Children instance. For example for heartsbeat checks, collecting
+    // stats, etc.
+    helper_actors: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
 }
 
 impl Children {
@@ -111,6 +120,8 @@ impl Children {
         let name = None;
         #[cfg(feature = "scaling")]
         let resizer = Box::new(OptimalSizeExploringResizer::default());
+        let hearbeat_tick = Duration::from_secs(10);
+        let helper_actors = FxHashMap::default();
 
         Children {
             bcast,
@@ -124,6 +135,8 @@ impl Children {
             name,
             #[cfg(feature = "scaling")]
             resizer,
+            hearbeat_tick,
+            helper_actors,
         }
     }
 
@@ -425,6 +438,87 @@ impl Children {
         self
     }
 
+    /// Overrides the default time interval for heartbeat onto
+    /// the user defined.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - The value of the [`std::time::Duration`] type
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// # use std::time::Duration;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_heartbeat_tick(Duration::from_secs(5))
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///                 # Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
+    pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {
+        trace!(
+            "Children({}): Set heartbeat tick to {:?}",
+            self.id(),
+            interval
+        );
+        self.hearbeat_tick = interval;
+        self
+    }
+
+    // Returns executable code for the actor that will trigger heartbeat
+    fn get_heartbeat_fut(&self) -> Init {
+        let interval = self.hearbeat_tick.clone();
+
+        let exec_fut = move |ctx: BastionContext| async move {
+            let self_path = ctx.current().path();
+            let self_sender = ctx.current().sender();
+
+            loop {
+                Delay::new(interval).await;
+
+                let msg = BastionMessage::heartbeat();
+                let env = Envelope::new(msg, self_path.clone(), self_sender.clone());
+                ctx.parent().send(env).ok();
+            }
+        };
+
+        Init::new(exec_fut)
+    }
+
+    async fn disable_helper_actors(&mut self) {
+        let mut children = FuturesOrdered::new();
+        for (_, (_, launched)) in self.helper_actors.drain() {
+            launched.cancel();
+
+            children.push(launched);
+        }
+
+        children
+            .for_each_concurrent(None, |_| async {
+                trace!("Children({}): Helper child has been disabled.", self.id());
+            })
+            .await;
+    }
+
     async fn kill(&mut self) {
         debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
@@ -461,12 +555,14 @@ impl Children {
     }
 
     async fn kill_children(&mut self) -> Result<(), ()> {
+        self.disable_helper_actors().await;
         self.kill().await;
         self.stopped();
         Err(())
     }
 
     async fn stop_children(&mut self) -> Result<(), ()> {
+        self.disable_helper_actors().await;
         self.kill().await;
         self.stopped();
         Err(())
@@ -650,6 +746,10 @@ impl Children {
                 msg: BastionMessage::Faulted { id },
                 ..
             } => self.handle_faulted_child(&id).await?,
+            Envelope {
+                msg: BastionMessage::Heartbeat,
+                ..
+            } => {}
         }
 
         Ok(())
@@ -811,11 +911,57 @@ impl Children {
         self.launched.insert(id, (sender, launched));
     }
 
+    pub(crate) fn launch_heartbeat(&mut self) {
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
+
+        // TODO: clone or ref?
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        let state = ContextState::new().with_stats(self.resizer.stats());
+        let state = Qutex::new(Box::pin(state));
+
+        let ctx = BastionContext::new(
+            id.clone(),
+            child_ref.clone(),
+            children,
+            supervisor,
+            state.clone(),
+        );
+        let init = self.get_heartbeat_fut();
+        let exec = (init.0)(ctx);
+        self.bcast.register(&bcast);
+
+        debug!(
+            "Children({}): Initializing HeartbeatChild({}).",
+            self.id(),
+            bcast.id()
+        );
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
+        debug!(
+            "Children({}): Launching HeartbeatChild({}).",
+            self.id(),
+            child.id()
+        );
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.helper_actors.insert(id, (sender, launched));
+    }
+
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
         for _ in 0..self.redundancy {
             self.launch_child();
         }
+
+        self.launch_heartbeat();
     }
 
     pub(crate) fn launch(self) -> RecoverableHandle<Self> {

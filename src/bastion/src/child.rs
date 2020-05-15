@@ -18,7 +18,6 @@ use futures::prelude::*;
 use lightproc::prelude::*;
 use lightproc::proc_state::EmptyProcState;
 use std::fmt::{self, Debug, Formatter};
-use std::fs::read_to_string;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -234,6 +233,10 @@ impl Child {
                 msg: BastionMessage::Faulted { .. },
                 ..
             } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Heartbeat,
+                ..
+            } => unreachable!(),
         }
 
         Ok(())

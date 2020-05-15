@@ -143,7 +143,7 @@ impl OptimalSizeExploringResizer {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
                     let count = stats.actors_count as f64 * self.downscale_threshold;
-                    return ScalingRule::Upscale(count.floor() as u64);
+                    return ScalingRule::Upscale(count.round() as u64);
                 }
             }
         };
@@ -217,7 +217,8 @@ impl ActorGroupStats {
 
     /// Updates the average mailbox size in the structure.
     pub(crate) fn update_average_mailbox_size(&mut self, value: u32) {
-        self.average_mailbox_size = (self.average_mailbox_size + value) / 2
+        let avg = (self.average_mailbox_size + value) as f32 / 2.0;
+        self.average_mailbox_size = avg.floor() as u32;
     }
 }
 

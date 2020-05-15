@@ -45,12 +45,12 @@ fn input_group(children: Children) -> Children {
             let group_name = "Processing".to_string();
             let target = BroadcastTarget::Group(group_name);
 
-            while messages_sent != 10000 {
+            while messages_sent != 100 {
                 // Emulate the workload. The number means how
                 // long it must wait before processing.
                 for value in INPUT.iter() {
                     ctx.broadcast_message(target.clone(), value);
-                    Delay::new(Duration::from_millis(500 * value)).await;
+                    Delay::new(Duration::from_millis(450 * value)).await;
                 }
 
                 messages_sent += INPUT.len();
@@ -63,6 +63,7 @@ fn input_group(children: Children) -> Children {
 fn auto_resize_group(children: Children) -> Children {
     children
         .with_redundancy(3)                                // Start with 3 actors
+        .with_heartbeat_tick(Duration::from_secs(5))       // Do heartbeat each 5 seconds
         .with_resizer(
             OptimalSizeExploringResizer::default()
                 .with_lower_bound(0)                       // A minimal acceptable size of group
@@ -91,7 +92,7 @@ fn auto_resize_group(children: Children) -> Children {
                             ref number: &'static u64 => {
                                 // Emulate some processing. The received number is a delay.
                                 println!("[Processing] Worker #{:?} received `{}`", ctx.current().id(), number);
-                                Delay::new(Duration::from_secs(**number)).await;
+                                Delay::new(Duration::from_millis(**number * 500)).await;
                             };
                             _: _ => ();
                         }
