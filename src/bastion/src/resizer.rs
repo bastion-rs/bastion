@@ -180,7 +180,7 @@ impl ActorGroupStats {
         let actors_count_mask = ActorGroupStats::actors_count_mask();
         let average_mailbox_size_mask = ActorGroupStats::average_mailbox_size_mask();
 
-        let value = storage.load(Ordering::Relaxed);
+        let value = storage.load(Ordering::SeqCst);
 
         ActorGroupStats {
             actors_count: ((value & actors_count_mask) >> 32) as u32,
@@ -197,7 +197,7 @@ impl ActorGroupStats {
         value |= (self.average_mailbox_size() as u64) & average_mailbox_size_mask;
         value |= ((self.actors_count() as u64) << 32) & actors_count_mask;
 
-        storage.store(value, Ordering::Relaxed);
+        storage.store(value, Ordering::SeqCst);
     }
 
     /// Returns an amount of active actors in the current group.
