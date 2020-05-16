@@ -137,12 +137,14 @@ impl OptimalSizeExploringResizer {
         &self,
         _actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     ) -> ScalingRule {
-        let stats = ActorGroupStats::load(self.stats.clone());
+        let mut stats = ActorGroupStats::load(self.stats.clone());
 
         match self.upscale_strategy {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
                     let count = stats.actors_count as f64 * self.downscale_threshold;
+                    stats.average_mailbox_size = 0;
+                    stats.store(self.stats.clone());
                     return ScalingRule::Upscale(count.round() as u64);
                 }
             }

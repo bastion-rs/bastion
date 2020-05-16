@@ -898,6 +898,10 @@ impl Children {
 
         self.bcast.register(&bcast);
 
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
         debug!(
             "Children({}): Initializing Child({}).",
             self.id(),
