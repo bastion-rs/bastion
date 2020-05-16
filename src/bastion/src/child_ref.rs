@@ -9,6 +9,7 @@ use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone)]
 /// A "reference" to an element of a children group, allowing to

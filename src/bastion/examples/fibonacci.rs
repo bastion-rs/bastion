@@ -1,7 +1,6 @@
 use bastion::prelude::*;
 
-#[macro_use]
-extern crate log;
+use tracing::{error, info};
 
 // This terribly slow implementation
 // will allow us to be rough on the cpu

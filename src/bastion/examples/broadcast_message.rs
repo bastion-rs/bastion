@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use bastion::prelude::*;
 
+use tracing::Level;
+
 ///
 /// An example with the usage of the broadcasting messages feature.
 ///
@@ -20,6 +22,14 @@ use bastion::prelude::*;
 ///    Reduce group, combines the results and prints its when everything is done.
 ///
 fn main() {
+    let subscriber = tracing_subscriber::fmt()
+        // all spans/events with a level higher than INFO
+        // will be written to stdout.
+        .with_max_level(Level::INFO)
+        // completes the builder and sets the constructed `Subscriber` as the default.
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     Bastion::init();
 
     Bastion::supervisor(input_supervisor)
