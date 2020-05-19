@@ -4,7 +4,7 @@
 //! actors grouped together.
 use crate::child_ref::ChildRef;
 use crate::envelope::SignedMessage;
-use dashmap::DashMap;
+use lever::prelude::*;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::{
@@ -15,7 +15,7 @@ use tracing::{trace, warn};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
-pub type DispatcherMap = DashMap<ChildRef, String>;
+pub type DispatcherMap = LOTable<ChildRef, String>;
 
 #[derive(Debug, Clone)]
 /// Defines types of the notifications handled by the dispatcher
@@ -88,7 +88,7 @@ impl DispatcherHandler for RoundRobinHandler {
                 continue;
             }
 
-            let entry = pair.key();
+            let entry = pair.0;
             entry.tell_anonymously(message.clone()).unwrap();
             break;
         }
@@ -181,7 +181,7 @@ impl Dispatcher {
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
     pub(crate) fn remove(&self, key: &ChildRef) {
-        if let Some(_) = self.actors.remove(key) {
+        if let Ok(_) = self.actors.remove(key) {
             self.handler
                 .notify(key, &self.actors, NotificationType::Remove);
         }
@@ -226,7 +226,7 @@ impl Default for Dispatcher {
         Dispatcher {
             dispatcher_type: DispatcherType::default(),
             handler: Box::new(DefaultDispatcherHandler::default()),
-            actors: DashMap::new(),
+            actors: LOTable::new(),
         }
     }
 }
@@ -260,14 +260,14 @@ impl Into<DispatcherType> for String {
 /// developers can communicate with actors through group names.
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
-    pub dispatchers: DashMap<DispatcherType, Arc<Box<Dispatcher>>>,
+    pub dispatchers: LOTable<DispatcherType, Arc<Box<Dispatcher>>>,
 }
 
 impl GlobalDispatcher {
     /// Creates a new instance of the global registry.
     pub(crate) fn new() -> Self {
         GlobalDispatcher {
-            dispatchers: DashMap::new(),
+            dispatchers: LOTable::new(),
         }
     }
 
@@ -311,9 +311,9 @@ impl GlobalDispatcher {
     ) {
         self.dispatchers
             .iter()
-            .filter(|pair| dispatchers.contains(&pair.key()))
+            .filter(|pair| dispatchers.contains(&pair.0))
             .for_each(|pair| {
-                let dispatcher = pair.value();
+                let dispatcher = pair.1;
                 dispatcher.notify(from_actor, notification_type.clone())
             })
     }
@@ -326,7 +326,7 @@ impl GlobalDispatcher {
             BroadcastTarget::All => self
                 .dispatchers
                 .iter()
-                .map(|pair| pair.key().name().into())
+                .map(|pair| pair.0.name().into())
                 .for_each(|group_name| acked_dispatchers.push(group_name)),
             BroadcastTarget::Group(name) => {
                 let target_dispatcher = name.into();
@@ -336,8 +336,7 @@ impl GlobalDispatcher {
 
         for dispatcher_type in acked_dispatchers {
             match self.dispatchers.get(&dispatcher_type) {
-                Some(pair) => {
-                    let dispatcher = pair.value();
+                Some(dispatcher) => {
                     dispatcher.broadcast_message(&message.clone());
                 }
                 // TODO: Put the message into the dead queue
