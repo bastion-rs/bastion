@@ -60,7 +60,7 @@ tracing = "0.1.13"
 
 [dev-dependencies]
 env_logger = "0.7"
-proptest = "0.9"
+proptest = "0.10"
 snap = "1.0"
 # prime_numbers example
 bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
