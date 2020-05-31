@@ -25,7 +25,7 @@ travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [features]
-unstable = ["numanji", "allocator-suite", "jemallocator"]
+unstable = ["numanji", "jemallocator"]
 
 [dependencies]
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }

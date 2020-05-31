@@ -5,7 +5,7 @@ use crate::child_ref::ChildRef;
 use crate::context::BastionId;
 use crate::dispatcher::DispatcherType;
 use crate::envelope::Envelope;
-use crate::message::{BastionMessage, Message};
+use crate::message::{Answer, BastionMessage, Message};
 use crate::path::BastionPath;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
@@ -182,6 +182,24 @@ impl ChildrenRef {
         let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
         self.send(env).map_err(|err| err.into_msg().unwrap())
+    }
+
+    pub fn tell<M: Message>(&self, msg: M) -> Result<(), M> {
+        debug!("ChildrenRef({}): Telling message: {:?}", self.id(), msg);
+        let msg = BastionMessage::tell(msg);
+        let env = Envelope::from_dead_letters(msg);
+        // FIXME: panics?
+        self.send(env).map_err(|err| err.into_msg().unwrap())
+    }
+
+    pub fn ask<M: Message>(&self, msg: M) -> Result<Answer, M> {
+        debug!("ChildrenRef({}): Asking message: {:?}", self.id(), msg);
+        let (msg, answer) = BastionMessage::ask(msg);
+        let env = Envelope::from_dead_letters(msg);
+        // FIXME: panics?
+        self.send(env)
+            .and_then(|_| Ok(answer))
+            .map_err(|err| err.into_msg().unwrap())
     }
 
     /// Sends a message to the children group this `ChildrenRef`

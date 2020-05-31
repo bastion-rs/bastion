@@ -77,8 +77,10 @@ impl DispatcherHandler for RoundRobinHandler {
         _notification_type: NotificationType,
     ) {
     }
-    // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
+        self.dispatch_message(entries, message)
+    }
+    fn dispatch_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
         let current_index = self.index.load(Ordering::SeqCst) % entries.len() as u64;
 
         let mut skipped = 0;
@@ -106,8 +108,10 @@ pub trait DispatcherHandler {
         entries: &DispatcherMap,
         notification_type: NotificationType,
     );
-    /// Broadcasts the message to actors in according to the implemented behaviour.
+    #[deprecated(since = "0.3.5", note = "please use dispatch_message instead.")]
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>);
+    /// Dispatch the message to actors in according to the implemented behaviour
+    fn dispatch_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>);
 }
 
 /// A generic implementation of the Bastion dispatcher
@@ -196,8 +200,8 @@ impl Dispatcher {
     /// Sends the message to the group of actors.
     /// The logic of who and how should receive the message relies onto
     /// the handler implementation.
-    pub fn broadcast_message(&self, message: &Arc<SignedMessage>) {
-        self.handler.broadcast_message(&self.actors, &message);
+    pub fn dispatch_message(&self, message: &Arc<SignedMessage>) {
+        self.handler.dispatch_message(&self.actors, &message);
     }
 }
 
@@ -320,6 +324,10 @@ impl GlobalDispatcher {
 
     /// Broadcasts the given message in according with the specified target.
     pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
+        self.dispatch_message(target, message)
+    }
+
+    pub(crate) fn dispatch_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
         let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
 
         match target {
@@ -337,7 +345,7 @@ impl GlobalDispatcher {
         for dispatcher_type in acked_dispatchers {
             match self.dispatchers.get(&dispatcher_type) {
                 Some(dispatcher) => {
-                    dispatcher.broadcast_message(&message.clone());
+                    dispatcher.dispatch_message(&message.clone());
                 }
                 // TODO: Put the message into the dead queue
                 None => {
