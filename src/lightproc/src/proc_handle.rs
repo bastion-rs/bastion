@@ -94,6 +94,14 @@ impl<R> ProcHandle<R> {
             &*raw
         }
     }
+
+    /// Returns current state of the handle.
+    pub fn state(&self) -> State {
+        let ptr = self.raw_proc.as_ptr();
+        let pdata = ptr as *const ProcData;
+        let raw_state = unsafe { (*pdata).state.load(Ordering::SeqCst) };
+        State::new(raw_state)
+    }
 }
 
 impl<R> Future for ProcHandle<R> {

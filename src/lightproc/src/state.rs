@@ -63,3 +63,137 @@ pub(crate) const LOCKED: usize = 1 << 6;
 /// Note that the reference counter only tracks the `LightProc` and `Waker`s. The `ProcHandle` is
 /// tracked separately by the `HANDLE` flag.
 pub(crate) const REFERENCE: usize = 1 << 7;
+
+/// Human-readable representation of the ProcHandle state;
+#[derive(Debug)]
+pub struct State(usize);
+
+impl State {
+    pub fn new(value: usize) -> Self {
+        State(value)
+    }
+
+    /// Returns `true` if the proc is scheduled for running.
+    pub fn is_scheduled(&self) -> bool {
+        self.0 & SCHEDULED != 0
+    }
+
+    /// Returns `true` if a proc is running state while its future is being polled.
+    pub fn is_running(&self) -> bool {
+        self.0 & RUNNING != 0
+    }
+
+    /// Returns `true` if the proc has been completed.
+    pub fn is_completed(&self) -> bool {
+        self.0 & COMPLETED != 0
+    }
+
+    /// Returns `true` if the proc is closed or has panicked.
+    pub fn is_closed(&self) -> bool {
+        self.0 & CLOSED != 0
+    }
+
+    /// Returns `true` if the `ProcHandle` still exists.
+    pub fn is_handle(&self) -> bool {
+        self.0 & HANDLE != 0
+    }
+
+    /// Returns `true` if the awaiter is locked.
+    pub fn is_awaiter(&self) -> bool {
+        self.0 & AWAITER != 0
+    }
+
+    /// Returns `true` if the awaiter is locked.
+    pub fn is_locked(&self) -> bool {
+        self.0 & LOCKED != 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state::*;
+
+    #[test]
+    fn test_is_scheduled_returns_true() {
+        let state = State::new(SCHEDULED);
+        assert_eq!(state.is_scheduled(), true);
+    }
+
+    #[test]
+    fn test_is_scheduled_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_scheduled(), false);
+    }
+
+    #[test]
+    fn test_is_running_returns_true() {
+        let state = State::new(RUNNING);
+        assert_eq!(state.is_running(), true);
+    }
+
+    #[test]
+    fn test_is_running_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_running(), false);
+    }
+
+    #[test]
+    fn test_is_completed_returns_true() {
+        let state = State::new(COMPLETED);
+        assert_eq!(state.is_completed(), true);
+    }
+
+    #[test]
+    fn test_is_completed_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_completed(), false);
+    }
+
+    #[test]
+    fn test_is_closed_returns_true() {
+        let state = State::new(CLOSED);
+        assert_eq!(state.is_closed(), true);
+    }
+
+    #[test]
+    fn test_is_closed_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_closed(), false);
+    }
+
+    #[test]
+    fn test_is_handle_returns_true() {
+        let state = State::new(HANDLE);
+        assert_eq!(state.is_handle(), true);
+    }
+
+    #[test]
+    fn test_is_handle_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_handle(), false);
+    }
+
+    #[test]
+    fn test_is_awaiter_returns_true() {
+        let state = State::new(AWAITER);
+        assert_eq!(state.is_awaiter(), true);
+    }
+
+    #[test]
+    fn test_is_awaiter_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_awaiter(), false);
+    }
+
+    #[test]
+    fn test_is_locked_returns_true() {
+        let state = State::new(LOCKED);
+        assert_eq!(state.is_locked(), true);
+    }
+
+    #[test]
+    fn test_is_locked_returns_false() {
+        let state = State::new(0);
+        assert_eq!(state.is_locked(), false);
+    }
+}
