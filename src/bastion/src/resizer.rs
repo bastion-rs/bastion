@@ -10,6 +10,7 @@ use crate::broadcast::Sender;
 use crate::context::BastionId;
 use fxhash::FxHashMap;
 use lightproc::recoverable_handle::RecoverableHandle;
+use std::cmp::min;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -135,20 +136,39 @@ impl OptimalSizeExploringResizer {
     /// Applies checks and does scaling up/down depends on stats.
     pub(crate) async fn scale(
         &self,
-        _actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+        actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     ) -> ScalingRule {
         let mut stats = ActorGroupStats::load(self.stats.clone());
 
+        // Scaling up
+        // TODO: Compare with the upped_bound
         match self.upscale_strategy {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
-                    let count = stats.actors_count as f64 * self.downscale_threshold;
+                    let count = stats.actors_count as f64 * self.upscale_rate;
                     stats.average_mailbox_size = 0;
                     stats.store(self.stats.clone());
+                    let desired_
                     return ScalingRule::Upscale(count.round() as u64);
                 }
             }
         };
+
+        // Scaling down
+        let mut actors_to_stop = Vec::new();
+        for (actor_id, (_, handle)) in actors {
+            let state = handle.state();
+
+            if state.is_closed() || state.is_completed() {
+                actors_to_stop.push(actor_id.clone())
+            }
+        }
+        if !actors.is_empty() {
+            let freed_actors_max = (self.downscale_rate * actors.len() as f64).round() as usize;
+            let freed_actors_limit = min(actors_to_stop.len(), freed_actors_max);
+            let freed_actors = actors_to_stop.drain(0..freed_actors_limit).collect();
+            return ScalingRule::Downscale(freed_actors);
+        }
 
         ScalingRule::DoNothing
     }
