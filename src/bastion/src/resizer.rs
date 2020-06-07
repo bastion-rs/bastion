@@ -162,9 +162,21 @@ impl OptimalSizeExploringResizer {
                 actors_to_stop.push(actor_id.clone())
             }
         }
-        if !actors.is_empty() {
-            let freed_actors_max = (self.downscale_rate * actors.len() as f64).round() as usize;
-            let freed_actors_limit = min(actors_to_stop.len(), freed_actors_max);
+        if !actors_to_stop.is_empty() {
+            let active_actors_count = actors.len();
+            let freed_actors_max =
+                (self.downscale_rate * active_actors_count as f64).round() as usize;
+            let mut freed_actors_limit = min(actors_to_stop.len(), freed_actors_max as usize);
+            let left_active_actors = (active_actors_count - freed_actors_limit) as u64;
+
+            freed_actors_limit = match left_active_actors >= self.lower_bound {
+                true => freed_actors_limit,
+                false => {
+                    let excessive_actors_count = self.lower_bound - left_active_actors;
+                    freed_actors_limit - (excessive_actors_count as usize)
+                }
+            };
+
             let freed_actors = actors_to_stop.drain(0..freed_actors_limit).collect();
             return ScalingRule::Downscale(freed_actors);
         }
