@@ -141,15 +141,14 @@ impl OptimalSizeExploringResizer {
         let mut stats = ActorGroupStats::load(self.stats.clone());
 
         // Scaling up
-        // TODO: Compare with the upped_bound
         match self.upscale_strategy {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
-                    let count = stats.actors_count as f64 * self.upscale_rate;
+                    let desired_upscale =
+                        (stats.actors_count as f64 * self.upscale_rate).round() as u64;
                     stats.average_mailbox_size = 0;
                     stats.store(self.stats.clone());
-                    let desired_
-                    return ScalingRule::Upscale(count.round() as u64);
+                    return self.adjustment_upscaling(actors, desired_upscale);
                 }
             }
         };
@@ -171,6 +170,26 @@ impl OptimalSizeExploringResizer {
         }
 
         ScalingRule::DoNothing
+    }
+
+    fn adjustment_upscaling(
+        &self,
+        actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+        desired_upscale: u64,
+    ) -> ScalingRule {
+        match self.upper_bound {
+            UpperBound::Limit(actors_limit) => {
+                let active_actors = actors.len() as u64;
+                let can_be_added_actors_max = actors_limit - active_actors;
+                let added_actors_limit = min(desired_upscale, can_be_added_actors_max);
+
+                match added_actors_limit {
+                    0 => ScalingRule::DoNothing,
+                    _ => ScalingRule::Upscale(added_actors_limit),
+                }
+            }
+            UpperBound::Unlimited => ScalingRule::Upscale(desired_upscale),
+        }
     }
 }
 
