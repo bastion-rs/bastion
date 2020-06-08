@@ -144,11 +144,10 @@ impl OptimalSizeExploringResizer {
         match self.upscale_strategy {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
-                    let desired_upscale =
-                        (stats.actors_count as f64 * self.upscale_rate).round() as u64;
+                    let count = (stats.actors_count as f64 * self.upscale_rate).ceil() as u64;
                     stats.average_mailbox_size = 0;
                     stats.store(self.stats.clone());
-                    return self.adjustment_upscaling(actors, desired_upscale);
+                    return self.adjustment_upscaling(actors, count);
                 }
             }
         };
@@ -165,7 +164,7 @@ impl OptimalSizeExploringResizer {
         if !actors_to_stop.is_empty() {
             let active_actors_count = actors.len();
             let freed_actors_max =
-                (self.downscale_rate * active_actors_count as f64).round() as usize;
+                (self.downscale_rate * active_actors_count as f64).ceil() as usize;
             let mut freed_actors_limit = min(actors_to_stop.len(), freed_actors_max as usize);
             let left_active_actors = (active_actors_count - freed_actors_limit) as u64;
 
@@ -177,8 +176,13 @@ impl OptimalSizeExploringResizer {
                 }
             };
 
-            let freed_actors = actors_to_stop.drain(0..freed_actors_limit).collect();
-            return ScalingRule::Downscale(freed_actors);
+            return match freed_actors_limit {
+                0 => ScalingRule::DoNothing,
+                _ => {
+                    let freed_actors = actors_to_stop.drain(0..freed_actors_limit).collect();
+                    ScalingRule::Downscale(freed_actors)
+                }
+            };
         }
 
         ScalingRule::DoNothing
