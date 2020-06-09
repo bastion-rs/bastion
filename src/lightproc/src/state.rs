@@ -107,6 +107,11 @@ impl State {
     pub fn is_locked(&self) -> bool {
         self.0 & LOCKED != 0
     }
+
+    /// Returns `true` if the future is in the pending.
+    pub fn is_pending(&self) -> bool {
+        self.0 & COMPLETED == 0
+    }
 }
 
 #[cfg(test)]
@@ -195,5 +200,17 @@ mod tests {
     fn test_is_locked_returns_false() {
         let state = State::new(0);
         assert_eq!(state.is_locked(), false);
+    }
+
+    #[test]
+    fn test_is_pending_returns_true() {
+        let state = State::new(0);
+        assert_eq!(state.is_pending(), true);
+    }
+
+    #[test]
+    fn test_is_pending_returns_false() {
+        let state = State::new(COMPLETED);
+        assert_eq!(state.is_pending(), false);
     }
 }
