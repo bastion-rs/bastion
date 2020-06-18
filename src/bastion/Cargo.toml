@@ -33,7 +33,6 @@ exclude = [
 ]
 
 [badges]
-travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [features]
@@ -62,7 +61,7 @@ bastion-qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
 
 # Distributed
-artillery-core = { path = "../../../artillery/artillery-core", optional = true }
+artillery-core = { version = "0.1.0", optional = true }
 
 # Log crates
 tracing-subscriber = "0.2.5"
