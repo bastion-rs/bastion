@@ -1,8 +1,8 @@
 use crate::children_ref::ChildrenRef;
 use crate::Bastion;
 use crate::context::*;
-use crate::message::{BastionMessage, Message};
-use crate::envelope::{RefAddr, SignedMessage};
+use crate::message::{Message};
+
 use crate::message::Msg;
 
 use std::sync::Arc;
@@ -12,9 +12,9 @@ use artillery_core::epidemic::prelude::*;
 use tracing::*;
 use futures::future;
 use core::future::Future;
-use futures::pending;
-use futures::future::FutureExt;
-use crate::child::Exec;
+
+
+
 use lever::table::lotable::*;
 
 use uuid::Uuid;
@@ -126,7 +126,7 @@ where
         let action = action.clone();
 
         let core = async move {
-            let ap_events = ap_cluster.clone();
+            let _ap_events = ap_cluster.clone();
 
             // Detach cluster launch
             let cluster_handle =

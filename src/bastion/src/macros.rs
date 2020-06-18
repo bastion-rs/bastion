@@ -263,7 +263,6 @@ macro_rules! spawn {
     };
 }
 
-
 ///
 /// Marker of distributed API.
 #[doc(hidden)]

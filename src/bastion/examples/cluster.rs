@@ -1,15 +1,14 @@
-use bastion::prelude::*;
-use std::sync::Arc;
 use bastion::distributed::*;
-use futures::{select, FutureExt};
-use std::net::ToSocketAddrs;
-use uuid::Uuid;
-use pin_utils::pin_mut;
-use futures::{pending, join};
+use bastion::prelude::*;
+
 use lazy_static::*;
 
-use std::time::Duration;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
+use uuid::Uuid;
+
 use futures_timer::Delay;
+use std::time::Duration;
 
 use artillery_core::service_discovery::mdns::prelude::*;
 
@@ -42,7 +41,6 @@ lazy_static! {
     };
 }
 
-
 ///
 /// Spawns node that will assemble local eventually consistent Bastion cluster
 ///
@@ -61,37 +59,36 @@ fn main() {
     Bastion::init();
 
     // Assemble this node's actor
-    Bastion::distributed(&*CLUSTER_CONFIG, |dctx: Arc<DistributedContext>| async move {
-        // Assemble outbound action for node
-        let outdctx = dctx.clone();
-        let outbound = blocking!(
+    Bastion::distributed(
+        &*CLUSTER_CONFIG,
+        |dctx: Arc<DistributedContext>| async move {
+            // Assemble outbound action for node
+            let outdctx = dctx.clone();
+            let _outbound = blocking!(loop {
+                outdctx.members().iter().for_each(|m| {
+                    let message = format!("PING FROM {}", outdctx.current());
+                    outdctx.tell(&m.host_key(), message);
+                });
+
+                let _member_msg_wait = Delay::new(Duration::from_secs(1)).await;
+            });
+
+            // Assemble inbound action for node
+            println!("Started listening...");
             loop {
-                outdctx.members()
-                    .iter()
-                    .for_each(|m| {
-                        let message = format!("PING FROM {}", outdctx.current());
-                        outdctx.tell(&m.host_key(), message);
-                    });
-
-                let member_msg_wait = Delay::new(Duration::from_secs(1)).await;
+                let mmsg = dctx.recv().await?.extract();
+                let member_msg: String = mmsg.downcast().unwrap();
+                println!("Message received: {:?}", member_msg);
             }
-        );
 
-        // Assemble inbound action for node
-        println!("Started listening...");
-        loop {
-            let mmsg = dctx.recv().await?.extract();
-            let member_msg: String = mmsg.downcast().unwrap();
-            println!("Message received: {:?}", member_msg);
-        }
-
-        Ok(())
-    }).expect("Couldn't start cluster node.");
+            Ok(())
+        },
+    )
+    .expect("Couldn't start cluster node.");
 
     Bastion::start();
     Bastion::block_until_stopped();
 }
-
 
 fn get_port() -> u16 {
     use rand::{thread_rng, Rng};
