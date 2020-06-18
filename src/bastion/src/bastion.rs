@@ -14,6 +14,12 @@ use tracing::{debug, trace};
 
 use std::fmt::{self, Debug, Formatter};
 
+distributed_api! {
+    use std::sync::Arc;
+    use crate::distributed::*;
+    use artillery_core::cluster::ap::*;
+}
+
 /// A `struct` allowing to access the system's API to initialize it,
 /// start, stop and kill it and to create new supervisors and top-level
 /// children groups.
@@ -379,6 +385,16 @@ impl Bastion {
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         Bastion::children(|ch| ch.with_redundancy(1).with_exec(action))
+    }
+
+    distributed_api! {
+        pub fn distributed<I, F>(cluster_config: &'static ArtilleryAPClusterConfig, action: I) -> Result<ChildrenRef, ()>
+        where
+            I: Fn(Arc<DistributedContext>) -> F + Send + Sync + 'static,
+            F: Future<Output = Result<(), ()>> + Send + 'static,
+        {
+            cluster_actor(cluster_config, action)
+        }
     }
 
     /// Sends a message to the system which will then send it to all

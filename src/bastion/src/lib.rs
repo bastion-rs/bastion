@@ -45,9 +45,6 @@
 //! [fort]: https://docs.rs/fort/
 //!
 
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion-logo.png"
-)]
 // Force missing implementations
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
@@ -62,12 +59,14 @@ pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
 pub use self::config::Config;
 
+#[macro_use]
+mod macros;
+
 mod bastion;
 mod broadcast;
 mod callbacks;
 mod child;
 mod config;
-mod macros;
 mod system;
 
 pub mod child_ref;
@@ -79,6 +78,11 @@ pub mod envelope;
 pub mod message;
 pub mod path;
 pub mod supervisor;
+
+distributed_api! {
+    pub mod dist_messages;
+    pub mod distributed;
+}
 
 ///
 /// Prelude of Bastion
@@ -103,4 +107,11 @@ pub mod prelude {
         SupervisorRef,
     };
     pub use crate::{answer, blocking, children, run, spawn, supervisor};
+
+    distributed_api! {
+        pub use crate::dist_messages::*;
+        pub use crate::distributed::*;
+        pub use artillery_core::cluster::ap::*;
+        pub use artillery_core::epidemic::prelude::*;
+    }
 }

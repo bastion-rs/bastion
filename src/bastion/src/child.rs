@@ -21,7 +21,7 @@ use std::task::{Context, Poll};
 use tracing::{debug, trace, warn};
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
-pub(crate) struct Exec(Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
+pub(crate) struct Exec(pub(crate) Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
 #[derive(Debug)]
 pub(crate) struct Child {
