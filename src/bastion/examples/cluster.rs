@@ -44,19 +44,17 @@ lazy_static! {
 
 
 ///
-/// Middleware that compresses streams with snappy with built-in back-pressure
+/// Spawns node that will assemble local eventually consistent Bastion cluster
 ///
 /// Prologue:
-/// This example starts a TCP server and compresses all requests with Snappy compression
-/// using fair distribution of workers.
+/// This example does the following:
+/// * starts MDNS service discovery mechanism and checks nodes throughout this service's lifetime.
+/// * discovered nodes are joining to Bastion cluster
+/// * sends a String message to every member that joined to cluster and this node knows.
+/// * listens incoming messages from other nodes and prints them.
 ///
-/// Workers capability of processing defines the back-pressure.
-/// This back-pressure is most natural one in the Rust environment since
-/// it is based on the workload(bottom-to-up) and
-/// not based on the source emission(top-to-bottom).
-///
-/// Try increasing the worker count. Yes!
-/// In addition to that try benchmarking with `ab`, `wrk` or `siege`.
+/// Bastion's cluster is using fixed size UDP packets to communicate.
+/// These can be used to assemble further level of membership and data interchange.
 fn main() {
     env_logger::init();
 
