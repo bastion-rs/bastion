@@ -117,7 +117,27 @@ If you answer any of the questions below with yes, then Bastion is just for you:
 * Do I have some trust issues with orchestration systems?
 * Do I want to implement my own application lifecycle?
 
-### Get Started
+## Bastion Ecosystem
+
+Bastion Ecosystem is here to provide you a way to customize it. If you don't need to, or if you are a newcomers, you can install and use Bastion without knowing how everything works under the hood. We hope to find you on this section soon.
+
+### [LightProc](https://github.com/bastion-rs/bastion/tree/master/src/lightproc)
+
+LightProc is Lightweight Process abstraction for Rust.
+
+It uses futures with lifecycle callbacks to implement Erlang like processes and contains basic pid to identify processes. 
+All panics inside futures are propagated to upper layers. 
+
+### [Bastion Executor](https://github.com/bastion-rs/bastion/tree/master/src/bastion-executor)
+
+Bastion Executor is NUMA-aware SMP based Fault-tolerant Executor, highly-available and async communication oriented.
+
+It's independent of it's framework implementation. It uses lightproc to encapsulate and provide fault-tolerance to your future based workloads. You can use your futures with lightproc to run your workloads on Bastion Executor without the need to have framework.
+
+### [Agnostik](https://github.com/bastion-rs/agnostik)
+Agnostik is a layer between your application and the executor for your async stuff. It lets you switch the executors smooth and easy without having to change your applications code. Valid features are `runtime_bastion` (default), `runtime_tokio`, `runtime_asyncstd` and `runtime_nostd` (coming soon).
+
+## Get Started
 Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
 
 [Examples](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples) cover possible use cases of the crate.
