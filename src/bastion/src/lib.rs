@@ -1,7 +1,4 @@
 //! # Bastion: Fault-tolerant Runtime for Rust applications
-//! [![Bastion](https://raw.githubusercontent.com/bastion-rs/bastion/master/img/bastion.png)](https://github.com/bastion-rs/bastion)
-//!
-//!
 //!
 //! Bastion is a highly-available, fault-tolerant runtime system
 //! with dynamic dispatch oriented lightweight process model.
@@ -53,6 +50,8 @@
 #![warn(missing_debug_implementations)]
 // Deny using unsafe code
 #![deny(unsafe_code)]
+// Doc generation experimental features
+#![cfg_attr(feature = "docs", feature(doc_cfg))]
 
 // TODO: https://github.com/cogciprocate/qutex/pull/5
 // TODO: https://github.com/cogciprocate/qutex/pull/6
@@ -62,12 +61,14 @@ pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
 pub use self::config::Config;
 
+#[macro_use]
+mod macros;
+
 mod bastion;
 mod broadcast;
 mod callbacks;
 mod child;
 mod config;
-mod macros;
 mod system;
 
 pub mod child_ref;
@@ -79,6 +80,11 @@ pub mod envelope;
 pub mod message;
 pub mod path;
 pub mod supervisor;
+
+distributed_api! {
+    // pub mod dist_messages;
+    pub mod distributed;
+}
 
 ///
 /// Prelude of Bastion
@@ -103,4 +109,11 @@ pub mod prelude {
         SupervisorRef,
     };
     pub use crate::{answer, blocking, children, run, spawn, supervisor};
+
+    distributed_api! {
+        // pub use crate::dist_messages::*;
+        pub use crate::distributed::*;
+        pub use artillery_core::cluster::ap::*;
+        pub use artillery_core::epidemic::prelude::*;
+    }
 }

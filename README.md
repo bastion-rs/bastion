@@ -4,7 +4,7 @@
 
 -----------------
 
-<h1 align="center">Highly-available Distributed* Fault-tolerant Runtime</h1>
+<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
 
 <table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 <tr>
@@ -78,7 +78,7 @@
 
 ---
 
-Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery.
+Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery. It com
 
 ---
 
@@ -96,6 +96,8 @@ You can use this to launch automatically supervised tasks.
     * Exploiting hardware locality wherever it is possible. It is designed for servers.
 * Supervision system makes it easy to manage lifecycles.
     * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
+* Automatic member discovery, cluster formation and custom message passing between cluster members.
+    * Using zeroconf or not, launch your bastion cluster from everywhere, with a single actor block.
 
 ## Guarantees
 * At most once delivery for all messages.
@@ -171,7 +173,3 @@ A detailed overview on how to contribute can be found in the  [CONTRIBUTING guid
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_large)
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_shield)
-
-
----
-<sup><sub>* Currently, we are working on distributed properties and protocol[.](https://spoti.fi/2OaEsj9)</sub></sup>
