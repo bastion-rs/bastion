@@ -1,10 +1,11 @@
 use serde::{Serialize, Deserialize};
 
+// TODO: These are not ready yet. Probably these are going to change since some work is done by Artillery.
 
 /// Client request
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "c", content="d")]
-pub enum Request {
+enum Request {
     Handshake(String),
     Ping,
     Pong,
@@ -15,7 +16,7 @@ pub enum Request {
 /// Server response
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag="c", content="d")]
-pub enum Response {
+enum Response {
     Handshake,
     Ping,
     Pong,

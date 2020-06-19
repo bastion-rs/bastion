@@ -270,6 +270,7 @@ macro_rules! distributed_api {
     ($($block:item)*) => {
         $(
             #[cfg(feature = "distributed")]
+            #[cfg_attr(feature = "docs", doc(cfg(distributed)))]
             $block
         )*
     }

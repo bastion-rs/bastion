@@ -41,6 +41,12 @@ unstable = ["bastion-executor/unstable"]
 distributed = [
   "artillery-core"
 ]
+docs = ["distributed", "default"]
+
+
+[package.metadata.docs.rs]
+features = ["docs"]
+rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
 bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }

@@ -1,3 +1,5 @@
+//!
+//! Cluster formation and distributed actor instantiation
 use crate::children_ref::ChildrenRef;
 use crate::Bastion;
 use crate::context::*;
@@ -19,6 +21,8 @@ use lever::table::lotable::*;
 
 use uuid::Uuid;
 
+///
+/// Cluster message that is sent and delivered among members
 #[derive(Debug)]
 pub struct ClusterMessage {
     pub(crate) msg: Msg,
@@ -36,6 +40,8 @@ impl ClusterMessage {
     }
 }
 
+///
+/// Distributed context that holds currently formed/forming cluster's context.
 pub struct DistributedContext {
     bctx: BastionContext,
     me: Uuid,
@@ -44,6 +50,8 @@ pub struct DistributedContext {
 }
 
 impl DistributedContext {
+    ///
+    /// Initializes distributed context with underlying actor's local context and cluster handle.
     fn new(bctx: BastionContext, cluster: Arc<Cluster>, me: Uuid) -> Self {
         DistributedContext {
             bctx,
@@ -53,14 +61,26 @@ impl DistributedContext {
         }
     }
 
-    fn local_ctx(&self) -> &BastionContext {
+    ///
+    /// Exposes local bastion context to distributed actor
+    pub fn local_ctx(&self) -> &BastionContext {
         &self.bctx
     }
 
+    ///
+    /// Gets the current member's node id in the cluster
+    ///
+    /// This shouldn't be confused with content addressing of actors in the application.
     pub fn current(&self) -> Uuid {
         self.me
     }
 
+    ///
+    /// Get current members of the cluster.
+    ///
+    /// This list is continuously updates with cluster state.
+    /// If a node is down it won't appear in this list.
+    /// If a node is suspected, it will still be in here. When suspected message delivery isn't guaranteed.
     pub fn members(&self) -> Vec<ArtilleryMember> {
         self.members.values()
             .into_iter()
@@ -68,6 +88,9 @@ impl DistributedContext {
             .collect()
     }
 
+    ///
+    /// Send a fire and forget style message to a destined cluster member.
+    /// Message needs to be stringified or apply the rules of bastion's [Message] trait.
     pub fn tell<M>(&self, to: &Uuid, msg: M) -> Result<(), M>
     where
         M: Message + AsRef<str>
@@ -77,6 +100,8 @@ impl DistributedContext {
         Ok(())
     }
 
+    ///
+    /// Channel that aggregates incoming cluster events to this node.
     pub async fn recv(&self) -> Result<ClusterMessage, ()> {
         debug!("DistributedContext({}): Waiting to receive message.", self.me);
         loop {
@@ -110,7 +135,7 @@ impl DistributedContext {
 
 ///
 /// Creates distributed cluster actor
-pub fn cluster_actor<I, F>(
+pub(crate) fn cluster_actor<I, F>(
     cluster_config: &'static ArtilleryAPClusterConfig,
     action: I,
 ) -> Result<ChildrenRef, ()>
