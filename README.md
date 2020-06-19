@@ -117,6 +117,8 @@ If you answer any of the questions below with yes, then Bastion is just for you:
 
 ## Bastion Ecosystem
 
+Bastion Ecosystem is here to provide you a way to customize it. If you don't need to, or if you are a newcomers, you can install and use Bastion without knowing how everything works under the hood. We hope to find you on this section soon.
+
 ### [LightProc](https://github.com/bastion-rs/bastion/tree/master/src/lightproc)
 
 LightProc is Lightweight Process abstraction for Rust.
