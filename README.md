@@ -117,33 +117,21 @@ If you answer any of the questions below with yes, then Bastion is just for you:
 
 ## Bastion Ecosystem
 
-// TODO: Quick introduction to explain the bastion ecosystem goal. Might answer to: 
-- Why are there so many repositories
-- How do they all fit in the bastion-rs picture
-
-### [Bastion Executor](https://github.com/bastion-rs/bastion/tree/master/src/bastion-executor)
-
-Bastion Executor is NUMA-aware SMP based Fault-tolerant Executor.
-It is a highly-available, fault-tolerant, async communication oriented executor.
-
-Bastion Executor is independent of it's framework implementation. It uses lightproc to encapsulate and provide fault-tolerance to your future based workloads. You can use your futures with lightproc to run your workloads on Bastion Executor without the need to have framework.
-
-### [Agnostik](https://github.com/bastion-rs/agnostik)
-Agnostik is a layer between your application and the executor for your async stuff. It lets you switch the executors smooth and easy without having to change your applications code.
-
-#### Features
-  * Run futures and wait for them to finish
-  * Spawn Futures using the underlying executor
-  * Spawn blocking tasks using special threads that are able to execute blocking code
-
 ### [LightProc](https://github.com/bastion-rs/bastion/tree/master/src/lightproc)
 
 LightProc is Lightweight Process abstraction for Rust.
 
-#### Beneath the implementation
-* It uses futures with lifecycle callbacks to implement Erlang like processes.
-* Contains basic pid(process id) to identify processes.
-* All panics inside futures are propagated to upper layers. 
+It uses futures with lifecycle callbacks to implement Erlang like processes and contains basic pid to identify processes. 
+All panics inside futures are propagated to upper layers. 
+
+### [Bastion Executor](https://github.com/bastion-rs/bastion/tree/master/src/bastion-executor)
+
+Bastion Executor is NUMA-aware SMP based Fault-tolerant Executor, highly-available and async communication oriented.
+
+It's independent of it's framework implementation. It uses lightproc to encapsulate and provide fault-tolerance to your future based workloads. You can use your futures with lightproc to run your workloads on Bastion Executor without the need to have framework.
+
+### [Agnostik](https://github.com/bastion-rs/agnostik)
+Agnostik is a layer between your application and the executor for your async stuff. It lets you switch the executors smooth and easy without having to change your applications code. Valid features are `runtime_bastion` (default), `runtime_tokio`, `runtime_asyncstd` and `runtime_nostd` (coming soon).
 
 ## Get Started
 Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
