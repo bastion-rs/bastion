@@ -262,3 +262,16 @@ macro_rules! spawn {
         bastion_executor::pool::spawn(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
     };
 }
+
+///
+/// Marker of distributed API.
+#[doc(hidden)]
+macro_rules! distributed_api {
+    ($($block:item)*) => {
+        $(
+            #[cfg(feature = "distributed")]
+            #[cfg_attr(feature = "docs", doc(cfg(distributed)))]
+            $block
+        )*
+    }
+}

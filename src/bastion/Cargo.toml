@@ -33,26 +33,41 @@ exclude = [
 ]
 
 [badges]
-travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [features]
+default = []
 unstable = ["bastion-executor/unstable"]
+distributed = [
+  "artillery-core"
+]
+docs = ["distributed", "default"]
+
+
+[package.metadata.docs.rs]
+features = ["docs"]
+rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
 bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
 
 lever = "0.1.1-alpha.2"
-futures = { version = "0.3", features = ["async-await"] }
-futures-timer = "3.0.0"
+futures = "0.3.5"
+futures-timer = "3.0.2"
 fxhash = "0.2"
 lazy_static = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+pin-utils = "0.1"
 
 # TODO: https://github.com/cogciprocate/qutex/pull/5
 # TODO: https://github.com/cogciprocate/qutex/pull/6
 bastion-qutex = { version = "0.2", features = ["async_await"] }
 uuid = { version = "0.8", features = ["v4"] }
+
+# Distributed
+artillery-core = { version = "0.1.0", optional = true }
 
 # Log crates
 tracing-subscriber = "0.2.5"

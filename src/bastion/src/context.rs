@@ -54,7 +54,7 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 ///     # Bastion::block_until_stopped();
 /// # }
 /// ```
-pub struct BastionId(Uuid);
+pub struct BastionId(pub(crate) Uuid);
 
 #[derive(Debug)]
 /// A child's execution context, allowing its [`exec`] future
