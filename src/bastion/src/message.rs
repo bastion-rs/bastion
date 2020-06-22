@@ -191,7 +191,7 @@ pub(crate) enum BastionMessage {
     Start,
     Stop,
     Kill,
-    Deploy(Deployment),
+    Deploy(Box<Deployment>),
     Prune {
         id: BastionId,
     },
@@ -405,13 +405,13 @@ impl BastionMessage {
     pub(crate) fn deploy_supervisor(supervisor: Supervisor) -> Self {
         let deployment = Deployment::Supervisor(supervisor);
 
-        BastionMessage::Deploy(deployment)
+        BastionMessage::Deploy(deployment.into())
     }
 
     pub(crate) fn deploy_children(children: Children) -> Self {
         let deployment = Deployment::Children(children);
 
-        BastionMessage::Deploy(deployment)
+        BastionMessage::Deploy(deployment.into())
     }
 
     pub(crate) fn prune(id: BastionId) -> Self {

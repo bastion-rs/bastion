@@ -22,9 +22,8 @@ pub(crate) struct Envelope {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
@@ -34,11 +33,10 @@ pub(crate) struct Envelope {
 ///         }
 ///     })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 pub struct SignedMessage {
     pub(crate) msg: Msg,
@@ -62,9 +60,8 @@ impl SignedMessage {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -74,11 +71,10 @@ impl SignedMessage {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn signature(&self) -> &RefAddr {
         &self.sign
@@ -93,9 +89,8 @@ impl SignedMessage {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
@@ -107,11 +102,10 @@ impl SignedMessage {
 ///         }
 ///     })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 pub struct RefAddr {
     path: Arc<BastionPath>,

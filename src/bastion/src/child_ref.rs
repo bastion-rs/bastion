@@ -47,9 +47,8 @@ impl ChildRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx| {
     ///         async move {
@@ -59,11 +58,10 @@ impl ChildRef {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -227,17 +225,15 @@ impl ChildRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
-    ///     # let child_ref = &children_ref.elems()[0];
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # let child_ref = &children_ref.elems()[0];
     /// child_ref.stop().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Stopping.", self.id);
@@ -257,17 +253,15 @@ impl ChildRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
-    ///     # let child_ref = &children_ref.elems()[0];
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # let child_ref = &children_ref.elems()[0];
     /// child_ref.kill().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Killing.", self.id());

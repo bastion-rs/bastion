@@ -26,12 +26,9 @@ fn spawn_responders() -> ChildrenRef {
 
             msg! { ctx.recv().await?,
                 msg: &'static str => {
-                    match msg {
-                        "Hi again" => {
-                            let sign = signature!();
-                            ctx.tell(&sign, "Farewell").unwrap();
-                        },
-                        _ => (),
+                    if msg == "Hi again" {
+                        let sign = signature!();
+                        ctx.tell(&sign, "Farewell").unwrap();
                     }
                 };
                 _: _ => ();

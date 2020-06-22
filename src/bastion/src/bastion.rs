@@ -167,15 +167,13 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     Bastion::init();
+    /// Bastion::init();
     ///
-    ///     // You can now use bastion...
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// // You can now use bastion...
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Config`]: struct.Config.html
@@ -201,18 +199,16 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     let config = Config::new()
-    ///         .show_backtraces();
+    /// let config = Config::new()
+    ///     .show_backtraces();
     ///
-    ///     Bastion::init_with(config);
+    /// Bastion::init_with(config);
     ///
-    ///     // You can now use bastion...
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// // You can now use bastion...
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Config`]: struct.Config.html
@@ -246,19 +242,17 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// let sp_ref: SupervisorRef = Bastion::supervisor(|sp| {
     ///     // Configure the supervisor...
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// }).expect("Couldn't create the supervisor.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -307,9 +301,8 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// let children_ref: ChildrenRef = Bastion::children(|children| {
     ///     // Configure the children group...
     ///     children.with_exec(|ctx: BastionContext| {
@@ -325,11 +318,10 @@ impl Bastion {
     ///     })
     ///     // ...and return it.
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Children`]: children/struct.Children.html
@@ -359,20 +351,18 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// let children_ref: ChildrenRef = Bastion::spawn(|ctx: BastionContext| {
     ///     async move {
     ///         // ...
     ///         Ok(())
     ///     }
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Children::with_exec`]: children/struct.Children.html#method.with_exec
@@ -462,19 +452,17 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     Bastion::init();
+    /// Bastion::init();
     ///
-    ///     // Use bastion, spawn children and supervisors...
+    /// // Use bastion, spawn children and supervisors...
     ///
-    ///     Bastion::start();
+    /// Bastion::start();
     ///
-    ///     // The system will soon start, messages will
-    ///     // now be handled...
-    ///     #
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// // The system will soon start, messages will
+    /// // now be handled...
+    /// #
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn start() {
         debug!("Bastion: Starting.");
@@ -493,19 +481,17 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     Bastion::init();
+    /// Bastion::init();
     ///
-    ///     // Use bastion, spawn children and supervisors...
+    /// // Use bastion, spawn children and supervisors...
     ///
-    ///     Bastion::start();
+    /// Bastion::start();
     ///
-    ///     // Send messages to children and/or do some
-    ///     // work until you decide to stop the system...
+    /// // Send messages to children and/or do some
+    /// // work until you decide to stop the system...
     ///
-    ///     Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn stop() {
         debug!("Bastion: Stopping.");
@@ -524,18 +510,16 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     Bastion::init();
+    /// Bastion::init();
     ///
-    ///     // Use bastion, spawn children and supervisors...
+    /// // Use bastion, spawn children and supervisors...
     ///
-    ///     Bastion::start();
-    ///     // Send messages to children and/or do some
-    ///     // work until you decide to kill the system...
+    /// Bastion::start();
+    /// // Send messages to children and/or do some
+    /// // work until you decide to kill the system...
     ///
-    ///     Bastion::kill();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// Bastion::kill();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn kill() {
         debug!("Bastion: Killing.");
@@ -564,20 +548,18 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     Bastion::init();
+    /// Bastion::init();
     ///
-    ///     // Use bastion, spawn children and supervisors...
+    /// // Use bastion, spawn children and supervisors...
     ///
-    ///     Bastion::start();
-    ///     // Send messages to children and/or do some
-    ///     // work...
+    /// Bastion::start();
+    /// // Send messages to children and/or do some
+    /// // work...
     ///
-    ///     # Bastion::stop();
-    ///     Bastion::block_until_stopped();
-    ///     // The system is now stopped. A child might have
-    ///     // stopped or killed it...
-    /// }
+    /// # Bastion::stop();
+    /// Bastion::block_until_stopped();
+    /// // The system is now stopped. A child might have
+    /// // stopped or killed it...
     /// ```
     ///
     /// [`Bastion::stop()`]: #method.stop

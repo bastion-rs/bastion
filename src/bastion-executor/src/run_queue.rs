@@ -642,7 +642,8 @@ impl<T> Stealer<T> {
 
             // Steal a batch of tasks from the front one by one.
             Flavor::Lifo => {
-                for i in 0..batch_size {
+                let size = batch_size;
+                for i in 0..size {
                     // If this is not the first steal, check whether the queue is empty.
                     if i > 0 {
                         // We've already got the current front index. Now execute the fence to
@@ -822,7 +823,8 @@ impl<T> Stealer<T> {
                 f = f.wrapping_add(1);
 
                 // Repeat the same procedure for the batch steals.
-                for i in 0..batch_size {
+                let size = batch_size;
+                for i in 0..size {
                     // We've already got the current front index. Now execute the fence to
                     // synchronize with other threads.
                     atomic::fence(Ordering::SeqCst);
@@ -1001,7 +1003,8 @@ impl<T> Stealer<T> {
                 f = f.wrapping_add(1);
 
                 // Repeat the same procedure for the batch steals.
-                for i in 0..batch_size {
+                let size = batch_size;
+                for i in 0..size {
                     // We've already got the current front index. Now execute the fence to
                     // synchronize with other threads.
                     atomic::fence(Ordering::SeqCst);
@@ -1198,11 +1201,10 @@ pub struct Injector<T> {
 unsafe impl<T: Send> Send for Injector<T> {}
 unsafe impl<T: Send> Sync for Injector<T> {}
 
-impl<T> Injector<T> {
-    /// Creates a new injector queue.
-    pub fn new() -> Injector<T> {
+impl<T> Default for Injector<T> {
+    fn default() -> Self {
         let block = Box::into_raw(Box::new(Block::<T>::new()));
-        Injector {
+        Self {
             head: CachePadded::new(Position {
                 block: AtomicPtr::new(block),
                 index: AtomicUsize::new(0),
@@ -1213,6 +1215,13 @@ impl<T> Injector<T> {
             }),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<T> Injector<T> {
+    /// Creates a new injector queue.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Pushes a task into the queue.

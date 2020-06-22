@@ -45,9 +45,8 @@ use tracing::{debug, trace, warn};
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// let children_ref: ChildrenRef = Bastion::children(|children| {
 ///     // Configure the children group...
 ///     children.with_exec(|ctx: BastionContext| {
@@ -63,11 +62,10 @@ use tracing::{debug, trace, warn};
 ///     })
 ///     // ...and return it.
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 ///
 /// [`with_redundancy`]: #method.with_redundancy
@@ -136,19 +134,17 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     let children_id: &BastionId = children.id();
     ///     // ...
-    ///     # children
+    /// # children
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         self.bcast.id()
@@ -225,9 +221,8 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx| {
     ///         async move {
@@ -241,11 +236,10 @@ impl Children {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
@@ -273,18 +267,16 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     // Note that "1" is the default number of elements.
     ///     children.with_redundancy(1)
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`with_exec`]: #method.with_exec
@@ -317,20 +309,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children
     ///         .with_dispatcher(
     ///             Dispatcher::with_type(DispatcherType::Named("CustomGroup".to_string()))
     ///         )
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     /// [`DispatcherHandler`]: ../dispatcher/trait.DispatcherHandler.html
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
@@ -354,9 +344,8 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -373,11 +362,10 @@ impl Children {
     ///             // -- Children group stopped.
     ///         })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Callbacks`]: struct.Callbacks.html

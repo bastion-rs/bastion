@@ -10,17 +10,15 @@
 /// ```rust
 /// use bastion::prelude::*;
 ///
-/// fn main() {
-///     let config = Config::new().show_backtraces();
+/// let config = Config::new().show_backtraces();
 ///
-///     Bastion::init_with(config);
+/// Bastion::init_with(config);
 ///
-///     // You can now use bastion...
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// }
+/// // You can now use bastion...
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 ///
 /// [`Bastion::init_with`]: struct.Bastion.html#method.init_with
@@ -59,18 +57,16 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     let config = Config::new().show_backtraces();
+    /// let config = Config::new().show_backtraces();
     ///
-    ///     Bastion::init_with(config);
+    /// Bastion::init_with(config);
     ///
-    ///     // You can now use bastion and it will show you the
-    ///     // backtraces of panics...
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// // You can now use bastion and it will show you the
+    /// // backtraces of panics...
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn show_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::show();
@@ -87,18 +83,16 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
-    /// fn main() {
-    ///     let config = Config::new().hide_backtraces();
+    /// let config = Config::new().hide_backtraces();
     ///
-    ///     Bastion::init_with(config);
+    /// Bastion::init_with(config);
     ///
-    ///     // You can now use bastion and no panic backtraces
-    ///     // will be shown...
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// }
+    /// // You can now use bastion and no panic backtraces
+    /// // will be shown...
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Config::show_backtraces`]: #method.show_backtraces
