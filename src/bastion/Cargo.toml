@@ -36,7 +36,7 @@ exclude = [
 maintenance = { status = "actively-developed" }
 
 [features]
-default = []
+default = ["distributed"]
 unstable = ["bastion-executor/unstable"]
 distributed = [
   "artillery-core"
@@ -82,4 +82,3 @@ bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
 rand = "0.7.3"
 rayon = "1.3.0"
 num_cpus = "1.13.0"
-

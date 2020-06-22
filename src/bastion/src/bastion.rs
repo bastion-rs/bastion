@@ -381,7 +381,7 @@ impl Bastion {
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn spawn<I, F>(action: I) -> Result<ChildrenRef, ()>
     where
-        I: Fn(BastionContext) -> F + Send + Sync + 'static,
+        I: Fn(BastionContext) -> F + Send + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         Bastion::children(|ch| ch.with_redundancy(1).with_exec(action))
