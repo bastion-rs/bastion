@@ -54,7 +54,7 @@ mod prime_number {
         use rand::Rng;
         let mut maybe_prime = rand::thread_rng().gen_range(min_bound, max_bound);
         loop {
-            if is_prime(maybe_prime.into()) {
+            if is_prime(maybe_prime) {
                 return number_or_panic(maybe_prime);
             }
             // for any integer n > 3,

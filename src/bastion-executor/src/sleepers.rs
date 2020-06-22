@@ -37,7 +37,7 @@ impl Sleepers {
 
         if !self.notified.swap(false, Ordering::SeqCst) {
             *sleep += 1;
-            let _ = self.wake.wait(sleep).unwrap();
+            std::mem::drop(self.wake.wait(sleep).unwrap());
         }
     }
 

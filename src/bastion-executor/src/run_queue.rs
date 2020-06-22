@@ -257,7 +257,7 @@ impl<T> Worker<T> {
         let f = self.inner.front.load(Ordering::SeqCst);
         match b.wrapping_sub(f) {
             x if x <= 0 => 0_usize,
-            y @ _ => y as usize,
+            y => y as usize,
         }
     }
 
@@ -511,7 +511,7 @@ impl<T> Stealer<T> {
         let f = self.inner.front.load(Ordering::Acquire);
         match b.wrapping_sub(f) {
             x if x <= 0 => 0_usize,
-            y @ _ => y as usize,
+            y => y as usize,
         }
     }
 

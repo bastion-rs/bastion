@@ -86,19 +86,19 @@ impl Stats {
                     unsafe {
                         std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(0));
                     }
-                    i = i + 1;
+                    i += 1;
                     continue;
                 }
                 // MAX is for unused slot.
                 unsafe {
                     std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(usize::MAX));
                 }
-                i = i + 1;
+                i += 1;
             }
             unsafe { std::mem::transmute::<_, [AtomicUsize; MAX_CORE]>(data) }
         };
         Stats {
-            smp_load: smp_load,
+            smp_load,
             mean_level: AtomicUsize::new(0),
         }
     }

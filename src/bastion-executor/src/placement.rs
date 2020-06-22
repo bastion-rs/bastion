@@ -312,8 +312,6 @@ mod macos {
 
     use libc::{c_int, c_uint, pthread_self};
 
-    use num_cpus;
-
     use super::CoreId;
 
     type KernReturnT = c_int;
@@ -371,7 +369,6 @@ mod macos {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
 
         use super::*;
 
@@ -412,7 +409,6 @@ fn set_for_current_helper(core_id: CoreId) {}
 
 #[cfg(test)]
 mod tests {
-    use num_cpus;
 
     use super::*;
 

@@ -11,6 +11,7 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 use crate::system::SYSTEM;
+use anyhow::Result as AnyResult;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -411,13 +412,17 @@ impl Children {
 
     fn stopped(&mut self) {
         debug!("Children({}): Stopped.", self.id());
-        self.remove_dispatchers();
+        if let Err(e) = self.remove_dispatchers() {
+            warn!("couldn't remove all dispatchers from the registry: {}", e);
+        };
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Children({}): Faulted.", self.id());
-        self.remove_dispatchers();
+        if let Err(e) = self.remove_dispatchers() {
+            warn!("couldn't remove all dispatchers from the registry: {}", e);
+        };
         self.bcast.faulted();
     }
 
@@ -744,20 +749,22 @@ impl Children {
     }
 
     /// Registers all declared local dispatchers in the global dispatcher.
-    pub(crate) fn register_dispatchers(&self) {
+    pub(crate) fn register_dispatchers(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {
-            global_dispatcher.register_dispatcher(dispatcher)
+            global_dispatcher.register_dispatcher(dispatcher)?;
         }
+        Ok(())
     }
 
     /// Removes all declared local dispatchers from the global dispatcher.
-    pub(crate) fn remove_dispatchers(&self) {
+    pub(crate) fn remove_dispatchers(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {
-            global_dispatcher.remove_dispatcher(dispatcher)
+            global_dispatcher.remove_dispatcher(dispatcher)?;
         }
+        Ok(())
     }
 }

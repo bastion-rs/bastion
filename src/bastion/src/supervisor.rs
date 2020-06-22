@@ -574,7 +574,9 @@ impl Supervisor {
         let mut children = init(children);
         debug!("Children({}): Initialized.", children.id());
         // FIXME: children group elems launched without the group itself being launched
-        children.register_dispatchers();
+        if let Err(e) = children.register_dispatchers() {
+            warn!("couldn't register all dispatchers into the registry: {}", e);
+        };
         children.launch_elems();
 
         debug!(
@@ -1029,7 +1031,7 @@ impl Supervisor {
                 objects.push(element)
             }
             ActorSearchMethod::FromActor { id, parent_id } => {
-                let childs = self.tracked_groups.get(&parent_id.clone()).unwrap();
+                let childs = self.tracked_groups.get(&parent_id).unwrap();
                 let start_index = *self.tracked_groups_order.get(&id).unwrap();
 
                 // Adding all elements in the group from the given actor
@@ -1044,7 +1046,7 @@ impl Supervisor {
                 }
 
                 // And then a rest after the failed group
-                let (rest_index, _) = self.launched.get(&parent_id.clone()).unwrap();
+                let (rest_index, _) = self.launched.get(&parent_id).unwrap();
                 for index in *rest_index + 1..self.order.len() {
                     let element_id = &self.order[index];
 
