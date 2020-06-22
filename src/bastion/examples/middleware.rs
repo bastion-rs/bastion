@@ -42,7 +42,7 @@ fn main() {
                                 let compressed = Encoder::new().compress_vec(&data_buf).unwrap();
                                 let response = escape(&compressed);
                                 // println!("Response: {}", response);
-                                stream.write(response.as_bytes()).unwrap();
+                                stream.write_all(response.as_bytes()).unwrap();
                                 answer!(ctx, stream).expect("Couldn't send an answer.");
                             };
                             _: _ => ();

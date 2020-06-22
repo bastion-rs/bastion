@@ -263,9 +263,8 @@ impl fmt::Debug for BastionPath {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 ///
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
@@ -282,10 +281,9 @@ impl fmt::Debug for BastionPath {
 ///         }
 ///     })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::block_until_stopped();
 /// ```
 pub enum BastionPathElement {
     #[doc(hidden)]
@@ -341,9 +339,7 @@ impl BastionPathElement {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
     ///
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
@@ -360,10 +356,9 @@ impl BastionPathElement {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn is_child(&self) -> bool {
         match self {

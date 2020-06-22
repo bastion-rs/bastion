@@ -18,12 +18,10 @@ proptest! {
                 .with_exec(move |ctx: BastionContext| {
                     async move {
                         msg! { ctx.recv().await?,
-                            ref _msg: &'static str => {
-                                ();
-                            };
+                            ref _msg: &'static str => {};
                             // This won't happen because this example
                             // only "asks" a `&'static str`...
-                            _: _ => ();
+                            _: _ => {};
                         }
 
                         Ok(())

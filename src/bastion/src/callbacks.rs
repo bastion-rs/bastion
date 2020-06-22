@@ -19,9 +19,8 @@ pub(crate) enum CallbackType {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// Bastion::children(|children| {
 ///     let callbacks = Callbacks::new()
 ///         .with_before_start(|| println!("Children group started."))
@@ -38,11 +37,10 @@ pub(crate) enum CallbackType {
 ///             // -- Children group stopped.
 ///         })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 ///
 /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -63,9 +61,8 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -82,11 +79,10 @@ impl Callbacks {
     ///             // -- Children group stopped.
     ///         })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor::with_callbacks`]: supervisor/struct.Supervisor.html#method.with_callbacks
@@ -111,10 +107,9 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|supervisor| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|supervisor| {
     /// supervisor.children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -138,12 +133,11 @@ impl Callbacks {
     ///         })
     ///         .with_callbacks(callbacks)
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -172,10 +166,9 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|supervisor| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|supervisor| {
     /// supervisor.children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -201,12 +194,11 @@ impl Callbacks {
     ///         })
     ///         .with_callbacks(callbacks)
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -235,10 +227,9 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|supervisor| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|supervisor| {
     /// supervisor.children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -264,12 +255,11 @@ impl Callbacks {
     ///         })
     ///         .with_callbacks(callbacks)
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -302,10 +292,9 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|supervisor| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|supervisor| {
     /// supervisor.children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -329,12 +318,11 @@ impl Callbacks {
     ///         })
     ///         .with_callbacks(callbacks)
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -356,12 +344,10 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
     /// let callbacks = Callbacks::new()
     ///     .with_before_start(|| println!("Children group started."));
     ///
     /// assert!(callbacks.has_before_start());
-    /// # }
     /// ```
     ///
     /// [`with_before_start`]: #method.with_before_start
@@ -376,12 +362,10 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
     /// let callbacks = Callbacks::new()
     ///     .with_before_restart(|| println!("Children group restarting."));
     ///
     /// assert!(callbacks.has_before_restart());
-    /// # }
     /// ```
     ///
     /// [`with_before_restart`]: #method.with_before_restart
@@ -396,12 +380,10 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
     /// let callbacks = Callbacks::new()
     ///     .with_after_restart(|| println!("Children group restarted."));
     ///
     /// assert!(callbacks.has_after_restart());
-    /// # }
     /// ```
     ///
     /// [`with_after_restart`]: #method.with_after_restart
@@ -416,12 +398,10 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
     /// let callbacks = Callbacks::new()
     ///     .with_after_stop(|| println!("Children group stopped."));
     ///
     /// assert!(callbacks.has_after_stop());
-    /// # }
     /// ```
     ///
     /// [`with_after_stop`]: #method.with_after_stop

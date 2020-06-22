@@ -36,9 +36,8 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx| {
 ///         async move {
@@ -48,11 +47,10 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 ///         }
 ///     })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 pub struct BastionId(pub(crate) Uuid);
 
@@ -67,9 +65,8 @@ pub struct BastionId(pub(crate) Uuid);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
 ///         async move {
@@ -96,11 +93,10 @@ pub struct BastionId(pub(crate) Uuid);
 ///         }
 ///     })
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 pub struct BastionContext {
     id: BastionId,
@@ -149,9 +145,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -163,11 +158,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -183,9 +177,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -197,11 +190,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
@@ -220,9 +212,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// // When calling the method from a children group supervised
     /// // by a supervisor created by the user...
     /// Bastion::supervisor(|sp| {
@@ -253,11 +244,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
@@ -280,9 +270,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -294,11 +283,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`recv`]: #method.recv
@@ -333,9 +321,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -346,11 +333,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`try_recv`]: #method.try_recv
@@ -379,9 +365,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     ///
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
@@ -393,10 +378,9 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`RefAddr`]: /prelude/struct.Answer.html
@@ -419,9 +403,8 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -435,11 +418,10 @@ impl BastionContext {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`RefAddr`]: ../prelude/struct.RefAddr.html
@@ -559,7 +541,7 @@ impl BastionContext {
     /// deliver a notification.
     /// * `notification_type` - The type of the notification to send.
     ///
-    pub fn notify(&self, dispatchers: &Vec<DispatcherType>, notification_type: NotificationType) {
+    pub fn notify(&self, dispatchers: &[DispatcherType], notification_type: NotificationType) {
         let global_dispatcher = SYSTEM.dispatcher();
         let from_actor = self.current();
         global_dispatcher.notify(from_actor, dispatchers, notification_type);

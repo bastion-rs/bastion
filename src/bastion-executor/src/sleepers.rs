@@ -10,6 +10,7 @@ use std::sync::{Condvar, Mutex};
 /// Similar to how thread parking works, if a notification comes up while no threads are sleeping,
 /// the next thread that attempts to go to sleep will pick up the notification immediately.
 #[derive(Debug)]
+#[allow(clippy::mutex_atomic)]
 pub struct Sleepers {
     /// How many threads are currently a sleep.
     sleep: Mutex<usize>,
@@ -21,14 +22,23 @@ pub struct Sleepers {
     notified: AtomicBool,
 }
 
-impl Sleepers {
+#[allow(clippy::mutex_atomic)]
+impl Default for Sleepers {
     /// Creates a new `Sleepers`.
-    pub fn new() -> Sleepers {
-        Sleepers {
+    fn default() -> Self {
+        Self {
             sleep: Mutex::new(0),
             wake: Condvar::new(),
             notified: AtomicBool::new(false),
         }
+    }
+}
+
+#[allow(clippy::mutex_atomic)]
+impl Sleepers {
+    /// Creates a new `Sleepers`.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Puts the current thread to sleep.

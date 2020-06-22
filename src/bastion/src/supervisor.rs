@@ -44,19 +44,17 @@ use tracing::{debug, trace, warn};
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// let sp_ref: SupervisorRef = Bastion::supervisor(|sp| {
 ///     // Configure the supervisor...
 ///     sp.with_strategy(SupervisionStrategy::OneForOne)
 ///     // ...and return it.
 /// }).expect("Couldn't create the supervisor.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 ///
 /// [`Children`]: children/struct.Children.html
@@ -339,20 +337,18 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::supervisor(|sp| {
     ///     let supervisor_id: &BastionId = sp.id();
     ///     // ...
-    ///     # sp
+    /// # sp
     /// }).expect("Couldn't create the supervisor.");
     ///
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.bcast.id()
@@ -397,21 +393,19 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|parent| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|parent| {
     /// parent.supervisor(|sp| {
     ///     // Configure the supervisor...
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`SupervisorRef`]: ../struct.SupervisorRef.html
@@ -462,22 +456,20 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|mut parent| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|mut parent| {
     /// let sp_ref: SupervisorRef = parent.supervisor_ref(|sp| {
     ///     // Configure the supervisor...
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// });
-    ///         # parent
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    ///     # parent
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`SupervisorRef`]: ../struct.SupervisorRef.html
@@ -529,10 +521,9 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|sp| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|sp| {
     /// sp.children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -546,12 +537,11 @@ impl Supervisor {
     ///         }
     ///     })
     /// })
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Children`]: children/struct.Children.html
@@ -608,10 +598,9 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # Bastion::supervisor(|mut sp| {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|mut sp| {
     /// let children_ref: ChildrenRef = sp.children_ref(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -625,13 +614,12 @@ impl Supervisor {
     ///         }
     ///     })
     /// });
-    ///         # sp
-    ///     # }).unwrap();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    ///     # sp
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Children`]: children/struct.Children.html
@@ -699,18 +687,16 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::supervisor(|sp| {
     ///     // Note that "one-for-one" is the default strategy.
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     /// }).expect("Couldn't create the supervisor");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
@@ -739,25 +725,23 @@ impl Supervisor {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     # Bastion::supervisor(|sp| {
-    ///     sp.with_restart_strategy(
-    ///         RestartStrategy::default()
-    ///             .with_restart_policy(RestartPolicy::Tries(5))
-    ///             .with_actor_restart_strategy(           
-    ///                 ActorRestartStrategy::ExponentialBackOff {
-    ///                     timeout: Duration::from_millis(5000),
-    ///                     multiplier: 3,
-    ///                 }
-    ///             )
-    ///     )
+    /// # Bastion::init();
+    /// # Bastion::supervisor(|sp| {
+    /// sp.with_restart_strategy(
+    ///     RestartStrategy::default()
+    ///         .with_restart_policy(RestartPolicy::Tries(5))
+    ///         .with_actor_restart_strategy(           
+    ///             ActorRestartStrategy::ExponentialBackOff {
+    ///                 timeout: Duration::from_millis(5000),
+    ///                 multiplier: 3,
+    ///             }
+    ///         )
+    /// )
     /// }).expect("Couldn't create the supervisor");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn with_restart_strategy(mut self, restart_strategy: RestartStrategy) -> Self {
         trace!(
@@ -785,9 +769,8 @@ impl Supervisor {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::supervisor(|sp| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Supervisor started."))
@@ -795,11 +778,10 @@ impl Supervisor {
     ///
     ///     sp.with_callbacks(callbacks)
     /// }).expect("Couldn't create the supervisor.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Callbacks`]: struct.Callbacks.html
@@ -1035,15 +1017,14 @@ impl Supervisor {
                 let start_index = *self.tracked_groups_order.get(&id).unwrap();
 
                 // Adding all elements in the group from the given actor
-                for index in start_index..childs.len() {
-                    let tracked_state = &childs[index];
+                childs.iter().skip(start_index).for_each(|tracked_state| {
                     let id = tracked_state.id();
                     let element = RestartedElement::Child {
                         id,
                         parent_id: parent_id.clone(),
                     };
                     objects.push(element)
-                }
+                });
 
                 // And then a rest after the failed group
                 let (rest_index, _) = self.launched.get(&parent_id).unwrap();
@@ -1109,8 +1090,8 @@ impl Supervisor {
         self.stopped();
     }
 
-    async fn deploy_supervised_object(&mut self, deployment: Deployment) {
-        let supervised = match deployment {
+    async fn deploy_supervised_object(&mut self, deployment: Box<Deployment>) {
+        let supervised = match *deployment {
             Deployment::Supervisor(supervisor) => {
                 debug!(
                     "Supervisor({}): Deploying Supervisor({}).",
@@ -1394,20 +1375,18 @@ impl SupervisorRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// let supervisor_ref = Bastion::supervisor(|sp| {
     ///     // ...
     ///     # sp
     /// }).expect("Couldn't create the supervisor.");
     ///
     /// let supervisor_id: &BastionId = supervisor_ref.id();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -1431,20 +1410,18 @@ impl SupervisorRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let mut parent_ref = Bastion::supervisor(|sp| sp).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let mut parent_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// let sp_ref: SupervisorRef = parent_ref.supervisor(|sp| {
     ///     // Configure the supervisor...
     ///     sp.with_strategy(SupervisionStrategy::OneForOne)
     ///     // ...and return it.
     /// }).expect("Couldn't create the supervisor.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Supervisor`]: supervisor/struct.Supervisor.html
@@ -1496,10 +1473,9 @@ impl SupervisorRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// let children_ref: ChildrenRef = sp_ref.children(|children| {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
@@ -1513,11 +1489,10 @@ impl SupervisorRef {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Children`]: children/struct.Children.html
@@ -1596,17 +1571,15 @@ impl SupervisorRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// // Note that "one-for-one" is the default strategy.
     /// sp_ref.strategy(SupervisionStrategy::OneForOne);
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
@@ -1695,16 +1668,14 @@ impl SupervisorRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// sp_ref.stop().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("SupervisorRef({}): Stopping.", self.id());
@@ -1725,16 +1696,14 @@ impl SupervisorRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let sp_ref = Bastion::supervisor(|sp| sp).unwrap();
     /// sp_ref.kill().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("SupervisorRef({}): Killing.", self.id());
@@ -1873,13 +1842,11 @@ impl RestartStrategy {
     /// # use std::time::Duration;
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///    let actor_restart_strategy = ActorRestartStrategy::LinearBackOff {
-    ///        timeout: Duration::from_secs(5)
-    ///    };
-    ///    let restart_strategy = RestartStrategy::default()
-    ///       .with_actor_restart_strategy(actor_restart_strategy);
-    /// # }
+    /// let actor_restart_strategy = ActorRestartStrategy::LinearBackOff {
+    ///     timeout: Duration::from_secs(5)
+    /// };
+    /// let restart_strategy = RestartStrategy::default()
+    ///     .with_actor_restart_strategy(actor_restart_strategy);
     /// ```
     ///
     /// [`RestartStrategy::Always`]: enum.RestartPolicy.html#variant.Always

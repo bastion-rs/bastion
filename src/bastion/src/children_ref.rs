@@ -52,20 +52,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// let children_ref = Bastion::children(|children| {
     ///     // ...
-    ///     # children
+    /// # children
     /// }).expect("Couldn't create the children group.");
     ///
     /// let children_id: &BastionId = children_ref.id();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -79,16 +77,14 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
     /// let dispatchers = children_ref.dispatchers();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -104,16 +100,14 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
     /// let elems: &[ChildRef] = children_ref.elems();
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -197,16 +191,14 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
     /// children_ref.stop().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Stopping.", self.id());
@@ -227,16 +219,14 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
-    ///     # let children_ref = Bastion::children(|children| children).unwrap();
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
     /// children_ref.kill().expect("Couldn't send the message.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Killing.", self.id());
