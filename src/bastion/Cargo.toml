@@ -36,7 +36,7 @@ exclude = [
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["distributed"]
+default = []
 unstable = ["bastion-executor/unstable"]
 distributed = [
   "artillery-core"
