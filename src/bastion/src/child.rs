@@ -20,7 +20,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tracing::{debug, trace, warn};
 
-pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
+pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send>);
 pub(crate) struct Exec(pub(crate) Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ pub(crate) struct Child {
 impl Init {
     pub(crate) fn new<C, F>(init: C) -> Self
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        C: Fn(BastionContext) -> F + Send + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         let init = Box::new(move |ctx: BastionContext| {

@@ -248,7 +248,7 @@ impl Children {
     /// ```
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
-        I: Fn(BastionContext) -> F + Send + Sync + 'static,
+        I: Fn(BastionContext) -> F + Send + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         trace!("Children({}): Setting exec closure.", self.id());
@@ -401,9 +401,10 @@ impl Children {
             children.push(launched);
         }
 
+        let id = self.id();
         children
             .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
+                trace!("Children({}): Unknown child stopped.", id);
             })
             .await;
     }
