@@ -185,6 +185,7 @@ mod windows {
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
+    #[allow(unused_imports)]
     use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
 
     use super::CoreId;
@@ -379,7 +380,7 @@ mod macos {
                     assert_eq!(set.len(), num_cpus::get());
                 }
                 None => {
-                    assert!(false);
+                    panic!();
                 }
             }
         }
@@ -419,7 +420,7 @@ mod tests {
                 assert_eq!(set.len(), num_cpus::get());
             }
             None => {
-                assert!(false);
+                panic!();
             }
         }
     }
