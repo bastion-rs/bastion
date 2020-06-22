@@ -7,6 +7,7 @@ use crate::dispatcher::DispatcherType;
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Message};
 use crate::path::BastionPath;
+use crate::system::SYSTEM;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -246,9 +247,13 @@ impl ChildrenRef {
 
     pub(crate) fn send(&self, env: Envelope) -> Result<(), Envelope> {
         trace!("ChildrenRef({}): Sending message: {:?}", self.id(), env);
-        self.sender
-            .unbounded_send(env)
-            .map_err(|err| err.into_inner())
+        self.sender.unbounded_send(env).or_else(|err| {
+            SYSTEM
+                .dead_letters()
+                .sender
+                .unbounded_send(err.into_inner())
+                .map_err(|err| err.into_inner())
+        })
     }
 
     /// Returns the [`BastionPath`] of this ChildrenRef
