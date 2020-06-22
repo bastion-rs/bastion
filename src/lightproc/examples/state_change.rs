@@ -72,5 +72,5 @@ fn main() {
     // +1 before the start
     // +2 after panic occurs and completion triggers
     // +3 after panic triggers
-    assert_eq!(gs.clone().lock().unwrap().amount, 6);
+    assert_eq!(gs.lock().unwrap().amount, 6);
 }

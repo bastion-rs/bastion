@@ -17,10 +17,7 @@ fn fib(n: usize) -> usize {
 // in the real world
 fn deserialize_into_fib_command(message: String) -> (String, usize) {
     let arguments: Vec<&str> = message.split(' ').collect();
-    let command = arguments
-        .first()
-        .map(|s| s.to_string())
-        .unwrap_or(String::new());
+    let command = arguments.first().map(|s| s.to_string()).unwrap_or_default();
     let number = usize::from_str_radix(arguments.get(1).unwrap_or(&"0"), 10).unwrap_or(0);
     (command, number)
 }
@@ -71,7 +68,7 @@ async fn request(child: &ChildRef, body: String) -> std::io::Result<String> {
         .expect("couldn't perform request");
     Ok(msg! { answer.await.expect("couldn't receive answer"),
         reply: String => {
-            reply.to_string()
+            reply
         };
         unknown:_ => {
             error!("uh oh, I received a message I didn't understand: {:?}", unknown);

@@ -46,7 +46,7 @@ fn supervisor(supervisor: Supervisor) -> Supervisor {
         // That uses our restart strategy defined earlier
         .with_restart_strategy(restart_strategy)
         // And tracks the child group, defined in the following function
-        .children(|children| failed_actors_group(children))
+        .children(failed_actors_group)
 }
 
 fn failed_actors_group(children: Children) -> Children {

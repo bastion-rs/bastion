@@ -9,7 +9,7 @@ fn stack_copy() {
             println!("After panic!");
         });
 
-    let stack2 = stack.clone();
+    let stack2 = stack;
 
     assert_eq!(stack2.get_pid(), 12);
 }
