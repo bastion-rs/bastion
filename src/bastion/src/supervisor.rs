@@ -517,7 +517,7 @@ impl Supervisor {
     ///
     /// If you don't need to chain calls to this `Supervisor`'s methods
     /// and need to get a [`ChildrenRef`] referencing the newly
-    /// created supervisor, use the [`children`] method instead.
+    /// created supervisor, use the [`children_ref`] method instead.
     ///
     /// # Arguments
     ///
