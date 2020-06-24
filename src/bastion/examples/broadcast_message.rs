@@ -43,17 +43,17 @@ fn main() {
 
 // Supervisor that tracking only the single actor with input data
 fn input_supervisor(supervisor: Supervisor) -> Supervisor {
-    supervisor.children(|children| input_group(children))
+    supervisor.children(input_group)
 }
 
 // Supervisor for actors in map group
 fn map_supervisor(supervisor: Supervisor) -> Supervisor {
-    supervisor.children(|children| process_group(children))
+    supervisor.children(process_group)
 }
 
 // Supervisor that tracking only the single actor with output data
 fn response_supervisor(supervisor: Supervisor) -> Supervisor {
-    supervisor.children(|children| response_group(children))
+    supervisor.children(response_group)
 }
 
 fn input_group(children: Children) -> Children {
@@ -110,7 +110,7 @@ fn process_group(children: Children) -> Children {
                             // Push hashmap with data to the next actor group
                             let group_name = "Response".to_string();
                             let target = BroadcastTarget::Group(group_name);
-                            ctx.broadcast_message(target.clone(), counter);
+                            ctx.broadcast_message(target, counter);
                         };
                         _: _ => ();
                     }

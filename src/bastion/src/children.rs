@@ -11,6 +11,7 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 use crate::system::SYSTEM;
+use anyhow::Result as AnyResult;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -44,9 +45,8 @@ use tracing::{debug, trace, warn};
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # fn main() {
-///     # Bastion::init();
-///     #
+/// # Bastion::init();
+/// #
 /// let children_ref: ChildrenRef = Bastion::children(|children| {
 ///     // Configure the children group...
 ///     children.with_exec(|ctx: BastionContext| {
@@ -62,11 +62,10 @@ use tracing::{debug, trace, warn};
 ///     })
 ///     // ...and return it.
 /// }).expect("Couldn't create the children group.");
-///     #
-///     # Bastion::start();
-///     # Bastion::stop();
-///     # Bastion::block_until_stopped();
-/// # }
+/// #
+/// # Bastion::start();
+/// # Bastion::stop();
+/// # Bastion::block_until_stopped();
 /// ```
 ///
 /// [`with_redundancy`]: #method.with_redundancy
@@ -135,19 +134,17 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     let children_id: &BastionId = children.id();
     ///     // ...
-    ///     # children
+    /// # children
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn id(&self) -> &BastionId {
         self.bcast.id()
@@ -224,9 +221,8 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children.with_exec(|ctx| {
     ///         async move {
@@ -240,15 +236,14 @@ impl Children {
     ///         }
     ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
-        I: Fn(BastionContext) -> F + Send + Sync + 'static,
+        I: Fn(BastionContext) -> F + Send + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         trace!("Children({}): Setting exec closure.", self.id());
@@ -272,18 +267,16 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     // Note that "1" is the default number of elements.
     ///     children.with_redundancy(1)
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`with_exec`]: #method.with_exec
@@ -316,20 +309,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     children
     ///         .with_dispatcher(
     ///             Dispatcher::with_type(DispatcherType::Named("CustomGroup".to_string()))
     ///         )
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     /// [`DispatcherHandler`]: ../dispatcher/trait.DispatcherHandler.html
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
@@ -353,9 +344,8 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
     ///     let callbacks = Callbacks::new()
     ///         .with_before_start(|| println!("Children group started."))
@@ -372,11 +362,10 @@ impl Children {
     ///             // -- Children group stopped.
     ///         })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     ///
     /// [`Callbacks`]: struct.Callbacks.html
@@ -401,22 +390,27 @@ impl Children {
             children.push(launched);
         }
 
+        let id = self.id();
         children
             .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Unknown child stopped.", self.id());
+                trace!("Children({}): Unknown child stopped.", id);
             })
             .await;
     }
 
     fn stopped(&mut self) {
         debug!("Children({}): Stopped.", self.id());
-        self.remove_dispatchers();
+        if let Err(e) = self.remove_dispatchers() {
+            warn!("couldn't remove all dispatchers from the registry: {}", e);
+        };
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Children({}): Faulted.", self.id());
-        self.remove_dispatchers();
+        if let Err(e) = self.remove_dispatchers() {
+            warn!("couldn't remove all dispatchers from the registry: {}", e);
+        };
         self.bcast.faulted();
     }
 
@@ -743,20 +737,22 @@ impl Children {
     }
 
     /// Registers all declared local dispatchers in the global dispatcher.
-    pub(crate) fn register_dispatchers(&self) {
+    pub(crate) fn register_dispatchers(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {
-            global_dispatcher.register_dispatcher(dispatcher)
+            global_dispatcher.register_dispatcher(dispatcher)?;
         }
+        Ok(())
     }
 
     /// Removes all declared local dispatchers from the global dispatcher.
-    pub(crate) fn remove_dispatchers(&self) {
+    pub(crate) fn remove_dispatchers(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
 
         for dispatcher in self.dispatchers.iter() {
-            global_dispatcher.remove_dispatcher(dispatcher)
+            global_dispatcher.remove_dispatcher(dispatcher)?;
         }
+        Ok(())
     }
 }

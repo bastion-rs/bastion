@@ -4,6 +4,7 @@
 //! actors grouped together.
 use crate::child_ref::ChildRef;
 use crate::envelope::SignedMessage;
+use anyhow::Result as AnyResult;
 use lever::prelude::*;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
@@ -134,8 +135,8 @@ impl Dispatcher {
     }
 
     /// Returns the used handler by the dispatcher.
-    pub fn handler(&self) -> &Box<dyn DispatcherHandler + Send + Sync + 'static> {
-        &self.handler
+    pub fn handler(&self) -> &(dyn DispatcherHandler + Send + Sync + 'static) {
+        &*self.handler
     }
 
     /// Sets the dispatcher type.
@@ -172,16 +173,17 @@ impl Dispatcher {
     }
 
     /// Appends the information about actor to the dispatcher.
-    pub(crate) fn register(&self, key: &ChildRef, module_name: String) {
-        self.actors.insert(key.to_owned(), module_name);
+    pub(crate) fn register(&self, key: &ChildRef, module_name: String) -> AnyResult<()> {
+        self.actors.insert(key.to_owned(), module_name)?;
         self.handler
             .notify(key, &self.actors, NotificationType::Register);
+        Ok(())
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
     pub(crate) fn remove(&self, key: &ChildRef) {
-        if let Ok(_) = self.actors.remove(key) {
+        if self.actors.remove(key).is_ok() {
             self.handler
                 .notify(key, &self.actors, NotificationType::Remove);
         }
@@ -274,23 +276,27 @@ impl GlobalDispatcher {
     /// Appends the information about actor to the dispatcher.
     pub(crate) fn register(
         &self,
-        dispatchers: &Vec<DispatcherType>,
+        dispatchers: &[DispatcherType],
         child_ref: &ChildRef,
         module_name: String,
-    ) {
+    ) -> AnyResult<()> {
         dispatchers
             .iter()
             .filter(|key| self.dispatchers.contains_key(*key))
-            .for_each(|key| {
+            .map(|key| {
                 if let Some(dispatcher) = self.dispatchers.get(key) {
                     dispatcher.register(child_ref, module_name.clone())
+                } else {
+                    Ok(())
                 }
             })
+            .collect::<AnyResult<Vec<_>>>()?;
+        Ok(())
     }
 
     /// Removes and then returns the record from the registry by the given key.
     /// Returns `None` when the record wasn't found by the given key.
-    pub(crate) fn remove(&self, dispatchers: &Vec<DispatcherType>, child_ref: &ChildRef) {
+    pub(crate) fn remove(&self, dispatchers: &[DispatcherType], child_ref: &ChildRef) {
         dispatchers
             .iter()
             .filter(|key| self.dispatchers.contains_key(*key))
@@ -306,7 +312,7 @@ impl GlobalDispatcher {
     pub(crate) fn notify(
         &self,
         from_actor: &ChildRef,
-        dispatchers: &Vec<DispatcherType>,
+        dispatchers: &[DispatcherType],
         notification_type: NotificationType,
     ) {
         self.dispatchers
@@ -352,25 +358,27 @@ impl GlobalDispatcher {
     }
 
     /// Adds dispatcher to the global registry.
-    pub(crate) fn register_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) {
+    pub(crate) fn register_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) -> AnyResult<()> {
         let dispatcher_type = dispatcher.dispatcher_type();
-        let is_registered = self.dispatchers.contains_key(&dispatcher_type.clone());
+        let is_registered = self.dispatchers.contains_key(&dispatcher_type);
 
         if is_registered && dispatcher_type != DispatcherType::Anonymous {
             warn!(
                 "The dispatcher with the '{:?}' name already registered in the cluster.",
                 dispatcher_type
             );
-            return;
+            return Ok(());
         }
 
         let instance = dispatcher.clone();
-        self.dispatchers.insert(dispatcher_type, instance);
+        self.dispatchers.insert(dispatcher_type, instance)?;
+        Ok(())
     }
 
     /// Removes dispatcher from the global registry.
-    pub(crate) fn remove_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) {
-        self.dispatchers.remove(&dispatcher.dispatcher_type());
+    pub(crate) fn remove_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) -> AnyResult<()> {
+        self.dispatchers.remove(&dispatcher.dispatcher_type())?;
+        Ok(())
     }
 }
 
@@ -431,7 +439,7 @@ mod tests {
     #[test]
     fn test_get_dispatcher_type_as_named() {
         let name = "test_group".to_string();
-        let dispatcher_type = DispatcherType::Named(name.clone());
+        let dispatcher_type = DispatcherType::Named(name);
         let instance = Dispatcher::with_type(dispatcher_type.clone());
 
         assert_eq!(instance.dispatcher_type(), dispatcher_type);
@@ -448,7 +456,9 @@ mod tests {
 
         assert_eq!(instance.actors.contains_key(&child_ref), false);
 
-        instance.register(&child_ref, "my::test::module".to_string());
+        instance
+            .register(&child_ref, "my::test::module".to_string())
+            .unwrap();
         assert_eq!(instance.actors.contains_key(&child_ref), true);
     }
 
@@ -461,7 +471,9 @@ mod tests {
         let name = "test_name".to_string();
         let child_ref = ChildRef::new(bastion_id, sender, name, path);
 
-        instance.register(&child_ref, "my::test::module".to_string());
+        instance
+            .register(&child_ref, "my::test::module".to_string())
+            .unwrap();
         assert_eq!(instance.actors.contains_key(&child_ref), true);
 
         instance.remove(&child_ref);
@@ -490,7 +502,7 @@ mod tests {
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
 
-        const DATA: &'static str = "A message containing data (ask).";
+        const DATA: &str = "A message containing data (ask).";
         let message = Arc::new(SignedMessage::new(
             Msg::broadcast(DATA),
             RefAddr::new(path, sender),
@@ -512,7 +524,9 @@ mod tests {
             false
         );
 
-        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
         assert_eq!(
             global_dispatcher.dispatchers.contains_key(&dispatcher_type),
             true
@@ -525,13 +539,17 @@ mod tests {
         let local_dispatcher = Arc::new(Box::new(Dispatcher::with_type(dispatcher_type.clone())));
         let global_dispatcher = GlobalDispatcher::new();
 
-        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
         assert_eq!(
             global_dispatcher.dispatchers.contains_key(&dispatcher_type),
             true
         );
 
-        global_dispatcher.remove_dispatcher(&local_dispatcher);
+        global_dispatcher
+            .remove_dispatcher(&local_dispatcher)
+            .unwrap();
         assert_eq!(
             global_dispatcher.dispatchers.contains_key(&dispatcher_type),
             false
@@ -552,11 +570,15 @@ mod tests {
         let module_name = "my::test::module".to_string();
 
         let global_dispatcher = GlobalDispatcher::new();
-        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
 
         assert_eq!(local_dispatcher.actors.contains_key(&child_ref), false);
 
-        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        global_dispatcher
+            .register(&actor_groups, &child_ref, module_name)
+            .unwrap();
         assert_eq!(local_dispatcher.actors.contains_key(&child_ref), true);
     }
 
@@ -574,9 +596,13 @@ mod tests {
         let module_name = "my::test::module".to_string();
 
         let global_dispatcher = GlobalDispatcher::new();
-        global_dispatcher.register_dispatcher(&local_dispatcher);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
 
-        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        global_dispatcher
+            .register(&actor_groups, &child_ref, module_name)
+            .unwrap();
         assert_eq!(local_dispatcher.actors.contains_key(&child_ref), true);
 
         global_dispatcher.remove(&actor_groups, &child_ref);
@@ -600,8 +626,12 @@ mod tests {
         let module_name = "my::test::module".to_string();
 
         let global_dispatcher = GlobalDispatcher::new();
-        global_dispatcher.register_dispatcher(&local_dispatcher);
-        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
+        global_dispatcher
+            .register(&actor_groups, &child_ref, module_name)
+            .unwrap();
 
         global_dispatcher.notify(&child_ref, &actor_groups, NotificationType::Register);
         let handler_was_called = handler.was_called();
@@ -625,12 +655,16 @@ mod tests {
         let module_name = "my::test::module".to_string();
 
         let global_dispatcher = GlobalDispatcher::new();
-        global_dispatcher.register_dispatcher(&local_dispatcher);
-        global_dispatcher.register(&actor_groups, &child_ref, module_name);
+        global_dispatcher
+            .register_dispatcher(&local_dispatcher)
+            .unwrap();
+        global_dispatcher
+            .register(&actor_groups, &child_ref, module_name)
+            .unwrap();
 
         let (sender, _) = mpsc::unbounded();
         let path = Arc::new(BastionPath::root());
-        const DATA: &'static str = "A message containing data (ask).";
+        const DATA: &str = "A message containing data (ask).";
         let message = Arc::new(SignedMessage::new(
             Msg::broadcast(DATA),
             RefAddr::new(path, sender),

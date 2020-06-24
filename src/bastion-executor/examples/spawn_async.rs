@@ -25,6 +25,6 @@ fn main() {
         async {
             handle.await;
         },
-        stack.clone(),
+        stack,
     );
 }

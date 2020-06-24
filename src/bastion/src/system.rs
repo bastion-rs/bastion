@@ -44,6 +44,7 @@ struct System {
     started: bool,
 }
 
+#[allow(clippy::mutex_atomic)]
 impl GlobalSystem {
     fn new(
         sender: Sender,
@@ -248,8 +249,8 @@ impl System {
         }
     }
 
-    async fn deploy(&mut self, deployment: Deployment) {
-        match deployment {
+    async fn deploy(&mut self, deployment: Box<Deployment>) {
+        match *deployment {
             Deployment::Supervisor(supervisor) => {
                 debug!("System: Deploying Supervisor({}).", supervisor.id());
                 supervisor.callbacks().before_start();

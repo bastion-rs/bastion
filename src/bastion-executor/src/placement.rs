@@ -185,6 +185,7 @@ mod windows {
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
+    #[allow(unused_imports)]
     use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
 
     use super::CoreId;
@@ -312,8 +313,6 @@ mod macos {
 
     use libc::{c_int, c_uint, pthread_self};
 
-    use num_cpus;
-
     use super::CoreId;
 
     type KernReturnT = c_int;
@@ -371,7 +370,6 @@ mod macos {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
 
         use super::*;
 
@@ -382,7 +380,7 @@ mod macos {
                     assert_eq!(set.len(), num_cpus::get());
                 }
                 None => {
-                    assert!(false);
+                    panic!();
                 }
             }
         }
@@ -412,7 +410,6 @@ fn set_for_current_helper(core_id: CoreId) {}
 
 #[cfg(test)]
 mod tests {
-    use num_cpus;
 
     use super::*;
 
@@ -423,7 +420,7 @@ mod tests {
                 assert_eq!(set.len(), num_cpus::get());
             }
             None => {
-                assert!(false);
+                panic!();
             }
         }
     }

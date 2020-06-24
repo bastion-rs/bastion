@@ -19,7 +19,9 @@ proptest! {
                 .with_redundancy(r)
                 .with_exec(|_ctx: BastionContext| {
                     async move {
-                        loop {}
+                        loop {
+                            std::mem::drop(());
+                        }
                     }
                 })
         }).expect("Coudn't spawn children.");

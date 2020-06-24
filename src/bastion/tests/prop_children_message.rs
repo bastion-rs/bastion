@@ -34,10 +34,8 @@ proptest! {
                         }
 
                         msg! { answer.await?,
-                            _msg: &'static str => {
-                                ();
-                            };
-                            _: _ => ();
+                            _msg: &'static str => {};
+                            _: _ => {};
                         }
 
                         Ok(())

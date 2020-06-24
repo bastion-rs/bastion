@@ -7,6 +7,7 @@ use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::system::SYSTEM;
+use anyhow::Result as AnyResult;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -18,9 +19,9 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 
-pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send + Sync>);
+pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send>);
 pub(crate) struct Exec(pub(crate) Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>);
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ pub(crate) struct Child {
 impl Init {
     pub(crate) fn new<C, F>(init: C) -> Self
     where
-        C: Fn(BastionContext) -> F + Send + Sync + 'static,
+        C: Fn(BastionContext) -> F + Send + 'static,
         F: Future<Output = Result<(), ()>> + Send + 'static,
     {
         let init = Box::new(move |ctx: BastionContext| {
@@ -133,7 +134,7 @@ impl Child {
         let sender = self.bcast.sender().clone();
 
         let msg = BastionMessage::restart_required(self.id().clone(), parent.id().clone());
-        let env = Envelope::new(msg, path.clone(), sender.clone());
+        let env = Envelope::new(msg, path, sender);
         // TODO: handle errors
         parent.send(env).ok();
     }
@@ -272,7 +273,10 @@ impl Child {
 
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
-        self.register_in_dispatchers();
+        if let Err(e) = self.register_in_dispatchers() {
+            error!("couldn't add actor to the registry: {}", e);
+            return;
+        };
 
         loop {
             match poll!(&mut self.bcast.next()) {
@@ -282,6 +286,7 @@ impl Child {
                     ..
                 })) => {
                     if self.initialize().await.is_err() {
+                        error!("couldn't initialize Child with id: {}", self.id());
                         return;
                     }
 
@@ -304,6 +309,7 @@ impl Child {
                         msg
                     );
                     if self.handle(msg).await.is_err() {
+                        error!("Child({}): Couldn't handle message", self.id());
                         return;
                     }
 
@@ -347,7 +353,7 @@ impl Child {
     }
 
     /// Adds the actor into each registry declared in the parent node.
-    fn register_in_dispatchers(&self) {
+    fn register_in_dispatchers(&self) -> AnyResult<()> {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
             let child_ref = self.child_ref.clone();
             let used_dispatchers = parent.dispatchers();
@@ -355,8 +361,9 @@ impl Child {
             let global_dispatcher = SYSTEM.dispatcher();
             // FIXME: Pass the module name explicitly?
             let module_name = module_path!().to_string();
-            global_dispatcher.register(used_dispatchers, &child_ref, module_name);
+            global_dispatcher.register(used_dispatchers, &child_ref, module_name)?;
         }
+        Ok(())
     }
 
     /// Cleanup the actor's record from each declared dispatcher.

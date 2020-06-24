@@ -9,13 +9,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
       - name: Install
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2020-03-08
+          toolchain: nightly-2020-06-22
           override: true
       - uses: davidB/rust-cargo-make@v1
         with:
@@ -30,8 +29,8 @@ jobs:
           cargo clean
           # Do some Bastion shake
           cd src/bastion && \
-            cargo miri test -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- dispatcher && \
-            cargo miri test -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- path && \
-            cargo miri test -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- broadcast && \
-            cargo miri test -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- children_ref && \
+            cargo miri test --features lever/nightly -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- dispatcher && \
+            cargo miri test --features lever/nightly -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- path && \
+            cargo miri test --features lever/nightly -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- broadcast && \
+            cargo miri test --features lever/nightly -- -Zmiri-disable-isolation -Zmiri-ignore-leaks -- children_ref && \
             cd -
