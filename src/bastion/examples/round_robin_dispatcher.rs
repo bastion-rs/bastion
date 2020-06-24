@@ -51,7 +51,8 @@ fn caller_group(children: Children) -> Children {
         // We create the function to exec
         .with_exec(move |ctx: BastionContext| {
             async move {
-                let data_to_send: Vec<&str> = vec!["data_1","data_2","data_3","data_4","data_5"];
+                let data_to_send: Vec<&str> =
+                    vec!["data_1", "data_2", "data_3", "data_4", "data_5"];
                 // We define the target which will receive the broadcasted message
                 let target = BroadcastTarget::Group("Rounder".to_string());
                 // We iterate on each data
@@ -72,7 +73,9 @@ fn rounder_group(children: Children) -> Children {
         // We want to have 5 children in this group
         .with_redundancy(5)
         // We want to have a disptacher named `Rounder`
-        .with_dispatcher(Dispatcher::with_type(DispatcherType::Named("Rounder".to_string())))
+        .with_dispatcher(Dispatcher::with_type(DispatcherType::Named(
+            "Rounder".to_string(),
+        )))
         // We create the function to exec when each children is called
         .with_exec(move |ctx: BastionContext| {
             async move {
