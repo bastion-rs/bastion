@@ -52,14 +52,16 @@ fn rounder_group(children: Children) -> Children {
 
 fn caller_group(children: Children) -> Children {
     children
+        .with_redundancy(1)
         .with_exec(move |ctx: BastionContext| {
             async move {
                 let test: Vec<&str> = vec!["test1","test2","test3","test4","test5"];
                 let target = BroadcastTarget::Group("Rounder".to_string());
                 for t in test {
-                    ctx.broadcast_message(target.clone(), t);
+                    println!("Sended: {}", t);
+                    ctx.broadcast_message(target.clone(), t)
                 }
-                Bastion::stop();
+                
                 Ok(())
             }
         })
