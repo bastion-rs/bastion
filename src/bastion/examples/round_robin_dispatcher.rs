@@ -31,6 +31,7 @@ fn rounder_group(children: Children) -> Children {
         .with_dispatcher(Dispatcher::with_type(DispatcherType::Named("Rounder".to_string())))
         .with_exec(move |ctx: BastionContext| {
             async move {
+                loop {
                 msg! {
                     ctx.recv().await?,
                     raw_message: Arc<SignedMessage> => {
@@ -44,8 +45,7 @@ fn rounder_group(children: Children) -> Children {
                     };
                     _: _ => ();
                 }
-
-                Ok(())
+            }
             }
         })
 }
@@ -61,6 +61,7 @@ fn caller_group(children: Children) -> Children {
                     println!("Sended: {}", t);
                     ctx.broadcast_message(target.clone(), t)
                 }
+                Bastion::stop();
                 
                 Ok(())
             }
