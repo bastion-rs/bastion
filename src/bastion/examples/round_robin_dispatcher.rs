@@ -1,4 +1,5 @@
 use bastion::prelude::*;
+use std::sync::Arc;
 
 /// 
 /// Dispatcher based on round robien algorithm example
@@ -7,20 +8,20 @@ fn main() {
     env_logger::init();
     // We need bastion to run our program
     Bastion::init();
+    Bastion::start();
 
-    let children = Bastion::children(|children: Children| {
+    Bastion::children(|children: Children| {
         children
+            .with_name("dispatcher")
             .with_redundancy(5)
+            .with_dispatcher(Dispatcher::with_type(DispatcherType::Named("Roudner".to_string())))
             .with_exec(move |ctx: BastionContext| {
                 async move {
-                    println!("Test");
-                    msg! {
+                    msg! { 
                         ctx.recv().await?,
-                        ref _msg: &'static str => {
-                            println!("static msg ref");
-                        };
-                        _msg: &'static str => {
-                            println!("static msg 1");
+                        t: &'static str =!> {
+                            println!("Received {} str", t);
+                            answer!(ctx, t).expect("Couldn't send an answer.");
                         };
                         _: _ => ();
                     }
@@ -28,7 +29,25 @@ fn main() {
                     Ok(())
                 }
             })
+    }).expect("Couldn't start the dispatcher children group");
+
+    let test: Vec<&'static str> = vec!["test1","test2","test3","test4"];
+
+    Bastion::children(|children: Children| {
+        children
+            .with_exec(move |ctx: BastionContext| {
+                let test = test.clone();
+                async move {
+                    let target = BroadcastTarget::Group("dispatcher".to_string());
+                    for t in test {
+                        ctx.broadcast_message(target.clone(), t);
+                    }
+                    Bastion::stop();
+
+                    Ok(())
+                }
+            })
     }).expect("Couldn't start a new children group");
 
-    Bastion::start();
+    Bastion::block_until_stopped();
 }
