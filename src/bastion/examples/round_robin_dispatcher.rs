@@ -5,14 +5,14 @@ use std::sync::Arc;
 /// Prologue:
 /// This example demonstrate a idiomatic way to implement the round robin
 /// algorithm with bastion. We will use two groups of children, one will be
-/// supervised by a dispatcher, named `Rounder`, the other one will call it.
+/// supervised by a dispatcher, named `Receiver`, the other one will call it.
 /// Both groups will be supervised by the supervisor.
 ///
 ///         Bastion
 ///            |
 ///        Supervisor     
 ///       /          \
-///    Caller      Rounder
+///    Caller      Receiver
 ///      |            |
 ///   Children     Children
 ///
@@ -27,7 +27,7 @@ fn main() {
     Bastion::init();
     // We create the supervisor and we add both groups on it
     Bastion::supervisor(caller_supervisor)
-        .and_then(|_| Bastion::supervisor(rounder_supervisor))
+        .and_then(|_| Bastion::supervisor(receiver_supervisor))
         .expect("Couldn't create supervisor chain.");
     // We are starting the Bastion program now
     Bastion::start();
@@ -40,9 +40,9 @@ fn caller_supervisor(supervisor: Supervisor) -> Supervisor {
     supervisor.children(|children| caller_group(children))
 }
 
-fn rounder_supervisor(supervisor: Supervisor) -> Supervisor {
+fn receiver_supervisor(supervisor: Supervisor) -> Supervisor {
     // We are doing the same as above
-    supervisor.children(|children| rounder_group(children))
+    supervisor.children(|children| receiver_group(children))
 }
 
 fn caller_group(children: Children) -> Children {
@@ -54,7 +54,7 @@ fn caller_group(children: Children) -> Children {
                 let data_to_send: Vec<&str> =
                     vec!["data_1", "data_2", "data_3", "data_4", "data_5"];
                 // We define the target which will receive the broadcasted message
-                let target = BroadcastTarget::Group("Rounder".to_string());
+                let target = BroadcastTarget::Group("Receiver".to_string());
                 // We iterate on each data
                 for data in data_to_send {
                     // We broadcast the message containing the data to the defined target
@@ -67,14 +67,14 @@ fn caller_group(children: Children) -> Children {
         })
 }
 
-fn rounder_group(children: Children) -> Children {
+fn receiver_group(children: Children) -> Children {
     // We create the second group of children
     children
         // We want to have 5 children in this group
         .with_redundancy(5)
-        // We want to have a disptacher named `Rounder`
+        // We want to have a disptacher named `Receiver`
         .with_dispatcher(Dispatcher::with_type(DispatcherType::Named(
-            "Rounder".to_string(),
+            "Receiver".to_string(),
         )))
         // We create the function to exec when each children is called
         .with_exec(move |ctx: BastionContext| {
