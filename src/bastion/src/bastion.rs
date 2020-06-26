@@ -218,8 +218,7 @@ impl Bastion {
             std::panic::set_hook(Box::new(|_| ()));
         }
 
-        // NOTE: this is just to make sure that SYSTEM has been initialized by lazy_static
-        SYSTEM.sender().is_closed();
+        lazy_static::initialize(&SYSTEM);
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified
