@@ -77,6 +77,7 @@ pub mod children_ref;
 pub mod context;
 pub mod dispatcher;
 pub mod envelope;
+pub mod executor;
 pub mod message;
 pub mod path;
 pub mod supervisor;

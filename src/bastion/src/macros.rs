@@ -199,9 +199,9 @@ macro_rules! supervisor {
 #[macro_export]
 macro_rules! blocking {
     ($($tokens:tt)*) => {
-        bastion_executor::blocking::spawn_blocking(async move {
+        $crate::executor::blocking(async move {
             $($tokens)*
-        }, lightproc::proc_stack::ProcStack::default())
+        })
     };
 }
 
