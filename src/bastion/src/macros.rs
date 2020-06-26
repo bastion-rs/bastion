@@ -199,9 +199,9 @@ macro_rules! supervisor {
 #[macro_export]
 macro_rules! blocking {
     ($($tokens:tt)*) => {
-        bastion_executor::blocking::spawn_blocking(async move {
+        $crate::executor::blocking(async move {
             $($tokens)*
-        }, lightproc::proc_stack::ProcStack::default())
+        })
     };
 }
 
@@ -232,11 +232,11 @@ macro_rules! blocking {
 #[macro_export]
 macro_rules! run {
     ($action:expr) => {
-        bastion_executor::run::run($action, lightproc::proc_stack::ProcStack::default())
+        bastion::executor::run($action)
     };
 
     ($($tokens:tt)*) => {
-        bastion_executor::run::run(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
+        bastion::executor::run(async move {$($tokens)*})
     };
 }
 
@@ -255,11 +255,11 @@ macro_rules! run {
 #[macro_export]
 macro_rules! spawn {
     ($action:expr) => {
-        bastion_executor::pool::spawn($action, lightproc::proc_stack::ProcStack::default())
+        bastion::executor::spawn($action)
     };
 
     ($($tokens:tt)*) => {
-        bastion_executor::pool::spawn(async move {$($tokens)*}, lightproc::proc_stack::ProcStack::default())
+        bastion::executor::spawn(async move {$($tokens)*})
     };
 }
 
