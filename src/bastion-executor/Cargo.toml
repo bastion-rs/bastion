@@ -36,8 +36,8 @@ crossbeam-channel = "0.4"
 crossbeam-epoch = "0.8"
 lazy_static = "1.4"
 libc = "0.2"
-num_cpus = "1.10"
-pin-utils = "0.1.0-alpha.4"
+num_cpus = "1.13"
+pin-utils = "0.1.0"
 
 # Allocator
 numanji = { version = "^0.1", optional = true, default-features = false }
@@ -52,4 +52,4 @@ kernel32-sys = "^0.2.2"
 
 [dev-dependencies]
 proptest = "^0.10"
-futures = "0.3.1"
+futures = "0.3.5"
