@@ -12,6 +12,7 @@ use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
+use async_mutex::Mutex;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -19,7 +20,6 @@ use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use qutex::Qutex;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
@@ -462,7 +462,7 @@ impl Children {
         }
     }
 
-    fn restart_child(&mut self, old_id: &BastionId, old_state: &Qutex<Pin<Box<ContextState>>>) {
+    fn restart_child(&mut self, old_id: &BastionId, old_state: Arc<Mutex<Pin<Box<ContextState>>>>) {
         let parent = Parent::children(self.as_ref());
         let bcast = Broadcast::new(parent, BastionPathElement::Child(old_id.clone()));
 
@@ -474,7 +474,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Qutex::new(Box::pin(ContextState::new()));
+        let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
 
         let ctx = BastionContext::new(
             id.clone(),
@@ -584,7 +584,7 @@ impl Children {
             Envelope {
                 msg: BastionMessage::RestoreChild { id, state },
                 ..
-            } => self.restart_child(&id, &state),
+            } => self.restart_child(&id, state),
             Envelope {
                 msg: BastionMessage::DropChild { id },
                 ..
@@ -698,7 +698,7 @@ impl Children {
             let children = self.as_ref();
             let supervisor = self.bcast.parent().clone().into_supervisor();
 
-            let state = Qutex::new(Box::pin(ContextState::new()));
+            let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
 
             let ctx = BastionContext::new(
                 id.clone(),

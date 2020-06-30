@@ -9,6 +9,7 @@ use crate::context::{BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::path::{BastionPath, BastionPathElement};
+use async_mutex::Mutex;
 use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
@@ -16,7 +17,6 @@ use futures::{pending, poll};
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
-use qutex::Qutex;
 use std::cmp::{Eq, PartialEq};
 use std::ops::Range;
 use std::pin::Pin;
@@ -106,7 +106,7 @@ pub struct Supervisor {
 #[derive(Debug, Clone)]
 struct TrackedChildState {
     id: BastionId,
-    state: Qutex<Pin<Box<ContextState>>>,
+    state: Arc<Mutex<Pin<Box<ContextState>>>>,
     restarts_counts: usize,
 }
 
@@ -1725,7 +1725,7 @@ impl SupervisorRef {
 }
 
 impl TrackedChildState {
-    fn new(id: BastionId, state: Qutex<Pin<Box<ContextState>>>) -> Self {
+    fn new(id: BastionId, state: Arc<Mutex<Pin<Box<ContextState>>>>) -> Self {
         TrackedChildState {
             id,
             state,
@@ -1737,7 +1737,7 @@ impl TrackedChildState {
         self.id.clone()
     }
 
-    fn state(&self) -> Qutex<Pin<Box<ContextState>>> {
+    fn state(&self) -> Arc<Mutex<Pin<Box<ContextState>>>> {
         self.state.clone()
     }
 

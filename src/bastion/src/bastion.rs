@@ -528,9 +528,9 @@ impl Bastion {
         // FIXME: Err(Error)
         SYSTEM.sender().unbounded_send(envelope).ok();
 
-        // FIXME: panics
-        let mut system = SYSTEM.handle().lock().wait().unwrap();
-        if let Some(system) = system.take() {
+        let handle = SYSTEM.handle();
+        let system = crate::executor::run(async { handle.lock().await.take() });
+        if let Some(system) = system {
             debug!("Bastion: Cancelling system handle.");
             system.cancel();
         }
