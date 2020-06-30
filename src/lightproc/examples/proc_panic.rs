@@ -1,5 +1,5 @@
 use crossbeam::channel::{unbounded, Sender};
-use futures::executor;
+use futures_executor as executor;
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use lightproc::proc_state::EmptyProcState;
