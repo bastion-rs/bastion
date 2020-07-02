@@ -19,6 +19,10 @@ proptest! {
                 .with_redundancy(r)
                 .with_exec(|_ctx: BastionContext| {
                     async move {
+                        // It's a proptest,
+                        // we just don't want the loop
+                        // to be optimized away
+                        #[allow(clippy::drop_copy)]
                         loop {
                             std::mem::drop(());
                         }

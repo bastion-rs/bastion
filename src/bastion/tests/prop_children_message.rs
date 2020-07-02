@@ -16,7 +16,7 @@ proptest! {
 
         let message = Arc::new(message);
 
-        match Bastion::children(|children| {
+        let _ = Bastion::children(|children| {
             children
                 .with_exec(move |ctx: BastionContext| {
                     let message = (*message).clone();
@@ -41,9 +41,6 @@ proptest! {
                         Ok(())
                     }
                 })
-        }) {
-            Ok(_) => (),
-            _ => (),
-        }
+        });
     }
 }

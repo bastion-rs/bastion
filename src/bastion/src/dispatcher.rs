@@ -398,6 +398,10 @@ mod tests {
         called: Arc<Mutex<bool>>,
     }
 
+    // Here we actually want both
+    // the locking mechanism and
+    // the bool value
+    #[allow(clippy::mutex_atomic)]
     impl CustomHandler {
         pub fn new(value: bool) -> Self {
             CustomHandler {
