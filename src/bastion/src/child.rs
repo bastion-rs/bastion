@@ -8,16 +8,17 @@ use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
+use async_mutex::Mutex;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use lightproc::prelude::*;
 use lightproc::proc_state::EmptyProcState;
-use qutex::Qutex;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::{debug, error, trace, warn};
 
@@ -36,7 +37,7 @@ pub(crate) struct Child {
     // This is used to store the messages that were received
     // for the child's associated future to be able to
     // retrieve them.
-    state: Qutex<Pin<Box<ContextState>>>,
+    state: Arc<Mutex<Pin<Box<ContextState>>>>,
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -68,7 +69,7 @@ impl Child {
         exec: Exec,
         callbacks: Callbacks,
         bcast: Broadcast,
-        state: Qutex<Pin<Box<ContextState>>>,
+        state: Arc<Mutex<Pin<Box<ContextState>>>>,
         child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
@@ -189,9 +190,9 @@ impl Child {
                 sign,
             } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
-                let mut guard = self.state.clone().lock_async().await.map_err(|_| ())?;
-                let mut state = guard.as_mut();
-                state.push_message(msg, sign);
+                let state = self.state.clone();
+                let mut guard = state.lock().await;
+                guard.push_message(msg, sign);
             }
             Envelope {
                 msg: BastionMessage::RestartRequired { .. },

@@ -1,5 +1,5 @@
 use crossbeam::channel;
-use futures::executor;
+use futures_executor as executor;
 use lightproc::prelude::*;
 use lightproc::proc_state::EmptyProcState;
 use std::future::Future;

@@ -6,6 +6,7 @@ use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment};
 use crate::path::{BastionPath, BastionPathElement};
 use crate::supervisor::{Supervisor, SupervisorRef};
+use async_mutex::Mutex as AsyncMutex;
 use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
@@ -13,7 +14,6 @@ use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
 use lightproc::prelude::*;
-use qutex::Qutex;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::Poll;
 use tracing::{debug, error, info, trace, warn};
@@ -27,7 +27,7 @@ pub(crate) struct GlobalSystem {
     supervisor: SupervisorRef,
     dead_letters: ChildrenRef,
     path: Arc<BastionPath>,
-    handle: Qutex<Option<RecoverableHandle<()>>>,
+    handle: Arc<AsyncMutex<Option<RecoverableHandle<()>>>>,
     running: Mutex<bool>,
     stopping_cvar: Condvar,
     dispatcher: GlobalDispatcher,
@@ -53,7 +53,7 @@ impl GlobalSystem {
         handle: RecoverableHandle<()>,
     ) -> Self {
         let handle = Some(handle);
-        let handle = Qutex::new(handle);
+        let handle = Arc::new(AsyncMutex::new(handle));
         let path = Arc::new(BastionPath::root());
         let running = Mutex::new(true);
         let stopping_cvar = Condvar::new();
@@ -83,7 +83,7 @@ impl GlobalSystem {
         &self.dead_letters
     }
 
-    pub(crate) fn handle(&self) -> Qutex<Option<RecoverableHandle<()>>> {
+    pub(crate) fn handle(&self) -> Arc<AsyncMutex<Option<RecoverableHandle<()>>>> {
         self.handle.clone()
     }
 
@@ -429,8 +429,8 @@ impl System {
                         trace!("System: Replaying message: {:?}", msg);
                         // FIXME: Err(Error)?
                         if self.handle(msg).await.is_err() {
-                            // FIXME: panics?
-                            let mut system = SYSTEM.handle().lock_async().await.unwrap();
+                            let handle = SYSTEM.handle();
+                            let mut system = handle.lock().await;
                             *system = None;
 
                             SYSTEM.notify_stopped();
@@ -446,8 +446,8 @@ impl System {
                 Poll::Ready(Some(msg)) => {
                     trace!("System: Received a new message (started=true): {:?}", msg);
                     if self.handle(msg).await.is_err() {
-                        // FIXME: panics?
-                        let mut system = SYSTEM.handle().lock_async().await.unwrap();
+                        let handle = SYSTEM.handle();
+                        let mut system = handle.lock().await;
                         *system = None;
 
                         SYSTEM.notify_stopped();

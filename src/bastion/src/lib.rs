@@ -53,10 +53,6 @@
 // Doc generation experimental features
 #![cfg_attr(feature = "docs", feature(doc_cfg))]
 
-// TODO: https://github.com/cogciprocate/qutex/pull/5
-// TODO: https://github.com/cogciprocate/qutex/pull/6
-extern crate bastion_qutex as qutex;
-
 pub use self::bastion::Bastion;
 pub use self::callbacks::Callbacks;
 pub use self::config::Config;

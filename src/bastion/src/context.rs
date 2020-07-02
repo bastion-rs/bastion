@@ -9,8 +9,8 @@ use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
+use async_mutex::Mutex;
 use futures::pending;
-use qutex::{Guard, Qutex};
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
@@ -103,7 +103,7 @@ pub struct BastionContext {
     child: ChildRef,
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
-    state: Qutex<Pin<Box<ContextState>>>,
+    state: Arc<Mutex<Pin<Box<ContextState>>>>,
 }
 
 #[derive(Debug)]
@@ -125,7 +125,7 @@ impl BastionContext {
         child: ChildRef,
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
-        state: Qutex<Pin<Box<ContextState>>>,
+        state: Arc<Mutex<Pin<Box<ContextState>>>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -293,11 +293,10 @@ impl BastionContext {
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         debug!("BastionContext({}): Trying to receive message.", self.id);
-        // TODO: Err(Error)
-        let mut guard = self.state.clone().lock_async().await.ok()?;
-        let mut state = guard.as_mut();
+        let state = self.state.clone();
+        let mut guard = state.lock().await;
 
-        if let Some(msg) = state.pop_message() {
+        if let Some(msg) = guard.pop_message() {
             trace!("BastionContext({}): Received message: {:?}", self.id, msg);
             Some(msg)
         } else {
@@ -344,16 +343,15 @@ impl BastionContext {
     pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
-            // TODO: Err(Error)
-            let mut guard = self.state.clone().lock_async().await.unwrap();
-            let mut state = guard.as_mut();
+            let state = self.state.clone();
+            let mut guard = state.lock().await;
 
-            if let Some(msg) = state.pop_message() {
+            if let Some(msg) = guard.pop_message() {
                 trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
 
-            Guard::unlock(guard);
+            drop(guard);
             pending!();
         }
     }

@@ -61,9 +61,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 pin-utils = "0.1"
 
-# TODO: https://github.com/cogciprocate/qutex/pull/5
-# TODO: https://github.com/cogciprocate/qutex/pull/6
-bastion-qutex = { version = "0.2", features = ["async_await"] }
+async-mutex = "1.1"
 uuid = { version = "0.8", features = ["v4"] }
 
 # Distributed
