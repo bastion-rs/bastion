@@ -48,7 +48,6 @@ jemallocator = { version = "^0.3", optional = true, default-features = false }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "^0.3.8", features = ["basetsd"] }
-kernel32-sys = "^0.2.2"
 
 [dev-dependencies]
 proptest = "^0.10"

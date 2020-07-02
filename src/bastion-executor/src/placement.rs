@@ -176,17 +176,14 @@ fn set_for_current_helper(core_id: CoreId) {
 }
 
 #[cfg(target_os = "windows")]
-extern crate kernel32;
-#[cfg(target_os = "windows")]
 extern crate winapi;
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use kernel32::{
-        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
-    };
     #[allow(unused_imports)]
-    use winapi::shared::basetsd::{DWORD32, DWORD64, PDWORD32, PDWORD64};
+    use winapi::shared::basetsd::{DWORD_PTR, PDWORD_PTR};
+    use winapi::um::processthreadsapi::{GetCurrentProcess, GetCurrentThread};
+    use winapi::um::winbase::{GetProcessAffinityMask, SetThreadAffinityMask};
 
     use super::CoreId;
 
@@ -195,11 +192,11 @@ mod windows {
             // Find all active cores in the bitmask.
             let mut core_ids: Vec<CoreId> = Vec::new();
 
-            for i in 0..64 as u64 {
+            for i in 0..64 as usize {
                 let test_mask = 1 << i;
 
                 if (mask & test_mask) == test_mask {
-                    core_ids.push(CoreId { id: i as usize });
+                    core_ids.push(CoreId { id: i });
                 }
             }
 
@@ -211,52 +208,29 @@ mod windows {
 
     pub fn set_for_current(core_id: CoreId) {
         // Convert `CoreId` back into mask.
-        let mask: u64 = 1 << core_id.id;
+        let mask: DWORD_PTR = 1 << core_id.id;
 
         // Set core affinity for current thread.
         unsafe {
-            #[cfg(target_pointer_width = "32")]
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD32);
-            #[cfg(target_pointer_width = "64")]
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD64);
+            SetThreadAffinityMask(GetCurrentThread(), mask);
         }
     }
 
-    fn get_affinity_mask() -> Option<u64> {
-        #[cfg(target_pointer_width = "64")]
-        let mut process_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut process_mask: u32 = 0;
-        #[cfg(target_pointer_width = "64")]
-        let mut system_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut system_mask: u32 = 0;
+    fn get_affinity_mask() -> Option<usize> {
+        let mut process_mask: usize = 0;
+        let mut system_mask: usize = 0;
 
         let res = unsafe {
-            // Good luck with other architectures.
-            // Since Windows is already like a cartoon:
-            // Tinky winky, dipsy, laa laa, po.
-
-            #[cfg(target_pointer_width = "32")]
-            let r = GetProcessAffinityMask(
+            GetProcessAffinityMask(
                 GetCurrentProcess(),
-                &mut process_mask as PDWORD32,
-                &mut system_mask as PDWORD32,
-            );
-
-            #[cfg(target_pointer_width = "64")]
-            let r = GetProcessAffinityMask(
-                GetCurrentProcess(),
-                &mut process_mask as PDWORD64,
-                &mut system_mask as PDWORD64,
-            );
-
-            r
+                &mut process_mask as PDWORD_PTR,
+                &mut system_mask as PDWORD_PTR,
+            )
         };
 
         // Successfully retrieved affinity mask
         if res != 0 {
-            Some(process_mask as u64)
+            Some(process_mask)
         }
         // Failed to retrieve affinity mask
         else {
