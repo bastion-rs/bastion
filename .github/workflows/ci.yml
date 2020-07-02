@@ -60,7 +60,8 @@ jobs:
           command: test
           args: --all
 
-      - name: tests nightly
+      - name: tests nightly not linux
+        if: matrix.os == 'ubuntu-latest' && matrix.version == 'nightly'
         uses: actions-rs/cargo@v1
         with:
           command: test

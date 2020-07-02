@@ -232,7 +232,7 @@ macro_rules! blocking {
 #[macro_export]
 macro_rules! run {
     ($action:expr) => {
-        bastion::executor::run($action)
+        $crate::executor::run($action)
     };
 
     ($($tokens:tt)*) => {
@@ -255,7 +255,7 @@ macro_rules! run {
 #[macro_export]
 macro_rules! spawn {
     ($action:expr) => {
-        bastion::executor::spawn($action)
+        $crate::executor::spawn($action)
     };
 
     ($($tokens:tt)*) => {
