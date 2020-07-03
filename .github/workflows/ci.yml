@@ -17,16 +17,16 @@ jobs:
           - stable
           - nightly
         include:
-          - toolchain: x86_64-pc-windows-msvc
-            os: windows-latest
-          - toolchain: x86_64-pc-windows-gnu
-            os: windows-latest
-          - toolchain: i686-pc-windows-msvc
-            os: windows-latest
-          - toolchain: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - toolchain: x86_64-apple-darwin
-            os: macOS-latest
+        - toolchain: x86_64-pc-windows-msvc
+          os: windows-latest
+        - toolchain: x86_64-pc-windows-gnu
+          os: windows-latest
+        - toolchain: i686-pc-windows-msvc
+          os: windows-latest
+        - toolchain: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+        - toolchain: x86_64-apple-darwin
+          os: macOS-latest
 
     name: ${{ matrix.version }} - ${{ matrix.toolchain }}
     runs-on: ${{ matrix.os }}
@@ -40,15 +40,15 @@ jobs:
           toolchain: ${{ matrix.version }}-${{ matrix.toolchain }}
           default: true
 
-      - name: nix check nightly
-        if: matrix.version == 'nightly' && (matrix.os == "ubuntu-latest" || matrix.os == "macOS-latest")
+      - name: check nightly (nix)
+        if: ${{ matrix.version == 'nightly' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest') }}
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all-targets --all-features --benches --bins --examples --tests
 
-      - name: Windows check nightly
-        if: matrix.version == 'nightly' && matrix.os == "windows-latest"
+      - name: check nightly (windows)
+        if: ${{ matrix.version == 'nightly' && matrix.os == 'windows-latest' }}
         uses: actions-rs/cargo@v1
         with:
           command: check
@@ -67,8 +67,15 @@ jobs:
           command: test
           args: --all
 
-      - name: tests nightly not linux
-        if: matrix.os == 'ubuntu-latest' && matrix.version == 'nightly'
+      - name: tests nightly
+        if: ${{ matrix.version == 'nightly' && matrix.os != 'ubuntu-latest' }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-targets --all-features
+
+      - name: tests nightly linux
+        if: ${{ matrix.version == 'nightly' && matrix.os == 'ubuntu-latest' }}
         uses: actions-rs/cargo@v1
         with:
           command: test
