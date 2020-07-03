@@ -40,12 +40,19 @@ jobs:
           toolchain: ${{ matrix.version }}-${{ matrix.toolchain }}
           default: true
 
-      - name: check nightly
-        if: matrix.version == 'nightly'
+      - name: nix check nightly
+        if: matrix.version == 'nightly' && (matrix.os == "ubuntu-latest" || matrix.os == "macOS-latest")
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all-targets --all-features --benches --bins --examples --tests
+
+      - name: Windows check nightly
+        if: matrix.version == 'nightly' && matrix.os == "windows-latest"
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --benches --bins --examples --tests
 
       - name: check stable
         if: matrix.version == 'stable'
