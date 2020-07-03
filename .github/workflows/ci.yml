@@ -72,7 +72,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-targets --all-features
+          args: --all
 
       - name: tests nightly linux
         if: ${{ matrix.version == 'nightly' && matrix.os == 'ubuntu-latest' }}
