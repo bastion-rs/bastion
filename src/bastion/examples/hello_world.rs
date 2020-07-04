@@ -18,7 +18,7 @@ fn main() {
                   // We are waiting a msg
                   ctx.recv().await?,
                   ref msg: &'static str => {
-                    // We are logging the msg broadcasted bellow
+                    // We are logging the broadcasted msg below
                     println!("{}", msg);
                   };
                   _: _ => ();
