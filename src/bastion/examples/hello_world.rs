@@ -9,7 +9,7 @@ fn main() {
     Bastion::init();
     // We are starting the Bastion program now
     Bastion::start();
-    // We are creating the group of children which will received the message
+    // We are creating the group of children which will receive the message
     let children = Bastion::children(|children| {
         // We are creating the function to exec
         children.with_exec(|ctx: BastionContext| {
