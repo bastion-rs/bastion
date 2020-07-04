@@ -11,7 +11,7 @@ fn main() {
     Bastion::start();
     // We are creating the group of children which will received the message
     let children = Bastion::children(|children| {
-        // We create the function to exec
+        // We are creating the function to exec
         children.with_exec(|ctx: BastionContext| {
             async move {
                 msg! {
