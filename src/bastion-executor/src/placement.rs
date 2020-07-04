@@ -191,7 +191,7 @@ mod windows {
             // Find all active cores in the bitmask.
             let mut core_ids: Vec<CoreId> = Vec::new();
 
-            for i in 0..64 as usize {
+            for i in 0..usize::MIN.count_zeros() as usize {
                 let test_mask = 1 << i;
 
                 if (mask & test_mask) == test_mask {
