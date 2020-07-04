@@ -28,7 +28,10 @@
 // Force missing implementations
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
-
+#![cfg_attr(
+    any(feature = "numanji", feature = "allocator-suite"),
+    feature(allocator_api)
+)]
 #[macro_use]
 mod macros;
 

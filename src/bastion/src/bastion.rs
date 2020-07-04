@@ -375,8 +375,9 @@ impl Bastion {
     {
         Bastion::children(|ch| ch.with_redundancy(1).with_exec(action))
     }
-
     distributed_api! {
+        // FIXME!
+        #[allow(missing_docs)]
         pub fn distributed<I, F>(cluster_config: &'static ArtilleryAPClusterConfig, action: I) -> Result<ChildrenRef, ()>
         where
             I: Fn(Arc<DistributedContext>) -> F + Send + Sync + 'static,

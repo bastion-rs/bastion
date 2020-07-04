@@ -104,7 +104,6 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
 
         use super::*;
 
@@ -113,7 +112,7 @@ mod linux {
             match get_affinity_mask() {
                 Some(_) => {}
                 None => {
-                    assert!(false);
+                    panic!();
                 }
             }
         }
@@ -125,7 +124,7 @@ mod linux {
                     assert_eq!(set.len(), num_cpus::get());
                 }
                 None => {
-                    assert!(false);
+                    panic!();
                 }
             }
         }
@@ -134,7 +133,7 @@ mod linux {
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
-            assert!(ids.len() > 0);
+            assert!(!ids.is_empty());
 
             set_for_current(ids[0]);
 
@@ -403,7 +402,7 @@ mod tests {
     fn test_set_for_current() {
         let ids = get_core_ids().unwrap();
 
-        assert!(ids.len() > 0);
+        assert!(!ids.is_empty());
 
         set_for_current(ids[0]);
     }

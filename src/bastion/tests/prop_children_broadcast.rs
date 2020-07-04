@@ -13,7 +13,7 @@ proptest! {
         });
         Bastion::start();
 
-        match Bastion::children(|children: Children| {
+        if let Ok(_chrn) = Bastion::children(|children: Children| {
             children
                 .with_exec(move |ctx: BastionContext| {
                     async move {
@@ -27,12 +27,9 @@ proptest! {
                         Ok(())
                     }
                 })
-        }) {
-            Ok(_chrn) => {
-                let message: &'static str = Box::leak(message.into_boxed_str());
-                Bastion::broadcast(message).expect("broadcast failed");
-            },
-            _ => (),
+        }){
+            let message: &'static str = Box::leak(message.into_boxed_str());
+            Bastion::broadcast(message).expect("broadcast failed");
         }
     }
 }

@@ -13,12 +13,9 @@ fn spawn_responders() -> ChildrenRef {
         children.with_exec(move |ctx: BastionContext| async move {
             msg! { ctx.recv().await?,
                 msg: &'static str =!> {
-                    match msg {
-                        "Hello" => {
+                    if msg == "Hello" {
                             assert!(signature!().is_sender_identified(), false);
                             answer!(ctx, "Goodbye").unwrap();
-                        },
-                        _ => (),
                     }
                 };
                 _: _ => ();

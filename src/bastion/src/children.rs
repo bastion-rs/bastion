@@ -487,7 +487,7 @@ impl Children {
 
         self.bcast.register(&bcast);
 
-        let msg = BastionMessage::set_state(old_state.clone());
+        let msg = BastionMessage::set_state(old_state);
         let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
         self.bcast.send_child(&id, env);
 

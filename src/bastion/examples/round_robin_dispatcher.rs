@@ -37,12 +37,12 @@ fn main() {
 
 fn caller_supervisor(supervisor: Supervisor) -> Supervisor {
     // We create a new children, it wrap the Bastion::Children method to add it on the supervisor
-    supervisor.children(|children| caller_group(children))
+    supervisor.children(caller_group)
 }
 
 fn receiver_supervisor(supervisor: Supervisor) -> Supervisor {
     // We are doing the same as above
-    supervisor.children(|children| receiver_group(children))
+    supervisor.children(receiver_group)
 }
 
 fn caller_group(children: Children) -> Children {

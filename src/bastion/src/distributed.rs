@@ -1,21 +1,19 @@
 //!
 //! Cluster formation and distributed actor instantiation
 use crate::children_ref::ChildrenRef;
-use crate::Bastion;
 use crate::context::*;
-use crate::message::{Message};
+use crate::message::Message;
+use crate::Bastion;
 
 use crate::message::Msg;
 
-use std::sync::Arc;
 use artillery_core::cluster::ap::*;
 use artillery_core::epidemic::prelude::*;
+use std::sync::Arc;
 
-use tracing::*;
-use futures::future;
 use core::future::Future;
-
-
+use futures::future;
+use tracing::*;
 
 use lever::table::lotable::*;
 
@@ -30,23 +28,27 @@ pub struct ClusterMessage {
 }
 
 impl ClusterMessage {
+    ///
+    /// Create a `ClusterMessage` from a `Msg` and a member
     pub fn new(msg: Msg, member: Uuid) -> Self {
         ClusterMessage { msg, member }
     }
 
-    pub fn extract(self) -> Msg
-    {
+    ///
+    /// Extract a `Msg` from a `ClusterMessage`
+    pub fn extract(self) -> Msg {
         self.msg
     }
 }
 
 ///
 /// Distributed context that holds currently formed/forming cluster's context.
+#[derive(Debug)]
 pub struct DistributedContext {
     bctx: BastionContext,
     me: Uuid,
     members: LOTable<Uuid, ArtilleryMember>,
-    cluster: Arc<Cluster>
+    cluster: Arc<Cluster>,
 }
 
 impl DistributedContext {
@@ -57,7 +59,7 @@ impl DistributedContext {
             bctx,
             me,
             members: LOTable::new(),
-            cluster
+            cluster,
         }
     }
 
@@ -82,8 +84,8 @@ impl DistributedContext {
     /// If a node is down it won't appear in this list.
     /// If a node is suspected, it will still be in here. When suspected message delivery isn't guaranteed.
     pub fn members(&self) -> Vec<ArtilleryMember> {
-        self.members.values()
-            .into_iter()
+        self.members
+            .values()
             .filter(|m| m.host_key() != self.me)
             .collect()
     }
@@ -93,7 +95,7 @@ impl DistributedContext {
     /// Message needs to be stringified or apply the rules of bastion's [Message] trait.
     pub fn tell<M>(&self, to: &Uuid, msg: M) -> Result<(), M>
     where
-        M: Message + AsRef<str>
+        M: Message + AsRef<str>,
     {
         debug!("Sending payload");
         self.cluster.send_payload(*to, msg);
@@ -103,35 +105,30 @@ impl DistributedContext {
     ///
     /// Channel that aggregates incoming cluster events to this node.
     pub async fn recv(&self) -> Result<ClusterMessage, ()> {
-        debug!("DistributedContext({}): Waiting to receive message.", self.me);
+        debug!(
+            "DistributedContext({}): Waiting to receive message.",
+            self.me
+        );
         loop {
             for (members, event) in self.cluster.events.try_iter() {
                 warn!(event = format!("{:?}", event).as_str(), "Cluster event");
-                match event {
-                    ArtilleryMemberEvent::Payload(member, msg) => {
-                        return Ok(ClusterMessage::new(Msg::tell(msg), member.host_key()));
-                    },
-                    _ => {}
+                if let ArtilleryMemberEvent::Payload(member, msg) = event {
+                    return Ok(ClusterMessage::new(Msg::tell(msg), member.host_key()));
                 }
 
-                members
-                    .iter()
-                    .for_each(|m| {
-                        match m.state() {
-                            ArtilleryMemberState::Alive => {
-                                let _ = self.members.insert(m.host_key(), m.clone());
-                            },
-                            ArtilleryMemberState::Down => {
-                                let _ = self.members.remove(&m.host_key());
-                            },
-                            _ => {}
-                        }
-                    });
+                members.iter().for_each(|m| match m.state() {
+                    ArtilleryMemberState::Alive => {
+                        let _ = self.members.insert(m.host_key(), m.clone());
+                    }
+                    ArtilleryMemberState::Down => {
+                        let _ = self.members.remove(&m.host_key());
+                    }
+                    _ => {}
+                });
             }
         }
     }
 }
-
 
 ///
 /// Creates distributed cluster actor
@@ -147,19 +144,20 @@ where
 
     Bastion::spawn(move |ctx: BastionContext| {
         let ap_cluster = Arc::new(ArtilleryAPCluster::new(cluster_config.clone()).unwrap());
-        let dctx = Arc::new(DistributedContext::new(ctx, ap_cluster.cluster(), cluster_config.node_id));
+        let dctx = Arc::new(DistributedContext::new(
+            ctx,
+            ap_cluster.cluster(),
+            cluster_config.node_id,
+        ));
         let action = action.clone();
 
         let core = async move {
             let _ap_events = ap_cluster.clone();
 
             // Detach cluster launch
-            let cluster_handle =
-                blocking!(ap_cluster.launch().await);
+            let cluster_handle = blocking!(ap_cluster.launch().await);
 
-            let events_handle = blocking!(
-                action(dctx).await;
-            );
+            let events_handle = blocking!(action(dctx).await);
 
             future::join(events_handle, cluster_handle).await
         };

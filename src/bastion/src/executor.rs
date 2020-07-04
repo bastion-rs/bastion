@@ -11,11 +11,9 @@ use std::future::Future;
 /// ```
 /// # use std::{thread, time};
 /// use bastion::executor::blocking;
-/// # fn main() {
 /// let task = blocking(async move {
 ///     thread::sleep(time::Duration::from_millis(3000));
 /// });
-/// # }
 /// ```
 pub fn blocking<F, R>(future: F) -> RecoverableHandle<R>
 where
@@ -32,7 +30,6 @@ where
 /// ```
 /// # use bastion::prelude::*;
 /// use bastion::executor::run;
-/// # fn main() {
 /// let future1 = async move {
 ///     123
 /// };
@@ -48,7 +45,6 @@ where
 ///
 /// let result = run(future2);
 /// assert_eq!(result, 5);
-/// # }
 /// ```
 pub fn run<F, T>(future: F) -> T
 where
@@ -63,12 +59,10 @@ where
 /// ```
 /// # use bastion::prelude::*;
 /// use bastion::executor::{spawn, run};
-/// # fn main() {
 /// let handle = spawn(async {
 ///     panic!("test");
 /// });
 /// run(handle);
-/// # }
 /// ```
 pub fn spawn<F, T>(future: F) -> RecoverableHandle<T>
 where
