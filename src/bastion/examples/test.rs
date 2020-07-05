@@ -1,9 +1,9 @@
+use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    RwLock,
+    Mutex,
 };
-use std::collections::{hash_map::OccupiedEntry, HashMap};
 
 // ----------------------------------------------------------------
 
@@ -31,14 +31,14 @@ where
 #[derive(Debug)]
 struct Room {
     movie: String,
-    available_seats: AtomicUsize,
+    available_seats: usize,
 }
 
 impl Room {
-    pub fn new(movie: String, max_seats: usize) -> Self {
+    pub fn new(movie: String, available_seats: usize) -> Self {
         Self {
             movie,
-            available_seats: AtomicUsize::new(max_seats),
+            available_seats,
         }
     }
 }
@@ -48,7 +48,7 @@ impl Display for Room {
         write!(
             f,
             "Hosting {} with {} available seats",
-            self.movie, self.available_seats.load(Ordering::SeqCst)
+            self.movie, self.available_seats
         )
     }
 }
@@ -56,14 +56,14 @@ impl Display for Room {
 #[derive(Debug)]
 struct Cinema {
     next_ticket_id: AtomicUsize,
-    rooms: RwLock<HashMap<String, Room>>,
+    rooms: Mutex<HashMap<String, Room>>,
 }
 
 impl Default for Cinema {
     fn default() -> Self {
         Self {
             next_ticket_id: AtomicUsize::new(1),
-            rooms: RwLock::new(HashMap::new()),
+            rooms: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -87,34 +87,43 @@ impl Request for Reservation {
 
 impl Display for BookedTicket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} got seat number {}. Ticket id is {}", self.name, self.seat_number, self.ticket_id)
+        write!(
+            f,
+            "{} got seat number {}. Ticket id is {}",
+            self.name, self.seat_number, self.ticket_id
+        )
     }
 }
 
 impl Receiver<Room> for Cinema {
     fn receive(&self, room: Room) {
         println!("Opened new room: {}", room);
-        self.rooms.write().unwrap().insert(room.movie.clone(), room);
+        self.rooms.lock().unwrap().insert(room.movie.clone(), room);
     }
 }
 
 impl RequestHandler<Reservation> for Cinema {
-    fn handle(&self, reservation: Reservation) -> Result<<Reservation as Request>::Response, String> {
-        if !self.rooms.read().contains_key(reservation.movie) {
-            Err("no movie".to_string())
-        }
-        let seat_number = match self.rooms.entry(reservation.movie) {
-            OccupiedEntry((movie, room)) => {
-                //FIXME: Not atomic at all, could go wrong
-                let seat_number = room.available_seats.load(Ordering::SeqCst);
+    fn handle(
+        &self,
+        reservation: Reservation,
+    ) -> Result<<Reservation as Request>::Response, String> {
+        let seat_number = self
+            .rooms
+            .lock()
+            .unwrap()
+            .get_mut(&reservation.movie)
+            .map(|mut room| {
+                let seat_number = room.available_seats;
 
                 if seat_number == 0 {
-                    return Err(format!("no more seats for {} today", reservation.movie))
+                    Err(format!("no more seats for {} today", reservation.movie))
+                } else {
+                    room.available_seats -= 1;
+                    Ok(seat_number)
                 }
-                room.available_seats.fetch_sub(1, Ordering::SeqCst);
-            },
-            _ => return Err(format!("no room displaying {} today", reservation.movie))
-        };
+            })
+            .ok_or_else(|| format!("no room displaying {} today", reservation.movie))??;
+
         Ok(BookedTicket {
             name: reservation.name,
             seat_number,
@@ -141,7 +150,7 @@ fn main() {
     let tickets = (1..=10usize).map(|i| {
         let r = Reservation {
             name: format!("Jeremy_{}", i),
-            movie: "Star Wars".to_string()
+            movie: "Star Wars".to_string(),
         };
 
         cinema.handle(r).expect("woopsie")
