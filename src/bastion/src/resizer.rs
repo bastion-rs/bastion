@@ -166,7 +166,7 @@ impl OptimalSizeExploringResizer {
         for (actor_id, (_, handle)) in actors {
             let state = handle.state();
             let mailbox_size = self.actor_stats.get(actor_id).unwrap_or(0);
-            let can_be_freed = state.is_pending() && mailbox_size == 0;
+            let can_be_freed = mailbox_size == 0 && state.is_pending();
 
             if state.is_closed() || state.is_completed() || can_be_freed {
                 actors_to_stop.push(actor_id.clone())
@@ -225,7 +225,7 @@ impl Default for OptimalSizeExploringResizer {
         OptimalSizeExploringResizer {
             stats: Arc::new(AtomicU64::new(0)),
             actor_stats: Arc::new(LOTable::new()),
-            lower_bound: 1,
+            lower_bound: 0,
             upper_bound: UpperBound::Limit(10),
             upscale_strategy: UpscaleStrategy::MailboxSizeThreshold(3),
             upscale_rate: 0.1,

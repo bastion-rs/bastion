@@ -790,6 +790,8 @@ impl Children {
         let mut stats = ActorGroupStats::load(self.resizer.stats());
         stats.update_actors_count(self.launched.len() as u32);
         stats.store(self.resizer.stats());
+
+        println!("Active workers: {} [{}]", self.launched.len(), self.id());
     }
 
     #[cfg(feature = "scaling")]
@@ -937,11 +939,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let mut state = ContextState::new();
-        #[cfg(feature = "scaling")]
-        self.init_data_for_scaling(&mut state);
-
-        let state = Qutex::new(Box::pin(state));
+        let state = Qutex::new(Box::pin(ContextState::new()));
 
         let ctx = BastionContext::new(
             id.clone(),

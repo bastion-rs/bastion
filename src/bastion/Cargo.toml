@@ -54,7 +54,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
 
-lever = "0.1.1-alpha.3"
+lever = "0.1.1-alpha.7"
 futures = "0.3.5"
 futures-timer = "3.0.2"
 fxhash = "0.2"
