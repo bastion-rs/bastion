@@ -811,6 +811,12 @@ impl Children {
         self.update_actors_count_stats();
     }
 
+    #[cfg(feature = "scaling")]
+    fn init_data_for_scaling(&self, state: &mut ContextState) {
+        state.with_stats(self.resizer.stats());
+        state.with_actor_stats(self.resizer.actor_stats());
+    }
+
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
 
@@ -879,7 +885,10 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = ContextState::new().with_stats(self.resizer.stats());
+        let mut state = ContextState::new();
+        #[cfg(feature = "scaling")]
+        self.init_data_for_scaling(&mut state);
+
         let state = Arc::new(Mutex::new(Box::pin(state)));
 
         let ctx = BastionContext::new(
@@ -928,7 +937,10 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = ContextState::new().with_stats(self.resizer.stats());
+        let mut state = ContextState::new();
+        #[cfg(feature = "scaling")]
+        self.init_data_for_scaling(&mut state);
+
         let state = Qutex::new(Box::pin(state));
 
         let ctx = BastionContext::new(

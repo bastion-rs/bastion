@@ -11,6 +11,8 @@ use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
 use async_mutex::Mutex;
 use futures::pending;
+#[cfg(feature = "scaling")]
+use lever::table::lotable::LOTable;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
@@ -113,6 +115,8 @@ pub(crate) struct ContextState {
     messages: VecDeque<SignedMessage>,
     #[cfg(feature = "scaling")]
     stats: Arc<AtomicU64>,
+    #[cfg(feature = "scaling")]
+    actor_stats: Arc<LOTable<BastionId, u32>>,
 }
 
 impl BastionId {
@@ -575,18 +579,29 @@ impl ContextState {
             messages: VecDeque::new(),
             #[cfg(feature = "scaling")]
             stats: Arc::new(AtomicU64::new(0)),
+            #[cfg(feature = "scaling")]
+            actor_stats: Arc::new(LOTable::new()),
         }
     }
 
     #[cfg(feature = "scaling")]
-    pub(crate) fn with_stats(mut self, stats: Arc<AtomicU64>) -> Self {
+    pub(crate) fn with_stats(&mut self, stats: Arc<AtomicU64>) {
         self.stats = stats;
-        self
+    }
+
+    #[cfg(feature = "scaling")]
+    pub(crate) fn with_actor_stats(&mut self, actor_stats: Arc<LOTable<BastionId, u32>>) {
+        self.actor_stats = actor_stats;
     }
 
     #[cfg(feature = "scaling")]
     pub(crate) fn stats(&self) -> Arc<AtomicU64> {
         self.stats.clone()
+    }
+
+    #[cfg(feature = "scaling")]
+    pub(crate) fn actor_stats(&self) -> Arc<LOTable<BastionId, u32>> {
+        self.actor_stats.clone()
     }
 
     pub(crate) fn push_message(&mut self, msg: Msg, sign: RefAddr) {

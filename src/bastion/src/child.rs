@@ -297,6 +297,9 @@ impl Child {
         let mut stats = ActorGroupStats::load(storage.clone());
         stats.update_average_mailbox_size(context_state.mailbox_size());
         stats.store(storage);
+
+        let actor_stats_table = guard.actor_stats();
+        actor_stats_table.insert(self.bcast.id().clone(), context_state.mailbox_size());
     }
 
     async fn run(mut self) {

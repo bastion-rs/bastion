@@ -9,6 +9,7 @@
 use crate::broadcast::Sender;
 use crate::context::BastionId;
 use fxhash::FxHashMap;
+use lever::table::lotable::LOTable;
 use lightproc::recoverable_handle::RecoverableHandle;
 use std::cmp::min;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -22,6 +23,9 @@ pub struct OptimalSizeExploringResizer {
     // the big-endian endianness. Currently stores the amount of
     // active actors and an average mailbox size for the actor group.
     stats: Arc<AtomicU64>,
+    // Special storage for the actor's data, that handles
+    // information about current mailbox size of the specific actor.
+    actor_stats: Arc<LOTable<BastionId, u32>>,
     // The minimal amount of actors that must be active.
     lower_bound: u64,
     // The maximal amount of actors acceptable for usage.
@@ -97,6 +101,11 @@ impl OptimalSizeExploringResizer {
         self.stats.clone()
     }
 
+    /// Returns a reference to the table with actor stats
+    pub(crate) fn actor_stats(&self) -> Arc<LOTable<BastionId, u32>> {
+        self.actor_stats.clone()
+    }
+
     /// Overrides the minimal amount of actors available to use.
     pub fn with_lower_bound(mut self, lower_bound: u64) -> Self {
         self.lower_bound = lower_bound;
@@ -156,8 +165,10 @@ impl OptimalSizeExploringResizer {
         let mut actors_to_stop = Vec::new();
         for (actor_id, (_, handle)) in actors {
             let state = handle.state();
+            let mailbox_size = self.actor_stats.get(actor_id).unwrap_or(0);
+            let can_be_freed = state.is_pending() && mailbox_size == 0;
 
-            if state.is_closed() || state.is_completed() {
+            if state.is_closed() || state.is_completed() || can_be_freed {
                 actors_to_stop.push(actor_id.clone())
             }
         }
@@ -213,6 +224,7 @@ impl Default for OptimalSizeExploringResizer {
     fn default() -> Self {
         OptimalSizeExploringResizer {
             stats: Arc::new(AtomicU64::new(0)),
+            actor_stats: Arc::new(LOTable::new()),
             lower_bound: 1,
             upper_bound: UpperBound::Limit(10),
             upscale_strategy: UpscaleStrategy::MailboxSizeThreshold(3),
