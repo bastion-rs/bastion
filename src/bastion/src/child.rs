@@ -153,6 +153,10 @@ impl Child {
                 ..
             } => {
                 self.stopped();
+
+                #[cfg(feature = "scaling")]
+                self.cleanup_actors_stats().await;
+
                 self.callbacks.after_stop();
                 return Err(());
             }
@@ -161,6 +165,10 @@ impl Child {
                 ..
             } => {
                 self.stopped();
+
+                #[cfg(feature = "scaling")]
+                self.cleanup_actors_stats().await;
+
                 self.callbacks.before_restart();
                 return Err(());
             }
@@ -299,7 +307,9 @@ impl Child {
         stats.store(storage);
 
         let actor_stats_table = guard.actor_stats();
-        actor_stats_table.insert(self.bcast.id().clone(), context_state.mailbox_size());
+        actor_stats_table
+            .insert(self.bcast.id().clone(), context_state.mailbox_size())
+            .ok();
     }
 
     async fn run(mut self) {
@@ -412,6 +422,23 @@ impl Child {
             let global_dispatcher = SYSTEM.dispatcher();
             global_dispatcher.remove(used_dispatchers, &child_ref);
         }
+    }
+
+    #[cfg(feature = "scaling")]
+    async fn cleanup_actors_stats(&mut self) {
+        let guard = match self.state.clone().lock_async().await {
+            Ok(guard) => guard,
+            Err(err) => {
+                debug!(
+                    "Child({:?}) Can't cleanup stats. Reason: {:?}",
+                    self.bcast.id(),
+                    err
+                );
+                return;
+            }
+        };
+        let actor_stats_table = guard.actor_stats();
+        actor_stats_table.remove(&self.bcast.id().clone()).ok();
     }
 }
 

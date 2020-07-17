@@ -147,21 +147,55 @@ impl OptimalSizeExploringResizer {
         &self,
         actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     ) -> ScalingRule {
+        // Do a pre-check before doing a scaling up/down: need to ensure that
+        // we always have a minimum amount of actors in runtime, in according
+        // to the specified lower_bound parameter
+        let active_actors_count = actors.len() as u64;
+        if active_actors_count < self.lower_bound {
+            let additional_actors_count = self.lower_bound - active_actors_count;
+            return ScalingRule::Upscale(additional_actors_count);
+        }
+
         let mut stats = ActorGroupStats::load(self.stats.clone());
 
-        // Scaling up
+        if let Some(scaling_rule) = self.do_upscaling(&mut stats, actors) {
+            return scaling_rule;
+        }
+
+        if let Some(scaling_rule) = self.do_downscaling(&mut stats, actors) {
+            return scaling_rule;
+        }
+
+        ScalingRule::DoNothing
+    }
+
+    // Scaling up based on the given strategy.
+    fn do_upscaling(
+        &self,
+        stats: &mut ActorGroupStats,
+        actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    ) -> Option<ScalingRule> {
         match self.upscale_strategy {
             UpscaleStrategy::MailboxSizeThreshold(threshold) => {
                 if stats.average_mailbox_size > threshold {
                     let count = (stats.actors_count as f64 * self.upscale_rate).ceil() as u64;
                     stats.average_mailbox_size = 0;
                     stats.store(self.stats.clone());
-                    return self.adjustment_upscaling(actors, count);
+                    return Some(self.adjustment_upscaling(actors, count));
                 }
             }
-        };
+        }
 
-        // Scaling down
+        None
+    }
+
+    // Scaling down: stop and remove actors that killed, stopped or successfully
+    // finished up its own execution.
+    fn do_downscaling(
+        &self,
+        _stats: &mut ActorGroupStats,
+        actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    ) -> Option<ScalingRule> {
         let mut actors_to_stop = Vec::new();
         for (actor_id, (_, handle)) in actors {
             let state = handle.state();
@@ -174,31 +208,32 @@ impl OptimalSizeExploringResizer {
         }
         if !actors_to_stop.is_empty() {
             let active_actors_count = actors.len();
-            let freed_actors_max =
+            let freed_actors_limit =
                 (self.downscale_rate * active_actors_count as f64).ceil() as usize;
-            let mut freed_actors_limit = min(actors_to_stop.len(), freed_actors_max as usize);
-            let left_active_actors = (active_actors_count - freed_actors_limit) as u64;
+            let mut freed_actors_desired = min(actors_to_stop.len(), freed_actors_limit);
+            let left_active_actors = active_actors_count - freed_actors_desired;
 
-            freed_actors_limit = match left_active_actors >= self.lower_bound {
-                true => freed_actors_limit,
+            // Make sure here that we won't exceed the limits while stopping actors
+            freed_actors_desired = match left_active_actors >= self.lower_bound as usize {
+                true => freed_actors_desired,
                 false => {
-                    let excessive_actors_count = self.lower_bound - left_active_actors;
-                    freed_actors_limit - (excessive_actors_count as usize)
+                    let excessive_actors_to_stop = self.lower_bound as usize - left_active_actors;
+                    freed_actors_desired - excessive_actors_to_stop
                 }
             };
-
-            return match freed_actors_limit {
-                0 => ScalingRule::DoNothing,
+            return match freed_actors_desired {
+                0 => Some(ScalingRule::DoNothing),
                 _ => {
-                    let freed_actors = actors_to_stop.drain(0..freed_actors_limit).collect();
-                    ScalingRule::Downscale(freed_actors)
+                    let freed_actors = actors_to_stop.drain(0..freed_actors_desired).collect();
+                    Some(ScalingRule::Downscale(freed_actors))
                 }
             };
         }
 
-        ScalingRule::DoNothing
+        None
     }
 
+    // Adjusting upscaling in according to the upper_bound limits.
     fn adjustment_upscaling(
         &self,
         actors: &FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
@@ -225,7 +260,7 @@ impl Default for OptimalSizeExploringResizer {
         OptimalSizeExploringResizer {
             stats: Arc::new(AtomicU64::new(0)),
             actor_stats: Arc::new(LOTable::new()),
-            lower_bound: 0,
+            lower_bound: 1,
             upper_bound: UpperBound::Limit(10),
             upscale_strategy: UpscaleStrategy::MailboxSizeThreshold(3),
             upscale_rate: 0.1,

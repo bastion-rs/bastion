@@ -585,12 +585,12 @@ impl ContextState {
     }
 
     #[cfg(feature = "scaling")]
-    pub(crate) fn with_stats(&mut self, stats: Arc<AtomicU64>) {
+    pub(crate) fn set_stats(&mut self, stats: Arc<AtomicU64>) {
         self.stats = stats;
     }
 
     #[cfg(feature = "scaling")]
-    pub(crate) fn with_actor_stats(&mut self, actor_stats: Arc<LOTable<BastionId, u32>>) {
+    pub(crate) fn set_actor_stats(&mut self, actor_stats: Arc<LOTable<BastionId, u32>>) {
         self.actor_stats = actor_stats;
     }
 

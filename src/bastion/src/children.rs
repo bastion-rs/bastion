@@ -98,7 +98,8 @@ pub struct Children {
     #[cfg(feature = "scaling")]
     // Resizer for dynamic actor group scaling up/down.
     resizer: Box<OptimalSizeExploringResizer>,
-    // Defines how ofter do heartbeat checks.
+    // Defines how often do heartbeat checks. By default checks will
+    // be done each 60 seconds.
     hearbeat_tick: Duration,
     // Special kind for actors that not going to be visible for others
     // parts of the cluster, but required for extra behaviour for the
@@ -120,7 +121,7 @@ impl Children {
         let name = None;
         #[cfg(feature = "scaling")]
         let resizer = Box::new(OptimalSizeExploringResizer::default());
-        let hearbeat_tick = Duration::from_secs(10);
+        let hearbeat_tick = Duration::from_secs(60);
         let helper_actors = FxHashMap::default();
 
         Children {
@@ -790,8 +791,6 @@ impl Children {
         let mut stats = ActorGroupStats::load(self.resizer.stats());
         stats.update_actors_count(self.launched.len() as u32);
         stats.store(self.resizer.stats());
-
-        println!("Active workers: {} [{}]", self.launched.len(), self.id());
     }
 
     #[cfg(feature = "scaling")]
@@ -815,8 +814,8 @@ impl Children {
 
     #[cfg(feature = "scaling")]
     fn init_data_for_scaling(&self, state: &mut ContextState) {
-        state.with_stats(self.resizer.stats());
-        state.with_actor_stats(self.resizer.actor_stats());
+        state.set_stats(self.resizer.stats());
+        state.set_actor_stats(self.resizer.actor_stats());
     }
 
     async fn run(mut self) -> Self {
