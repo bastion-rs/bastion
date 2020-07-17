@@ -80,7 +80,7 @@ impl DispatcherHandler for RoundRobinHandler {
     }
     // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
-        if entries.is_empty() {
+        if entries.len() == 0 {
             return;
         }
 

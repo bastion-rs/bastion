@@ -288,17 +288,7 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn update_stats(&mut self) {
-        let guard = match self.state.clone().lock_async().await {
-            Ok(guard) => guard,
-            Err(err) => {
-                debug!(
-                    "Child({:?}) Can't update stats. Reason: {:?}",
-                    self.bcast.id(),
-                    err
-                );
-                return;
-            }
-        };
+        let guard = self.state.lock().await;
         let context_state = guard.as_ref();
         let storage = guard.stats();
 
@@ -426,17 +416,7 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn cleanup_actors_stats(&mut self) {
-        let guard = match self.state.clone().lock_async().await {
-            Ok(guard) => guard,
-            Err(err) => {
-                debug!(
-                    "Child({:?}) Can't cleanup stats. Reason: {:?}",
-                    self.bcast.id(),
-                    err
-                );
-                return;
-            }
-        };
+        let guard = self.state.lock().await;
         let actor_stats_table = guard.actor_stats();
         actor_stats_table.remove(&self.bcast.id().clone()).ok();
     }

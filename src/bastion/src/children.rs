@@ -513,9 +513,10 @@ impl Children {
             children.push(launched);
         }
 
+        let id = self.id();
         children
             .for_each_concurrent(None, |_| async {
-                trace!("Children({}): Helper child has been disabled.", self.id());
+                trace!("Children({}): Helper child has been disabled.", id);
             })
             .await;
     }
@@ -886,6 +887,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
+        #[warn(unused_mut)]
         let mut state = ContextState::new();
         #[cfg(feature = "scaling")]
         self.init_data_for_scaling(&mut state);
@@ -926,6 +928,7 @@ impl Children {
     }
 
     pub(crate) fn launch_heartbeat(&mut self) {
+        let name = self.name();
         let parent = Parent::children(self.as_ref());
         let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
 
@@ -933,12 +936,12 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), path);
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Qutex::new(Box::pin(ContextState::new()));
+        let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
 
         let ctx = BastionContext::new(
             id.clone(),

@@ -15,6 +15,7 @@ use std::cmp::min;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+#[cfg(feature = "scaling")]
 #[derive(Debug)]
 /// Special struct for scaling up and down actor groups in runtime.
 pub struct OptimalSizeExploringResizer {
@@ -42,6 +43,7 @@ pub struct OptimalSizeExploringResizer {
     downscale_rate: f64,
 }
 
+#[cfg(feature = "scaling")]
 #[derive(Debug)]
 /// Special wrapper for Arc<AtomicU64> type, that actually
 /// represented as struct for storing statistical information
@@ -66,6 +68,7 @@ pub(crate) struct ActorGroupStats {
     average_mailbox_size: u32,
 }
 
+#[cfg(feature = "scaling")]
 #[derive(Debug, Clone)]
 /// An enumeration that describe acceptable upper boundaries
 /// for the spawned actors in runtime.
@@ -76,6 +79,7 @@ pub enum UpperBound {
     Unlimited,
 }
 
+#[cfg(feature = "scaling")]
 #[derive(Debug, Clone)]
 /// Determines the strategy for scaling up in runtime.
 pub enum UpscaleStrategy {
@@ -83,6 +87,7 @@ pub enum UpscaleStrategy {
     MailboxSizeThreshold(u32),
 }
 
+#[cfg(feature = "scaling")]
 #[derive(Debug)]
 /// Determines what action needs to be applied by the caller
 /// after Resizer checks.
@@ -95,6 +100,7 @@ pub(crate) enum ScalingRule {
     DoNothing,
 }
 
+#[cfg(feature = "scaling")]
 impl OptimalSizeExploringResizer {
     /// Returns an atomic reference to data with actor statistics.
     pub(crate) fn stats(&self) -> Arc<AtomicU64> {
@@ -255,6 +261,7 @@ impl OptimalSizeExploringResizer {
     }
 }
 
+#[cfg(feature = "scaling")]
 impl Default for OptimalSizeExploringResizer {
     fn default() -> Self {
         OptimalSizeExploringResizer {
@@ -270,6 +277,7 @@ impl Default for OptimalSizeExploringResizer {
     }
 }
 
+#[cfg(feature = "scaling")]
 impl ActorGroupStats {
     fn actors_count_mask() -> u64 {
         0xFFFFFFFF_00000000

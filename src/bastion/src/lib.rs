@@ -76,6 +76,7 @@ pub mod envelope;
 pub mod executor;
 pub mod message;
 pub mod path;
+#[cfg(feature = "scaling")]
 pub mod resizer;
 pub mod supervisor;
 
