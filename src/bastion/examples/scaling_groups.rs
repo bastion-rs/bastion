@@ -45,12 +45,12 @@ fn input_group(children: Children) -> Children {
             let group_name = "Processing".to_string();
             let target = BroadcastTarget::Group(group_name);
 
-            while messages_sent != 100 {
+            while messages_sent != 1000 {
                 // Emulate the workload. The number means how
                 // long it must wait before processing.
                 for value in INPUT.iter() {
                     ctx.broadcast_message(target.clone(), value);
-                    Delay::new(Duration::from_millis(450 * value)).await;
+                    Delay::new(Duration::from_millis(75 * value)).await;
                 }
 
                 messages_sent += INPUT.len();
@@ -66,7 +66,7 @@ fn auto_resize_group(children: Children) -> Children {
         .with_heartbeat_tick(Duration::from_secs(5)) // Do heartbeat each 5 seconds
         .with_resizer(
             OptimalSizeExploringResizer::default()
-                .with_lower_bound(0) // A minimal acceptable size of group
+                .with_lower_bound(1) // A minimal acceptable size of group
                 .with_upper_bound(UpperBound::Limit(10)) // Max 10 actors in runtime
                 .with_upscale_strategy(UpscaleStrategy::MailboxSizeThreshold(3)) // Scale up when a half of actors have more then 3 messages
                 .with_upscale_rate(0.1) // Increase the size of group on 10%, if necessary to scale up
@@ -108,6 +108,7 @@ fn auto_resize_group(children: Children) -> Children {
                 );
             }
 
+            println!("[Processing] Worker finished!");
             Ok(())
         })
 }
