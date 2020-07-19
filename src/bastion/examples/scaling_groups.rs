@@ -93,7 +93,7 @@ fn auto_resize_group(children: Children) -> Children {
                             ref number: &'static u64 => {
                                 // Emulate some processing. The received number is a delay.
                                 println!("[Processing] Worker #{:?} received `{}`", ctx.current().id(), number);
-                                Delay::new(Duration::from_millis(**number)).await;
+                                Delay::new(Duration::from_millis(**number * 500)).await;
                             };
                             _: _ => ();
                         }
