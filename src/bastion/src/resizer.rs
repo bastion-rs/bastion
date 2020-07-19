@@ -206,7 +206,7 @@ impl OptimalSizeExploringResizer {
         for (actor_id, (_, handle)) in actors {
             let state = handle.state();
 
-            // TODO: Enable the following this check when the following will be resolved
+            // TODO: Enable this check when the following issue will be resolved
             // link: https://github.com/bastion-rs/bastion/issues/236
             // let mailbox_size = self.actor_stats.get(actor_id).unwrap_or(0);
             // let can_be_freed = mailbox_size == 0 && state.is_pending();
