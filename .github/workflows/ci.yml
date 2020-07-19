@@ -66,20 +66,21 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all
+          args: --all --all-features
 
       - name: tests windows
         if: matrix.os == 'windows-latest'
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --all-features
 
       - name: tests nightly osx
         if: ${{ matrix.version == 'nightly' && matrix.os == 'macOS-latest' }}
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all
+          args: --all --all-features
 
       - name: tests nightly linux
         if: ${{ matrix.version == 'nightly' && matrix.os == 'ubuntu-latest' }}
