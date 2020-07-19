@@ -614,7 +614,7 @@ impl ContextState {
 
     #[cfg(feature = "scaling")]
     pub(crate) fn mailbox_size(&self) -> u32 {
-        self.messages.len() as u32
+        self.messages.len() as _
     }
 }
 

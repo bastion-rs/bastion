@@ -485,7 +485,7 @@ impl Children {
         self
     }
 
-    // Returns executable code for the actor that will trigger heartbeat
+    /// Returns executable code for the actor that will trigger heartbeat
     fn get_heartbeat_fut(&self) -> Init {
         let interval = self.hearbeat_tick;
 
