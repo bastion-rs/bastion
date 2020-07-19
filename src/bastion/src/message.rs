@@ -276,29 +276,17 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn is_broadcast(&self) -> bool {
-        if let MsgInner::Broadcast(_) = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Broadcast(_))
     }
 
     #[doc(hidden)]
     pub fn is_tell(&self) -> bool {
-        if let MsgInner::Tell(_) = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Tell(_))
     }
 
     #[doc(hidden)]
     pub fn is_ask(&self) -> bool {
-        if let MsgInner::Ask { .. } = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Ask { .. })
     }
 
     #[doc(hidden)]

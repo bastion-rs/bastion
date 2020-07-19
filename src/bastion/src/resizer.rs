@@ -205,10 +205,13 @@ impl OptimalSizeExploringResizer {
         let mut actors_to_stop = Vec::new();
         for (actor_id, (_, handle)) in actors {
             let state = handle.state();
-            let mailbox_size = self.actor_stats.get(actor_id).unwrap_or(0);
-            let can_be_freed = mailbox_size == 0 && state.is_pending();
 
-            if state.is_closed() || state.is_completed() || can_be_freed {
+            // TODO: Enable the following this check when the following will be resolved
+            // link: https://github.com/bastion-rs/bastion/issues/236
+            // let mailbox_size = self.actor_stats.get(actor_id).unwrap_or(0);
+            // let can_be_freed = mailbox_size == 0 && state.is_pending();
+
+            if state.is_closed() || state.is_completed() {
                 actors_to_stop.push(actor_id.clone())
             }
         }

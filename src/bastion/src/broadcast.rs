@@ -34,17 +34,11 @@ pub(crate) enum Parent {
 
 impl Parent {
     pub(super) fn is_none(&self) -> bool {
-        match self {
-            Parent::None => true,
-            _ => false,
-        }
+        matches!(self, Parent::None)
     }
 
     pub(super) fn is_system(&self) -> bool {
-        match self {
-            Parent::System => true,
-            _ => false,
-        }
+        matches!(self, Parent::System)
     }
 }
 

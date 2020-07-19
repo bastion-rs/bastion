@@ -487,7 +487,7 @@ impl Children {
 
     // Returns executable code for the actor that will trigger heartbeat
     fn get_heartbeat_fut(&self) -> Init {
-        let interval = self.hearbeat_tick.clone();
+        let interval = self.hearbeat_tick;
 
         let exec_fut = move |ctx: BastionContext| async move {
             let self_path = ctx.current().path();
@@ -882,7 +882,7 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
@@ -936,20 +936,14 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
         let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
 
-        let ctx = BastionContext::new(
-            id.clone(),
-            child_ref.clone(),
-            children,
-            supervisor,
-            state.clone(),
-        );
+        let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
         let init = self.get_heartbeat_fut();
         let exec = (init.0)(ctx);
         self.bcast.register(&bcast);
