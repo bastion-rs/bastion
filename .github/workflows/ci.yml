@@ -42,49 +42,56 @@ jobs:
 
       - name: check nightly (nix)
         if: ${{ matrix.version == 'nightly' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest') }}
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: check
           args: --all-targets --features docs --benches --bins --examples --tests
 
       - name: check nightly (windows)
         if: ${{ matrix.version == 'nightly' && matrix.os == 'windows-latest' }}
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: check
           args: --features docs --benches --bins --examples --tests
 
       - name: check stable
         if: matrix.version == 'stable'
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: check
           args: --all --features docs --bins --examples --tests
 
       - name: tests windows
         if: matrix.os != 'windows-latest'
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: test
           args: --all --features docs
 
       - name: tests windows
         if: matrix.os == 'windows-latest'
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: test --features docs
 
       - name: tests nightly osx
         if: ${{ matrix.version == 'nightly' && matrix.os == 'macOS-latest' }}
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: test
           args: --all --features docs
 
       - name: tests nightly linux
         if: ${{ matrix.version == 'nightly' && matrix.os == 'ubuntu-latest' }}
-        uses: actions-rs/cargo@v1
+        uses: marcopolo/cargo@master # TODO: - uses: actions-rs/cargo@v1 https://github.com/actions-rs/cargo/pull/59
         with:
+          working-directory: src/bastion
           command: test
           args: --all-targets --all-features
 
