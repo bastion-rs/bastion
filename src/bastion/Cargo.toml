@@ -31,7 +31,6 @@ exclude = [
 	"*.toml",
 	"*.md"
 ]
-autoexamples = false
 
 [badges]
 maintenance = { status = "actively-developed" }
