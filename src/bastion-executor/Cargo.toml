@@ -30,8 +30,8 @@ unstable = ["numanji", "allocator-suite", "jemallocator"]
 [dependencies]
 lightproc = "0.3.5"
 bastion-utils = "0.3.2"
-# lightproc = { version = "= 0.3.6-alpha.0", path = "../lightproc" }
-# bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
+# lightproc = { path = "../lightproc" }
+# bastion-utils = { path = "../bastion-utils" }
 
 crossbeam-utils = "0.7"
 crossbeam-channel = "0.4"
