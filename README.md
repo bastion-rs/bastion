@@ -98,6 +98,8 @@ You can use this to launch automatically supervised tasks.
     * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
 * Automatic member discovery, cluster formation and custom message passing between cluster members.
     * Using zeroconf or not, launch your bastion cluster from everywhere, with a single actor block.
+* Proactive IO system which doesn't depend on anything other than `futures`.
+    * Bastion's proactive IO has scatter/gather operations, `io_uring` support and much more...
 
 ## Guarantees
 * At most once delivery for all messages.
