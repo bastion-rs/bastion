@@ -51,7 +51,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 
 [dependencies]
-nuclei = "0.1.0"
+nuclei = "0.1.1"
 bastion-executor = "0.3.5"
 lightproc = "0.3.5"
 # bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }
@@ -70,7 +70,7 @@ async-mutex = "1.1"
 uuid = { version = "0.8", features = ["v4"] }
 
 # Distributed
-artillery-core = { version = "0.1.2-alpha.1", optional = true }
+artillery-core = { version = "0.1.2-alpha.3", optional = true }
 
 # Log crates
 tracing-subscriber = "0.2.6"
