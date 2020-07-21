@@ -17,6 +17,10 @@
 //!     * Exploiting hardware locality wherever it is possible. It is designed for servers.
 //! * Supervision system makes it easy to manage lifecycles.
 //!     * Kill your application in certain condition or restart you subprocesses whenever a certain condition is met.
+//! * Automatic member discovery, cluster formation and custom message passing between cluster members.
+//!     * Using zeroconf or not, launch your bastion cluster from everywhere, with a single actor block.
+//! * Proactive IO system which doesn't depend on anything other than `futures`.
+//!     * Bastion's proactive IO has scatter/gather operations, `io_uring` support and much more...
 //!
 //! ## Guarantees
 //! * At most once delivery for all the messages.
@@ -29,6 +33,7 @@
 //!
 //! ## Why Bastion?
 //! If one of the questions below is answered with yes, then Bastion is just for you:
+//! * Do I want proactive IO?
 //! * Do I need fault-tolerance in my project?
 //! * Do I need to write resilient middleware/s?
 //! * I shouldn't need a webserver to run an actor system, right?

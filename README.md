@@ -112,6 +112,7 @@ You can use this to launch automatically supervised tasks.
 
 ## Why Bastion?
 If you answer any of the questions below with yes, then Bastion is just for you:
+* Do I want proactive IO?
 * Do I need fault-tolerance in my project?
 * Do I hate to implement weird Actor traits?
 * I shouldn't need a webserver to run an actor system, right?
