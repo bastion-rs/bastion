@@ -228,6 +228,7 @@ pub(crate) enum BastionMessage {
     Faulted {
         id: BastionId,
     },
+    Heartbeat,
 }
 
 #[derive(Debug)]
@@ -275,29 +276,17 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn is_broadcast(&self) -> bool {
-        if let MsgInner::Broadcast(_) = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Broadcast(_))
     }
 
     #[doc(hidden)]
     pub fn is_tell(&self) -> bool {
-        if let MsgInner::Tell(_) = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Tell(_))
     }
 
     #[doc(hidden)]
     pub fn is_ask(&self) -> bool {
-        if let MsgInner::Ask { .. } = self.0 {
-            true
-        } else {
-            false
-        }
+        matches!(self.0, MsgInner::Ask { .. })
     }
 
     #[doc(hidden)]
@@ -485,6 +474,10 @@ impl BastionMessage {
         BastionMessage::Faulted { id }
     }
 
+    pub(crate) fn heartbeat() -> Self {
+        BastionMessage::Heartbeat
+    }
+
     pub(crate) fn try_clone(&self) -> Option<Self> {
         trace!("{:?}: Trying to clone.", self);
         let clone = match self {
@@ -524,6 +517,7 @@ impl BastionMessage {
             BastionMessage::SetState { state } => BastionMessage::set_state(state.clone()),
             BastionMessage::Stopped { id } => BastionMessage::stopped(id.clone()),
             BastionMessage::Faulted { id } => BastionMessage::faulted(id.clone()),
+            BastionMessage::Heartbeat => BastionMessage::heartbeat(),
         };
 
         Some(clone)

@@ -76,6 +76,8 @@ pub mod envelope;
 pub mod executor;
 pub mod message;
 pub mod path;
+#[cfg(feature = "scaling")]
+pub mod resizer;
 pub mod supervisor;
 
 distributed_api! {
@@ -101,6 +103,8 @@ pub mod prelude {
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
+    #[cfg(feature = "scaling")]
+    pub use crate::resizer::{OptimalSizeExploringResizer, UpperBound, UpscaleStrategy};
     pub use crate::supervisor::{
         ActorRestartStrategy, RestartPolicy, RestartStrategy, SupervisionStrategy, Supervisor,
         SupervisorRef,

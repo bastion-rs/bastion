@@ -80,6 +80,10 @@ impl DispatcherHandler for RoundRobinHandler {
     }
     // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
+        if entries.len() == 0 {
+            return;
+        }
+
         let current_index = self.index.load(Ordering::SeqCst) % entries.len() as u64;
 
         let mut skipped = 0;

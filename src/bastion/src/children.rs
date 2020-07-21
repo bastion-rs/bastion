@@ -10,6 +10,8 @@ use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
+#[cfg(feature = "scaling")]
+use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
@@ -18,6 +20,7 @@ use futures::pending;
 use futures::poll;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
+use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
 use std::fmt::Debug;
@@ -25,6 +28,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use std::time::Duration;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug)]
@@ -91,6 +95,17 @@ pub struct Children {
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
     // The name of children
     name: Option<String>,
+    #[cfg(feature = "scaling")]
+    // Resizer for dynamic actor group scaling up/down.
+    resizer: Box<OptimalSizeExploringResizer>,
+    // Defines how often do heartbeat checks. By default checks will
+    // be done each 60 seconds.
+    hearbeat_tick: Duration,
+    // Special kind for actors that not going to be visible for others
+    // parts of the cluster, but required for extra behaviour for the
+    // Children instance. For example for heartsbeat checks, collecting
+    // stats, etc.
+    helper_actors: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
 }
 
 impl Children {
@@ -104,6 +119,10 @@ impl Children {
         let started = false;
         let dispatchers = Vec::new();
         let name = None;
+        #[cfg(feature = "scaling")]
+        let resizer = Box::new(OptimalSizeExploringResizer::default());
+        let hearbeat_tick = Duration::from_secs(60);
+        let helper_actors = FxHashMap::default();
 
         Children {
             bcast,
@@ -115,6 +134,10 @@ impl Children {
             started,
             dispatchers,
             name,
+            #[cfg(feature = "scaling")]
+            resizer,
+            hearbeat_tick,
+            helper_actors,
         }
     }
 
@@ -328,6 +351,43 @@ impl Children {
         self
     }
 
+    #[cfg(feature = "scaling")]
+    /// Sets a custom resizer for the Children.
+    ///
+    /// This method is available only with the `scaling` feature flag.
+    ///
+    /// # Arguments
+    ///
+    /// * `resizer` - An instance of the [`Resizer`] struct.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_resizer(
+    ///             OptimalSizeExploringResizer::default()
+    ///                 .with_lower_bound(10)
+    ///                 .with_upper_bound(UpperBound::Limit(100))
+    ///         )
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    /// [`Resizer`]: ../resizer/struct.Resizer.html
+    pub fn with_resizer(mut self, resizer: OptimalSizeExploringResizer) -> Self {
+        self.resizer = Box::new(resizer);
+        self
+    }
+
     /// Sets the callbacks that will get called at this children group's
     /// different lifecycle events.
     ///
@@ -379,6 +439,88 @@ impl Children {
         self
     }
 
+    /// Overrides the default time interval for heartbeat onto
+    /// the user defined.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - The value of the [`std::time::Duration`] type
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// # use std::time::Duration;
+    /// #
+    /// # fn main() {
+    ///     # Bastion::init();
+    ///     #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_heartbeat_tick(Duration::from_secs(5))
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             async move {
+    ///                 // ...
+    ///                 # Ok(())
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    /// }).expect("Couldn't create the children group.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
+    pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {
+        trace!(
+            "Children({}): Set heartbeat tick to {:?}",
+            self.id(),
+            interval
+        );
+        self.hearbeat_tick = interval;
+        self
+    }
+
+    /// Returns executable code for the actor that will trigger heartbeat
+    fn get_heartbeat_fut(&self) -> Init {
+        let interval = self.hearbeat_tick;
+
+        let exec_fut = move |ctx: BastionContext| async move {
+            let self_path = ctx.current().path();
+            let self_sender = ctx.current().sender();
+
+            loop {
+                Delay::new(interval).await;
+
+                let msg = BastionMessage::heartbeat();
+                let env = Envelope::new(msg, self_path.clone(), self_sender.clone());
+                ctx.parent().send(env).ok();
+            }
+        };
+
+        Init::new(exec_fut)
+    }
+
+    async fn disable_helper_actors(&mut self) {
+        let mut children = FuturesOrdered::new();
+        for (_, (_, launched)) in self.helper_actors.drain() {
+            launched.cancel();
+
+            children.push(launched);
+        }
+
+        let id = self.id();
+        children
+            .for_each_concurrent(None, |_| async {
+                trace!("Children({}): Helper child has been disabled.", id);
+            })
+            .await;
+    }
+
     async fn kill(&mut self) {
         debug!("Children({}): Killing.", self.id());
         self.bcast.kill_children();
@@ -415,12 +557,14 @@ impl Children {
     }
 
     async fn kill_children(&mut self) -> Result<(), ()> {
+        self.disable_helper_actors().await;
         self.kill().await;
         self.stopped();
         Err(())
     }
 
     async fn stop_children(&mut self) -> Result<(), ()> {
+        self.disable_helper_actors().await;
         self.kill().await;
         self.stopped();
         Err(())
@@ -519,6 +663,9 @@ impl Children {
             id,
         );
         self.launched.remove_entry(id);
+
+        #[cfg(feature = "scaling")]
+        self.update_actors_count_stats();
     }
 
     async fn handle(&mut self, envelope: Envelope) -> Result<(), ()> {
@@ -601,6 +748,10 @@ impl Children {
                 msg: BastionMessage::Faulted { id },
                 ..
             } => self.handle_faulted_child(&id).await?,
+            Envelope {
+                msg: BastionMessage::Heartbeat,
+                ..
+            } => {}
         }
 
         Ok(())
@@ -636,10 +787,48 @@ impl Children {
         Ok(())
     }
 
+    #[cfg(feature = "scaling")]
+    fn update_actors_count_stats(&self) {
+        let mut stats = ActorGroupStats::load(self.resizer.stats());
+        stats.update_actors_count(self.launched.len() as u32);
+        stats.store(self.resizer.stats());
+    }
+
+    #[cfg(feature = "scaling")]
+    async fn autoresize_group(&mut self) {
+        match self.resizer.scale(&self.launched).await {
+            ScalingRule::Upscale(count) => {
+                for _ in 0..count {
+                    self.launch_child();
+                }
+            }
+            ScalingRule::Downscale(actors_to_shutdown) => {
+                for id in actors_to_shutdown {
+                    self.drop_child(&id);
+                }
+            }
+            ScalingRule::DoNothing => {}
+        }
+
+        self.update_actors_count_stats();
+    }
+
+    #[cfg(feature = "scaling")]
+    fn init_data_for_scaling(&self, state: &mut ContextState) {
+        state.set_stats(self.resizer.stats());
+        state.set_actor_stats(self.resizer.actor_stats());
+    }
+
     async fn run(mut self) -> Self {
         debug!("Children({}): Launched.", self.id());
 
+        #[cfg(feature = "scaling")]
+        self.update_actors_count_stats();
+
         loop {
+            #[cfg(feature = "scaling")]
+            self.autoresize_group().await;
+
             for (_, launched) in self.launched.values_mut() {
                 let _ = poll!(launched);
             }
@@ -678,56 +867,111 @@ impl Children {
                 Poll::Ready(None) => unreachable!(),
                 Poll::Pending => pending!(),
             }
+
+            #[cfg(feature = "scaling")]
+            self.autoresize_group().await;
         }
+    }
+
+    pub(crate) fn launch_child(&mut self) {
+        let name = self.name();
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
+
+        // TODO: clone or ref?
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        #[warn(unused_mut)]
+        let mut state = ContextState::new();
+        #[cfg(feature = "scaling")]
+        self.init_data_for_scaling(&mut state);
+
+        let state = Arc::new(Mutex::new(Box::pin(state)));
+
+        let ctx = BastionContext::new(
+            id.clone(),
+            child_ref.clone(),
+            children,
+            supervisor,
+            state.clone(),
+        );
+        let exec = (self.init.0)(ctx);
+
+        let parent_id = self.bcast.id().clone();
+        let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_parent(env).ok();
+
+        self.bcast.register(&bcast);
+
+        let msg = BastionMessage::start();
+        let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
+        self.bcast.send_child(&id, env);
+
+        debug!(
+            "Children({}): Initializing Child({}).",
+            self.id(),
+            bcast.id()
+        );
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
+        debug!("Children({}): Launching Child({}).", self.id(), child.id());
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.launched.insert(id, (sender, launched));
+    }
+
+    pub(crate) fn launch_heartbeat(&mut self) {
+        let name = self.name();
+        let parent = Parent::children(self.as_ref());
+        let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
+
+        // TODO: clone or ref?
+        let id = bcast.id().clone();
+        let sender = bcast.sender().clone();
+        let path = bcast.path().clone();
+        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
+
+        let children = self.as_ref();
+        let supervisor = self.bcast.parent().clone().into_supervisor();
+
+        let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
+
+        let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
+        let init = self.get_heartbeat_fut();
+        let exec = (init.0)(ctx);
+        self.bcast.register(&bcast);
+
+        debug!(
+            "Children({}): Initializing HeartbeatChild({}).",
+            self.id(),
+            bcast.id()
+        );
+        let callbacks = self.callbacks.clone();
+        let child = Child::new(exec, callbacks, bcast, state, child_ref);
+        debug!(
+            "Children({}): Launching HeartbeatChild({}).",
+            self.id(),
+            child.id()
+        );
+        let id = child.id().clone();
+        let launched = child.launch();
+        self.helper_actors.insert(id, (sender, launched));
     }
 
     pub(crate) fn launch_elems(&mut self) {
         debug!("Children({}): Launching elements.", self.id());
-
-        let name = self.name();
         for _ in 0..self.redundancy {
-            let parent = Parent::children(self.as_ref());
-            let bcast = Broadcast::new(parent, BastionPathElement::Child(BastionId::new()));
-
-            // TODO: clone or ref?
-            let id = bcast.id().clone();
-            let sender = bcast.sender().clone();
-            let path = bcast.path().clone();
-            let child_ref = ChildRef::new(id.clone(), sender.clone(), name.clone(), path);
-
-            let children = self.as_ref();
-            let supervisor = self.bcast.parent().clone().into_supervisor();
-
-            let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
-
-            let ctx = BastionContext::new(
-                id.clone(),
-                child_ref.clone(),
-                children,
-                supervisor,
-                state.clone(),
-            );
-            let exec = (self.init.0)(ctx);
-
-            let parent_id = self.bcast.id().clone();
-            let msg = BastionMessage::instantiated_child(parent_id, id.clone(), state.clone());
-            let env = Envelope::new(msg, self.bcast.path().clone(), self.bcast.sender().clone());
-            self.bcast.send_parent(env).ok();
-
-            self.bcast.register(&bcast);
-
-            debug!(
-                "Children({}): Initializing Child({}).",
-                self.id(),
-                bcast.id()
-            );
-            let callbacks = self.callbacks.clone();
-            let child = Child::new(exec, callbacks, bcast, state, child_ref);
-            debug!("Children({}): Launching Child({}).", self.id(), child.id());
-            let id = child.id().clone();
-            let launched = child.launch();
-            self.launched.insert(id, (sender, launched));
+            self.launch_child();
         }
+
+        self.launch_heartbeat();
     }
 
     pub(crate) fn launch(self) -> RecoverableHandle<Self> {

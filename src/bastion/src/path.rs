@@ -319,19 +319,13 @@ impl BastionPathElement {
     #[doc(hidden)]
     /// Checks whether the BastionPath identifies a supervisor.
     pub fn is_supervisor(&self) -> bool {
-        match self {
-            BastionPathElement::Supervisor(_) => true,
-            _ => false,
-        }
+        matches!(self, BastionPathElement::Supervisor(_))
     }
 
     #[doc(hidden)]
     /// Checks whether the BastionPath identifies children.
     pub fn is_children(&self) -> bool {
-        match self {
-            BastionPathElement::Children(_) => true,
-            _ => false,
-        }
+        matches!(self, BastionPathElement::Children(_))
     }
 
     /// Checks whether the BastionPath identifies a child.
@@ -361,10 +355,7 @@ impl BastionPathElement {
     /// # Bastion::block_until_stopped();
     /// ```
     pub fn is_child(&self) -> bool {
-        match self {
-            BastionPathElement::Child(_) => true,
-            _ => false,
-        }
+        matches!(self, BastionPathElement::Child(_))
     }
 }
 

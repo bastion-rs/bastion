@@ -6,6 +6,8 @@ use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
+#[cfg(feature = "scaling")]
+use crate::resizer::ActorGroupStats;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
@@ -151,6 +153,10 @@ impl Child {
                 ..
             } => {
                 self.stopped();
+
+                #[cfg(feature = "scaling")]
+                self.cleanup_actors_stats().await;
+
                 self.callbacks.after_stop();
                 return Err(());
             }
@@ -159,6 +165,10 @@ impl Child {
                 ..
             } => {
                 self.stopped();
+
+                #[cfg(feature = "scaling")]
+                self.cleanup_actors_stats().await;
+
                 self.callbacks.before_restart();
                 return Err(());
             }
@@ -231,6 +241,10 @@ impl Child {
                 msg: BastionMessage::Faulted { .. },
                 ..
             } => unimplemented!(),
+            Envelope {
+                msg: BastionMessage::Heartbeat,
+                ..
+            } => unreachable!(),
         }
 
         Ok(())
@@ -272,6 +286,22 @@ impl Child {
         }
     }
 
+    #[cfg(feature = "scaling")]
+    async fn update_stats(&mut self) {
+        let guard = self.state.lock().await;
+        let context_state = guard.as_ref();
+        let storage = guard.stats();
+
+        let mut stats = ActorGroupStats::load(storage.clone());
+        stats.update_average_mailbox_size(context_state.mailbox_size());
+        stats.store(storage);
+
+        let actor_stats_table = guard.actor_stats();
+        actor_stats_table
+            .insert(self.bcast.id().clone(), context_state.mailbox_size())
+            .ok();
+    }
+
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
         if let Err(e) = self.register_in_dispatchers() {
@@ -280,6 +310,9 @@ impl Child {
         };
 
         loop {
+            #[cfg(feature = "scaling")]
+            self.update_stats().await;
+
             match poll!(&mut self.bcast.next()) {
                 // TODO: Err if started == true?
                 Poll::Ready(Some(Envelope {
@@ -322,6 +355,9 @@ impl Child {
                 Poll::Ready(None) => unreachable!(),
                 Poll::Pending => (),
             }
+
+            #[cfg(feature = "scaling")]
+            self.update_stats().await;
 
             if !self.started {
                 pending!();
@@ -376,6 +412,13 @@ impl Child {
             let global_dispatcher = SYSTEM.dispatcher();
             global_dispatcher.remove(used_dispatchers, &child_ref);
         }
+    }
+
+    #[cfg(feature = "scaling")]
+    async fn cleanup_actors_stats(&mut self) {
+        let guard = self.state.lock().await;
+        let actor_stats_table = guard.actor_stats();
+        actor_stats_table.remove(&self.bcast.id().clone()).ok();
     }
 }
 

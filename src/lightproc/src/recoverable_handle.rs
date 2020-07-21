@@ -3,6 +3,7 @@
 use crate::proc_data::ProcData;
 use crate::proc_handle::ProcHandle;
 use crate::proc_stack::ProcStack;
+use crate::state::State;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -27,6 +28,11 @@ impl<R> RecoverableHandle<R> {
     /// Returns a reference to the stack stored inside the proc.
     pub fn stack(&self) -> &ProcStack {
         self.0.stack()
+    }
+
+    /// Returns a state of the ProcHandle.
+    pub fn state(&self) -> State {
+        self.0.state()
     }
 }
 
