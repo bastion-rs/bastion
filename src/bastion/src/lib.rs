@@ -74,6 +74,7 @@ pub mod context;
 pub mod dispatcher;
 pub mod envelope;
 pub mod executor;
+pub mod io;
 pub mod message;
 pub mod path;
 #[cfg(feature = "scaling")]
@@ -100,6 +101,7 @@ pub mod prelude {
         DispatcherType, NotificationType,
     };
     pub use crate::envelope::{RefAddr, SignedMessage};
+    pub use crate::io::*;
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
