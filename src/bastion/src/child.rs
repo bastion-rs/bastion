@@ -9,7 +9,6 @@ use crate::message::BastionMessage;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
-use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
@@ -20,6 +19,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use nuclei::join_handle::*;
 use tracing::{debug, error, trace, warn};
 
 pub(crate) struct Init(pub(crate) Box<dyn Fn(BastionContext) -> Exec + Send>);
@@ -348,9 +348,9 @@ impl Child {
         }
     }
 
-    pub(crate) fn launch(self) -> RecoverableHandle<()> {
-        let stack = self.stack();
-        pool::spawn(self.run(), stack)
+    pub(crate) fn launch(self) -> JoinHandle<()> {
+        // let stack = self.stack();
+        crate::spawn!(self.run())
     }
 
     /// Adds the actor into each registry declared in the parent node.

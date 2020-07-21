@@ -67,6 +67,7 @@ mod child;
 mod config;
 mod system;
 
+pub mod io;
 pub mod child_ref;
 pub mod children;
 pub mod children_ref;
@@ -86,6 +87,7 @@ distributed_api! {
 ///
 /// Prelude of Bastion
 pub mod prelude {
+    pub use crate::io::*;
     pub use crate::bastion::Bastion;
     pub use crate::callbacks::Callbacks;
     pub use crate::child_ref::ChildRef;

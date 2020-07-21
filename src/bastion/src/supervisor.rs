@@ -10,7 +10,6 @@ use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::path::{BastionPath, BastionPathElement};
 use async_mutex::Mutex;
-use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
 use futures::{pending, poll};
@@ -24,6 +23,7 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
 use tracing::{debug, trace, warn};
+use nuclei::join_handle::*;
 
 #[derive(Debug)]
 /// A supervisor that can supervise both [`Children`] and other
@@ -75,7 +75,7 @@ pub struct Supervisor {
     tracked_groups_order: FxHashMap<BastionId, usize>,
     // The currently launched supervised children and supervisors.
     // The last value is the amount of times a given actor has restarted.
-    launched: FxHashMap<BastionId, (usize, RecoverableHandle<Supervised>)>,
+    launched: FxHashMap<BastionId, (usize, JoinHandle<Supervised>)>,
     // Supervised children and supervisors that are stopped.
     // This is used when resetting or recovering when the
     // supervision strategy is not "one-for-one".
@@ -730,7 +730,7 @@ impl Supervisor {
     /// sp.with_restart_strategy(
     ///     RestartStrategy::default()
     ///         .with_restart_policy(RestartPolicy::Tries(5))
-    ///         .with_actor_restart_strategy(           
+    ///         .with_actor_restart_strategy(
     ///             ActorRestartStrategy::ExponentialBackOff {
     ///                 timeout: Duration::from_millis(5000),
     ///                 multiplier: 3,
@@ -902,21 +902,15 @@ impl Supervisor {
         }
 
         while let Some(supervised) = supervised.next().await {
-            match supervised {
-                Some(supervised) => {
-                    trace!(
-                        "Supervisor({}): Supervised({}) stopped.",
-                        self.id(),
-                        supervised.id()
-                    );
-                    supervised.callbacks().after_stop();
+            trace!(
+                "Supervisor({}): Supervised({}) stopped.",
+                self.id(),
+                supervised.id()
+            );
+            supervised.callbacks().after_stop();
 
-                    let id = supervised.id().clone();
-                    self.stopped.insert(id, supervised);
-                }
-                // FIXME
-                None => unimplemented!(),
-            }
+            let id = supervised.id().clone();
+            self.stopped.insert(id, supervised);
         }
     }
 
@@ -943,19 +937,13 @@ impl Supervisor {
         }
 
         while let Some(supervised) = supervised.next().await {
-            match supervised {
-                Some(supervised) => {
-                    trace!(
-                        "Supervisor({}): Supervised({}) stopped.",
-                        self.id(),
-                        supervised.id()
-                    );
-                    let id = supervised.id().clone();
-                    self.killed.insert(id, supervised);
-                }
-                // FIXME
-                None => unimplemented!(),
-            }
+            trace!(
+                "Supervisor({}): Supervised({}) stopped.",
+                self.id(),
+                supervised.id()
+            );
+            let id = supervised.id().clone();
+            self.killed.insert(id, supervised);
         }
     }
 
@@ -1137,7 +1125,7 @@ impl Supervisor {
             debug!("Supervisor({}): Supervised({}) stopped.", self.id(), id);
             // TODO: add a "waiting" list an poll from it instead of awaiting
             // FIXME: panics?
-            let supervised = launched.await.unwrap();
+            let supervised = launched.await;
             supervised.callbacks().after_stop();
 
             self.bcast.unregister(&id);
@@ -1352,10 +1340,10 @@ impl Supervisor {
         }
     }
 
-    pub(crate) fn launch(self) -> RecoverableHandle<Self> {
+    pub(crate) fn launch(self) -> JoinHandle<Self> {
         debug!("Supervisor({}): Launching.", self.id());
-        let stack = self.stack();
-        pool::spawn(self.run(), stack)
+        // let stack = self.stack();
+        crate::executor::spawn(self.run())
     }
 }
 
@@ -1759,12 +1747,6 @@ impl Supervised {
         Supervised::Children(children)
     }
 
-    fn stack(&self) -> ProcStack {
-        trace!("Supervised({}): Creating ProcStack.", self.id());
-        // FIXME: with_id
-        ProcStack::default()
-    }
-
     fn id(&self) -> &BastionId {
         match self {
             Supervised::Supervisor(supervisor) => supervisor.id(),
@@ -1786,28 +1768,26 @@ impl Supervised {
         }
     }
 
-    fn launch(self) -> RecoverableHandle<Self> {
+    fn launch(self) -> JoinHandle<Self> {
         debug!("Supervised({}): Launching.", self.id());
-        let stack = self.stack();
+        // let stack = self.stack();
         match self {
             Supervised::Supervisor(supervisor) => {
-                pool::spawn(
+                crate::executor::spawn(
                     async {
                         // FIXME: panics?
-                        let supervisor = supervisor.launch().await.unwrap();
+                        let supervisor = supervisor.launch().await;
                         Supervised::Supervisor(supervisor)
-                    },
-                    stack,
+                    }
                 )
             }
             Supervised::Children(children) => {
-                pool::spawn(
+                crate::executor::spawn(
                     async {
                         // FIXME: panics?
-                        let children = children.launch().await.unwrap();
+                        let children = children.launch().await;
                         Supervised::Children(children)
-                    },
-                    stack,
+                    }
                 )
             }
         }
@@ -1826,7 +1806,7 @@ impl RestartStrategy {
     ///         failed actor and remove it from tracking.
     ///     - [`RestartStrategy::Tries`] would restart the
     ///         failed actor a limited amount of times. If can't be started,
-    ///         then will remove it from tracking.   
+    ///         then will remove it from tracking.
     ///
     /// * `strategy` - The strategy to use:
     ///     - [`ActorRestartStrategy::Immediate`] would restart the

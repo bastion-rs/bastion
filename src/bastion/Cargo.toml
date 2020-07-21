@@ -37,7 +37,6 @@ maintenance = { status = "actively-developed" }
 
 [features]
 default = []
-unstable = ["bastion-executor/unstable"]
 distributed = [
   "artillery-core"
 ]
@@ -49,7 +48,7 @@ features = ["docs"]
 rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
-bastion-executor = { version = "= 0.3.5-alpha", path = "../bastion-executor" }
+nuclei = { path = "../../../nuclei" }
 lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
 
 lever = "0.1.1-alpha.3"

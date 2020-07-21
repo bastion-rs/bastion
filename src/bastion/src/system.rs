@@ -7,7 +7,6 @@ use crate::message::{BastionMessage, Deployment};
 use crate::path::{BastionPath, BastionPathElement};
 use crate::supervisor::{Supervisor, SupervisorRef};
 use async_mutex::Mutex as AsyncMutex;
-use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
@@ -16,6 +15,7 @@ use lazy_static::lazy_static;
 use lightproc::prelude::*;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::Poll;
+use nuclei::join_handle::*;
 use tracing::{debug, error, info, trace, warn};
 
 lazy_static! {
@@ -27,7 +27,7 @@ pub(crate) struct GlobalSystem {
     supervisor: SupervisorRef,
     dead_letters: ChildrenRef,
     path: Arc<BastionPath>,
-    handle: Arc<AsyncMutex<Option<RecoverableHandle<()>>>>,
+    handle: Arc<AsyncMutex<Option<JoinHandle<()>>>>,
     running: Mutex<bool>,
     stopping_cvar: Condvar,
     dispatcher: GlobalDispatcher,
@@ -36,10 +36,10 @@ pub(crate) struct GlobalSystem {
 #[derive(Debug)]
 struct System {
     bcast: Broadcast,
-    launched: FxHashMap<BastionId, RecoverableHandle<Supervisor>>,
+    launched: FxHashMap<BastionId, JoinHandle<Supervisor>>,
     // TODO: set limit
     restart: FxHashSet<BastionId>,
-    waiting: FuturesUnordered<RecoverableHandle<Supervisor>>,
+    waiting: FuturesUnordered<JoinHandle<Supervisor>>,
     pre_start_msgs: Vec<Envelope>,
     started: bool,
 }
@@ -50,7 +50,7 @@ impl GlobalSystem {
         sender: Sender,
         supervisor: SupervisorRef,
         dead_letters: ChildrenRef,
-        handle: RecoverableHandle<()>,
+        handle: JoinHandle<()>,
     ) -> Self {
         let handle = Some(handle);
         let handle = Arc::new(AsyncMutex::new(handle));
@@ -83,7 +83,7 @@ impl GlobalSystem {
         &self.dead_letters
     }
 
-    pub(crate) fn handle(&self) -> Arc<AsyncMutex<Option<RecoverableHandle<()>>>> {
+    pub(crate) fn handle(&self) -> Arc<AsyncMutex<Option<JoinHandle<()>>>> {
         self.handle.clone()
     }
 
@@ -148,18 +148,12 @@ impl System {
         system.bcast.send_self(env);
 
         debug!("System: Launching.");
-        let stack = system.stack();
-        let handle = pool::spawn(system.run(), stack);
+        let handle = crate::executor::spawn(system.run());
 
         let dead_letters_ref =
             Self::spawn_dead_letters(&supervisor_ref).expect("Can't spawn dead letters");
 
         GlobalSystem::new(sender, supervisor_ref, dead_letters_ref, handle)
-    }
-
-    fn stack(&self) -> ProcStack {
-        // FIXME: with_id
-        ProcStack::default()
     }
 
     fn spawn_dead_letters(root_sv: &SupervisorRef) -> Result<ChildrenRef, ()> {
@@ -209,12 +203,9 @@ impl System {
         let mut supervisors = Vec::new();
         loop {
             match poll!(&mut self.waiting.next()) {
-                Poll::Ready(Some(Some(supervisor))) => {
+                Poll::Ready(Some(supervisor)) => {
                     debug!("System: Supervisor({}) stopped.", supervisor.id());
                     supervisors.push(supervisor);
-                }
-                Poll::Ready(Some(None)) => {
-                    error!("System: Unknown supervisor cancelled instead of stopped.");
                 }
                 Poll::Ready(None) => return supervisors,
                 Poll::Pending => pending!(),
@@ -226,22 +217,27 @@ impl System {
         self.bcast.kill_children();
 
         for launched in self.waiting.iter_mut() {
-            launched.cancel();
+            if let InnerJoinHandle::Bastion(already_launched) = &launched.0 {
+                already_launched.cancel();
+            } else {
+                error!("Can't cancel already running actors for other runtimes");
+            }
         }
 
         for (_, launched) in self.launched.drain() {
-            launched.cancel();
+            if let InnerJoinHandle::Bastion(already_launched) = &launched.0 {
+                already_launched.cancel();
+            } else {
+                error!("Can't cancel already running actors for other runtimes");
+            }
 
             self.waiting.push(launched);
         }
 
         loop {
             match poll!(&mut self.waiting.next()) {
-                Poll::Ready(Some(Some(supervisor))) => {
+                Poll::Ready(Some(supervisor)) => {
                     debug!("System: Supervisor({}) killed.", supervisor.id());
-                }
-                Poll::Ready(Some(None)) => {
-                    debug!("System: Unknown Supervisor killed.");
                 }
                 Poll::Ready(None) => return,
                 Poll::Pending => pending!(),
@@ -386,7 +382,7 @@ impl System {
         info!("System: Launched.");
         loop {
             match poll!(&mut self.waiting.next()) {
-                Poll::Ready(Some(Some(supervisor))) => {
+                Poll::Ready(Some(supervisor)) => {
                     let id = supervisor.id();
                     self.bcast.unregister(&id);
 
@@ -398,8 +394,6 @@ impl System {
 
                     continue;
                 }
-                // FIXME
-                Poll::Ready(Some(None)) => unimplemented!(),
                 Poll::Ready(None) | Poll::Pending => (),
             }
 

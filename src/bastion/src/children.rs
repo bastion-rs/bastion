@@ -13,7 +13,6 @@ use crate::path::BastionPathElement;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 use async_mutex::Mutex;
-use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
 use futures::prelude::*;
@@ -25,7 +24,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace, warn, error};
+use nuclei::join_handle::*;
 
 #[derive(Debug)]
 /// A children group that will contain a defined number of
@@ -74,7 +74,7 @@ use tracing::{debug, trace, warn};
 pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
-    launched: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    launched: FxHashMap<BastionId, (Sender, JoinHandle<()>)>,
     // The closure returning the future that will be used by
     // every element of the group.
     init: Init,
@@ -385,7 +385,11 @@ impl Children {
 
         let mut children = FuturesOrdered::new();
         for (_, (_, launched)) in self.launched.drain() {
-            launched.cancel();
+            if let InnerJoinHandle::Bastion(already_launched) = &launched.0 {
+                already_launched.cancel();
+            } else {
+                error!("Can't cancel already running actors for other runtimes");
+            }
 
             children.push(launched);
         }
@@ -730,10 +734,9 @@ impl Children {
         }
     }
 
-    pub(crate) fn launch(self) -> RecoverableHandle<Self> {
+    pub(crate) fn launch(self) -> JoinHandle<Self> {
         debug!("Children({}): Launching.", self.id());
-        let stack = self.stack();
-        pool::spawn(self.run(), stack)
+        crate::executor::spawn(self.run())
     }
 
     /// Registers all declared local dispatchers in the global dispatcher.

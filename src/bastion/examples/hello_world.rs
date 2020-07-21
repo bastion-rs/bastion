@@ -32,7 +32,7 @@ fn main() {
     })
     .expect("Couldn't create the children group.");
     // We are creating the asker
-    let asker = async {
+    let asker = async move {
         // We are getting the first (and only) worker
         let answer = workers.elems()[0]
             .ask_anonymously("hello, world!")

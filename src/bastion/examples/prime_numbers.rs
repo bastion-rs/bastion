@@ -166,7 +166,7 @@ mod client {
 
     pub struct Task {
         pub child_id: usize,
-        pub task: RecoverableHandle<std::io::Result<Response>>,
+        pub task: JoinHandle<std::io::Result<Response>>,
     }
 
     // `serve_digits` will allow us
@@ -228,7 +228,7 @@ mod client {
         tasks
             .into_par_iter()
             .map(|prime_task| {
-                let response = run!(prime_task.task).expect("task run failed")?;
+                let response = run!(prime_task.task)?;
                 info!("{} | {}", prime_task.child_id, response);
                 Ok(Result {
                     child_id: prime_task.child_id,

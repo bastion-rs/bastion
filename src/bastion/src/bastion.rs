@@ -10,7 +10,8 @@ use crate::supervisor::{Supervisor, SupervisorRef};
 use crate::system::SYSTEM;
 
 use core::future::Future;
-use tracing::{debug, trace};
+use tracing::{debug, trace, error};
+use nuclei::join_handle::*;
 
 use std::fmt::{self, Debug, Formatter};
 
@@ -530,10 +531,14 @@ impl Bastion {
         SYSTEM.sender().unbounded_send(envelope).ok();
 
         let handle = SYSTEM.handle();
-        let system = crate::executor::run(async { handle.lock().await.take() });
+        let system = crate::executor::run(async move { handle.lock().await.take() });
         if let Some(system) = system {
             debug!("Bastion: Cancelling system handle.");
-            system.cancel();
+            if let InnerJoinHandle::Bastion(running_system) = system.0 {
+                running_system.cancel();
+            } else {
+                error!("Can't cancel already running actors for other runtimes");
+            }
         }
 
         SYSTEM.notify_stopped();

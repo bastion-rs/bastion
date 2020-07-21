@@ -1,7 +1,7 @@
 //! A module that exposes the functions used under the hoods from `bastion`s macros: `spawn!`, `run!`
 //! and `blocking!`.
 pub use lightproc::proc_stack::ProcStack;
-use lightproc::recoverable_handle::RecoverableHandle;
+use nuclei::join_handle::*;
 use std::future::Future;
 
 /// Spawns a blocking task, which will run on the blocking thread pool,
@@ -15,12 +15,12 @@ use std::future::Future;
 ///     thread::sleep(time::Duration::from_millis(3000));
 /// });
 /// ```
-pub fn blocking<F, R>(future: F) -> RecoverableHandle<R>
+pub fn spawn_blocking<F, T>(task: F) -> JoinHandle<T>
 where
-    F: Future<Output = R> + Send + 'static,
-    R: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
 {
-    bastion_executor::blocking::spawn_blocking(future, lightproc::proc_stack::ProcStack::default())
+    nuclei::spawn_blocking(task)
 }
 
 /// Block the current thread until passed
@@ -48,9 +48,10 @@ where
 /// ```
 pub fn run<F, T>(future: F) -> T
 where
-    F: Future<Output = T>,
+    F: Future<Output = T> + Send + 'static,
+    T: Send + 'static
 {
-    bastion_executor::run::run(future, lightproc::proc_stack::ProcStack::default())
+    nuclei::block_on(future)
 }
 
 /// Spawn a given future onto the executor from the global level.
@@ -64,10 +65,10 @@ where
 /// });
 /// run(handle);
 /// ```
-pub fn spawn<F, T>(future: F) -> RecoverableHandle<T>
+pub fn spawn<F, T>(future: F) -> JoinHandle<T>
 where
     F: Future<Output = T> + Send + 'static,
     T: Send + 'static,
 {
-    bastion_executor::pool::spawn(future, lightproc::proc_stack::ProcStack::default())
+    nuclei::spawn(future)
 }
