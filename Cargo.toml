@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "src/bastion",
   "src/bastion-executor",
   "src/bastion-utils",
   "src/lightproc"
