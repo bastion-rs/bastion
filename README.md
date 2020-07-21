@@ -121,12 +121,16 @@ If you answer any of the questions below with yes, then Bastion is just for you:
 
 Bastion Ecosystem is here to provide you a way to customize it. If you don't need to, or if you are a newcomers, you can install and use Bastion without knowing how everything works under the hood. We hope to find you on this section soon.
 
+### [Nuclei](https://github.com/vertexclique/nuclei)
+Nuclei is proactive IO system that can be independently used without executor restriction. It is also powering Bastion's IO system.
+You can learn more about Nuclei [here](https://github.com/vertexclique/nuclei), check out Nuclei's repo for more sophisticated use cases.
+
 ### [LightProc](https://github.com/bastion-rs/bastion/tree/master/src/lightproc)
 
 LightProc is Lightweight Process abstraction for Rust.
 
-It uses futures with lifecycle callbacks to implement Erlang like processes and contains basic pid to identify processes. 
-All panics inside futures are propagated to upper layers. 
+It uses futures with lifecycle callbacks to implement Erlang like processes and contains basic pid to identify processes.
+All panics inside futures are propagated to upper layers.
 
 ### [Bastion Executor](https://github.com/bastion-rs/bastion/tree/master/src/bastion-executor)
 
@@ -144,7 +148,7 @@ Check the [getting started example](https://github.com/bastion-rs/bastion/blob/m
 
 Include bastion to your project with:
 ```toml
-bastion = "0.3"
+bastion = "0.4"
 ```
 
 For more information please check [Bastion Documentation](https://docs.rs/bastion)
@@ -152,15 +156,6 @@ For more information please check [Bastion Documentation](https://docs.rs/bastio
 ## Architecture of the Runtime
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
-
-You can see architecture of the framework [HERE](https://github.com/bastion-rs/bastion/blob/master/img/bastion-arch.png). 
-
-## Projects using Bastion
-If you are using Bastion open a PR so we can include it in our showcase.
-* Various proprietary Rust database implementations are using Bastion.
-* In AWS Lambdas we have used Bastion to enable retry mechanism and try different parsing strategies for data to be processed.
-* [SkyNet](https://github.com/vertexclique/skynet) (a Discord bot which is resending deleted messages)
-    * Skynet is running since 0.1.3 release of Bastion on the cloud and haven't killed yet.
 
 ## License
 
