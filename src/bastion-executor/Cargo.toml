@@ -28,7 +28,7 @@ maintenance = { status = "actively-developed" }
 unstable = ["numanji", "allocator-suite", "jemallocator"]
 
 [dependencies]
-lightproc = { version = "= 0.3.5-alpha.0", path = "../lightproc" }
+lightproc = { version = "= 0.3.5", path = "../lightproc" }
 bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
 
 crossbeam-utils = "0.7"
