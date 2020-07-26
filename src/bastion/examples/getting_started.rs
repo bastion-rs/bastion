@@ -65,16 +65,19 @@ fn main() {
                 async move {
                     // ...receiving and matching messages...
                     msg! { ctx.recv().await?,
+                        // ref <name> are broadcasts.
                         ref _msg: &'static str => {
                             // ...
                         };
+                        // <name> (without the ref keyword) are messages that have a unique recipient.
                         _msg: &'static str => {
                             // ...
                         };
+                        // =!> refer to messages that can be replied to.
                         _msg: &'static str =!> {
                             // ...
                         };
-                        // ...
+                        // <name> that have the `_` type are catch alls
                         _: _ => ();
                     }
 
@@ -129,7 +132,7 @@ fn main() {
     Bastion::broadcast("A message containing data.").expect("Couldn't send the message.");
 
     // Stopping or killing the system...
-    //Bastion::stop();
+    // Bastion::stop();
     // Bastion::kill();
 
     // Blocking until the system has stopped (or got killed)...
