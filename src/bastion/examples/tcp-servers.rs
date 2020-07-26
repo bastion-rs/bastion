@@ -25,7 +25,7 @@ fn main() {
 
     let _tcp_servers = Bastion::children(|children: Children| {
         children
-            .with_redundancy(TCP_SERVER_COUNT) // Let's have 40 tcp echo servers :)
+            .with_redundancy(TCP_SERVER_COUNT) // Let's have 10 tcp echo servers :)
             .with_exec(move |_ctx: BastionContext| {
                 async move {
                     println!("Server is starting!");
