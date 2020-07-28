@@ -40,7 +40,8 @@ fn input_group(children: Children) -> Children {
     #[cfg(feature = "scaling")]
     {
         // Don't start new actors after finishing execution
-        children = children.with_resizer(OptimalSizeExploringResizer::default().with_lower_bound(0));
+        children =
+            children.with_resizer(OptimalSizeExploringResizer::default().with_lower_bound(0));
     }
     children.with_exec(move |ctx: BastionContext| async move {
         println!("[Input] Worker started!");
