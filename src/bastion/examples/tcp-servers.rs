@@ -32,7 +32,7 @@ async fn run(addr: impl ToSocketAddrs) -> io::Result<()> {
         match stream {
             Ok(stream) => {
                 println!("Accepted client");
-                spawn(echo(stream));
+                spawn!(echo(stream));
             }
             _ => {
                 break;
