@@ -1,6 +1,8 @@
 use bastion::prelude::*;
 #[cfg(not(target_os = "windows"))]
 use futures::io;
+#[cfg(target_os = "windows")]
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
