@@ -35,44 +35,54 @@ fn auto_resize_group_supervisor(supervisor: Supervisor) -> Supervisor {
 }
 
 fn input_group(children: Children) -> Children {
-    children
-        .with_redundancy(1)
-        .with_resizer(OptimalSizeExploringResizer::default().with_lower_bound(0)) // Don't start new actors after finishing execution
-        .with_exec(move |ctx: BastionContext| async move {
-            println!("[Input] Worker started!");
+    // we would have fully chained the children builder if it wasn't for the feature flag
+    let mut children = children.with_redundancy(1);
+    #[cfg(feature = "scaling")]
+    {
+        // Don't start new actors after finishing execution
+        children = children.with_resizer(OptimalSizeExploringResizer::default().with_lower_bound(0));
+    }
+    children.with_exec(move |ctx: BastionContext| async move {
+        println!("[Input] Worker started!");
 
-            let mut messages_sent = 0;
-            static INPUT: [u64; 5] = [5u64, 1, 2, 4, 3];
-            let group_name = "Processing".to_string();
-            let target = BroadcastTarget::Group(group_name);
+        let mut messages_sent = 0;
+        static INPUT: [u64; 5] = [5u64, 1, 2, 4, 3];
+        let group_name = "Processing".to_string();
+        let target = BroadcastTarget::Group(group_name);
 
-            while messages_sent != 1000 {
-                // Emulate the workload. The number means how
-                // long it must wait before processing.
-                for value in INPUT.iter() {
-                    ctx.broadcast_message(target.clone(), value);
-                    Delay::new(Duration::from_millis(75 * value)).await;
-                }
-
-                messages_sent += INPUT.len();
+        while messages_sent != 1000 {
+            // Emulate the workload. The number means how
+            // long it must wait before processing.
+            for value in INPUT.iter() {
+                ctx.broadcast_message(target.clone(), value);
+                Delay::new(Duration::from_millis(75 * value)).await;
             }
 
-            Ok(())
-        })
+            messages_sent += INPUT.len();
+        }
+
+        Ok(())
+    })
 }
 
 fn auto_resize_group(children: Children) -> Children {
-    children
+    // we would have fully chained the children builder if it wasn't for the feature flag
+    let mut children = children
         .with_redundancy(3) // Start with 3 actors
-        .with_heartbeat_tick(Duration::from_secs(5)) // Do heartbeat each 5 seconds
-        .with_resizer(
+        .with_heartbeat_tick(Duration::from_secs(5)); // Do heartbeat each 5 seconds
+
+    #[cfg(feature = "scaling")]
+    {
+        children = children.with_resizer(
             OptimalSizeExploringResizer::default()
                 .with_lower_bound(1) // A minimal acceptable size of group
                 .with_upper_bound(UpperBound::Limit(10)) // Max 10 actors in runtime
                 .with_upscale_strategy(UpscaleStrategy::MailboxSizeThreshold(3)) // Scale up when a half of actors have more than 3 messages
                 .with_upscale_rate(0.1) // Increase the size of group on 10%, if necessary to scale up
                 .with_downscale_rate(0.2), // Decrease the size of group on 20%, if too many free actors
-        )
+        );
+    }
+    children
         .with_dispatcher(Dispatcher::with_type(DispatcherType::Named(
             "Processing".to_string(),
         )))
