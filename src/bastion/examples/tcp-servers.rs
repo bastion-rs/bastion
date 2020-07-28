@@ -2,7 +2,7 @@ use bastion::prelude::*;
 #[cfg(not(target_os = "windows"))]
 use futures::io;
 #[cfg(target_os = "windows")]
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -28,10 +28,16 @@ async fn run(addr: impl ToSocketAddrs) -> io::Result<()> {
     println!("Listening on {}", listener.local_addr().unwrap());
 
     // Accept clients in a loop.
-    while let Ok(stream) = listener.incoming() {
-        println!("Accepted client");
-        // Spawn a task that echoes messages from the client back to it.
-        spawn(echo(stream));
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                println!("Accepted client");
+                spawn(echo(stream));
+            }
+            _ => {
+                break;
+            }
+        }
     }
     Ok(())
 }
@@ -43,7 +49,7 @@ async fn echo(stream: Handle<TcpStream>) -> io::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-async fn echo(stream: TcpStream) -> io::Result<()> {
+async fn echo(mut stream: TcpStream) -> io::Result<()> {
     let mut buf = [0 as u8; 256];
     while let Ok(size) = stream.read(&mut buf) {
         stream.write(&buf[0..size]).unwrap();
