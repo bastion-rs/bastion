@@ -79,6 +79,7 @@ pub mod context;
 pub mod dispatcher;
 pub mod envelope;
 pub mod executor;
+#[cfg(not(target_os = "windows"))]
 pub mod io;
 pub mod message;
 pub mod path;
@@ -106,6 +107,7 @@ pub mod prelude {
         DispatcherType, NotificationType,
     };
     pub use crate::envelope::{RefAddr, SignedMessage};
+    #[cfg(not(target_os = "windows"))]
     pub use crate::io::*;
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
     pub use crate::msg;

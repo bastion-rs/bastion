@@ -3,9 +3,14 @@ extern crate bastion;
 use bastion::prelude::*;
 use std::panic;
 
-fn init_start() {
+fn setup() {
     Bastion::init();
     Bastion::start();
+}
+
+fn teardown() {
+    Bastion::stop();
+    Bastion::block_until_stopped();
 }
 
 fn spawn_responders() -> ChildrenRef {
@@ -39,31 +44,28 @@ fn spawn_responders() -> ChildrenRef {
 
 #[test]
 fn answer_and_tell_signatures() {
-    init_start();
-    Bastion::spawn(|ctx: BastionContext| async move {
-        let responders = spawn_responders();
-        let responder = &responders.elems()[0];
-        let answer = ctx.ask(&responder.addr(), "Hello").unwrap();
-        let (msg, sign) = answer.await?.extract();
-        let msg: &str = msg.downcast().unwrap();
-        assert_eq!(msg, "Goodbye");
+    setup();
+    Bastion::spawn(run).unwrap();
+    teardown();
+}
 
-        let path = sign.path();
-        let elem = path.elem().as_ref().expect("elem is not present");
-        assert!(elem.is_child());
-        ctx.tell(&sign, "Hi again").unwrap();
+async fn run(ctx: BastionContext) -> Result<(), ()> {
+    let responders = spawn_responders();
+    let responder = &responders.elems()[0];
+    let answer = ctx.ask(&responder.addr(), "Hello").unwrap();
+    let (msg, sign) = answer.await.unwrap().extract();
+    let msg: &str = msg.downcast().unwrap();
+    assert_eq!(msg, "Goodbye");
 
-        let (msg, _) = ctx.recv().await?.extract();
-        let msg: &str = msg.downcast().unwrap();
-        assert_eq!(msg, "Farewell");
+    let path = sign.path();
+    let elem = path.elem().as_ref().expect("elem is not present");
+    assert!(elem.is_child());
+    ctx.tell(&sign, "Hi again").unwrap();
 
-        Bastion::stop();
-
-        Ok(())
-    })
-    .unwrap();
-
-    Bastion::block_until_stopped();
+    let (msg, _) = ctx.recv().await.unwrap().extract();
+    let msg: &str = msg.downcast().unwrap();
+    assert_eq!(msg, "Farewell");
+    Ok(())
 }
 
 // TODO: anonymous signatures Bastion::* methods

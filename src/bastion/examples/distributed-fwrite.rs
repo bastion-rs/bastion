@@ -1,6 +1,8 @@
 use bastion::prelude::*;
 use futures::*;
 use std::fs::{File, OpenOptions};
+#[cfg(target_os = "windows")]
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -63,7 +65,11 @@ fn main() {
                     .write(true)
                     .open(&path)
                     .unwrap();
+
+                #[cfg(not(target_os = "windows"))]
                 let mut file = Handle::<File>::new(fo).unwrap();
+                #[cfg(target_os = "windows")]
+                let mut file = fo;
 
                 // Distribute your workload to workers
                 for id_worker_pair in workers.elems().iter().enumerate() {
@@ -74,6 +80,9 @@ fn main() {
                         msg: u64 => {
                             // Handle the answer...
                             println!("Source received the computed value: {}", msg);
+                            #[cfg(target_os = "windows")]
+                            file.write_all(msg.to_string().as_bytes()).unwrap();
+                            #[cfg(not(target_os = "windows"))]
                             file.write_all(msg.to_string().as_bytes()).await.unwrap();
                         };
                         _: _ => ();

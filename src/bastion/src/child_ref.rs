@@ -226,14 +226,32 @@ impl ChildRef {
     /// # use bastion::prelude::*;
     /// #
     /// # Bastion::init();
-    /// #
-    /// # let children_ref = Bastion::children(|children| children).unwrap();
-    /// # let child_ref = &children_ref.elems()[0];
-    /// child_ref.stop().expect("Couldn't send the message.");
-    /// #
-    /// # Bastion::start();
-    /// # Bastion::stop();
-    /// # Bastion::block_until_stopped();
+    /// # let children_ref =
+    /// # Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message asked...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str =!> {
+    ///                     // Handle the message...
+    ///
+    ///                     // ...and eventually answer to it...
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "asks" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///     # Bastion::start();
+    ///     # let child_ref = &children_ref.elems()[0];
+    ///     child_ref.stop().expect("Couldn't send the message.");
+    ///     #
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Stopping.", self.id);

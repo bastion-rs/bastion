@@ -118,7 +118,14 @@ distributed_api! {
 ///     // of reference to its elements...
 ///     let children = Bastion::children(|children| {
 ///         // ...
-///         # children
+///         # children.with_exec(|ctx: BastionContext| {
+///         #   async move {
+///         #       msg! { ctx.recv().await?,
+///         #            _: _ => ();
+///         #        }
+///         #        Ok(())
+///         #    }
+///         # })
 ///     }).expect("Couldn't create the children group.");
 ///     let elems: &[ChildRef] = children.elems();
 ///

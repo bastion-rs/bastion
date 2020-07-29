@@ -887,7 +887,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        #[warn(unused_mut)]
+        #[allow(unused_mut)]
         let mut state = ContextState::new();
         #[cfg(feature = "scaling")]
         self.init_data_for_scaling(&mut state);
