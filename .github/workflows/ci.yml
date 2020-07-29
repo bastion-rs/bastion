@@ -62,12 +62,16 @@ jobs:
           args: --bins --examples --tests
 
       - name: tests windows
+        env:
+          RUST_BACKTRACE: full
         if: matrix.os == 'windows-latest'
         uses: actions-rs/cargo@v1
         with:
           command: test
 
       - name: tests nightly osx
+        env:
+          RUST_BACKTRACE: full
         if: ${{ matrix.version == 'nightly' && matrix.os == 'macOS-latest' }}
         uses: actions-rs/cargo@v1
         with:
@@ -75,6 +79,8 @@ jobs:
           args: --all --all-features
 
       - name: tests nightly linux
+        env:
+          RUST_BACKTRACE: full
         if: ${{ matrix.version == 'nightly' && matrix.os == 'ubuntu-latest' }}
         uses: actions-rs/cargo@v1
         with:
