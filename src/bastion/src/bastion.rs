@@ -139,7 +139,7 @@ distributed_api! {
 ///     let answer: Answer = child.ask_anonymously("A message containing data.").expect("Couldn't send the message.");
 ///     # async {
 ///     // ...until the child eventually answers back...
-///     let answer: Result<SignedMessage, ()> = answer.await;
+///     let answer: Result<SignedMessage, ()> = run!(answer);
 ///     # };
 ///
 ///     // ...and then even stop or kill it...
