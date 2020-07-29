@@ -44,7 +44,7 @@ fn answer_and_tell_signatures() {
         let responders = spawn_responders();
         let responder = &responders.elems()[0];
         let answer = ctx.ask(&responder.addr(), "Hello").unwrap();
-        let (msg, sign) = answer.await?.extract();
+        let (msg, sign) = answer.await.unwrap().extract();
         let msg: &str = msg.downcast().unwrap();
         assert_eq!(msg, "Goodbye");
 
@@ -53,7 +53,7 @@ fn answer_and_tell_signatures() {
         assert!(elem.is_child());
         ctx.tell(&sign, "Hi again").unwrap();
 
-        let (msg, _) = ctx.recv().await?.extract();
+        let (msg, _) = ctx.recv().await.unwrap().extract();
         let msg: &str = msg.downcast().unwrap();
         assert_eq!(msg, "Farewell");
 
