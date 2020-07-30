@@ -769,6 +769,107 @@ macro_rules! msg {
 }
 
 #[macro_export]
+macro_rules! try_msg {
+    ($msg:expr, $($tokens:tt)+) => {
+        try_msg!(@internal $msg, (), (), (), $($tokens)+)
+    };
+
+    (@internal
+        $msg:expr,
+        ($($bvar:ident, $bty:ty, $bhandle:expr,)*),
+        ($($tvar:ident, $tty:ty, $thandle:expr,)*),
+        ($($avar:ident, $aty:ty, $ahandle:expr,)*),
+        ref $var:ident: $ty:ty => $handle:expr;
+        err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+        $($rest:tt)+
+    ) => {
+        try_msg!(@internal $msg,
+            ($($bvar, $bty, $bhandle,)* $var, $ty, $handle,),
+            ($($tvar, $tty, $thandle,)*),
+            ($($avar, $aty, $ahandle,)*),
+            err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+            $($rest)+
+        )
+    };
+
+    (@internal
+        $msg:expr,
+        ($($bvar:ident, $bty:ty, $bhandle:expr,)*),
+        ($($tvar:ident, $tty:ty, $thandle:expr,)*),
+        ($($avar:ident, $aty:ty, $ahandle:expr,)*),
+        $var:ident: $ty:ty => $handle:expr;
+        err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+        $($rest:tt)+
+    ) => {
+        try_msg!(@internal $msg,
+            ($($bvar, $bty, $bhandle,)*),
+            ($($tvar, $tty, $thandle,)* $var, $ty, $handle,),
+            ($($avar, $aty, $ahandle,)*),
+            err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+            $($rest)+
+        )
+    };
+
+    (@internal
+        $msg:expr,
+        ($($bvar:ident, $bty:ty, $bhandle:expr,)*),
+        ($($tvar:ident, $tty:ty, $thandle:expr,)*),
+        ($($avar:ident, $aty:ty, $ahandle:expr,)*),
+        $var:ident: $ty:ty =!> $handle:expr;
+        err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+        $($rest:tt)+
+    ) => {
+        try_msg!(@internal $msg,
+            ($($bvar, $bty, $bhandle,)*),
+            ($($tvar, $tty, $thandle,)*),
+            ($($avar, $aty, $ahandle,)* $var, $ty, $handle,),
+            err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+            $($rest)+
+        )
+    };
+
+    (@internal
+        $msg:expr,
+        ($($bvar:ident, $bty:ty, $bhandle:expr,)*),
+        ($($tvar:ident, $tty:ty, $thandle:expr,)*),
+        ($($avar:ident, $aty:ty, $ahandle:expr,)*),
+        err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+        _: _ => $handle:expr;
+    ) => {
+        try_msg!(@internal $msg,
+            ($($bvar, $bty, $bhandle,)*),
+            ($($tvar, $tty, $thandle,)*),
+            ($($avar, $aty, $ahandle,)*),
+            err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+            msg: _ => $handle;
+        )
+    };
+
+    (@internal
+        $msg:expr,
+        ($($bvar:ident, $bty:ty, $bhandle:expr,)*),
+        ($($tvar:ident, $tty:ty, $thandle:expr,)*),
+        ($($avar:ident, $aty:ty, $ahandle:expr,)*),
+        err ($($evar:ident, $ety:ty, $ehandle:expr,)*),
+        $var:ident: _ => $handle:expr;
+    ) => { {
+
+        if $msg.is_ok() {
+            msg!(@internal $msg.unwrap(),
+                ($($bvar, $bty, $bhandle,)*),
+                ($($tvar, $tty, $thandle,)*),
+                ($($avar, $aty, $ahandle,)*),
+                msg: _ => $handle;
+            )
+        } else {
+            match $msg {
+                ($($evar:ident, $ety:ty, $ehandle:expr,)*)
+            }
+        }
+    } };
+}
+
+#[macro_export]
 /// Answers to a given message, with the given answer.
 ///
 /// # Example

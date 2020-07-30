@@ -11,6 +11,8 @@ use crate::supervisor::SupervisorRef;
 use crate::system::SYSTEM;
 use async_mutex::Mutex;
 use futures::pending;
+use futures::FutureExt;
+use futures_timer::Delay;
 #[cfg(feature = "scaling")]
 use lever::table::lotable::LOTable;
 use std::collections::VecDeque;
@@ -18,7 +20,7 @@ use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 #[cfg(feature = "scaling")]
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tracing::{debug, trace};
 use uuid::Uuid;
 
@@ -364,6 +366,57 @@ impl BastionContext {
         }
     }
 
+    /// Retrieves asynchronously a message received by the element
+    /// this `BastionContext` is linked to and waits (always
+    /// asynchronously) for one if none has been received yet.
+    ///
+    /// If you don't need to wait until at least one message
+    /// can be retrieved, use [`try_recv`] instead.
+    ///
+    /// This method returns [`SignedMessage`] if it succeeded, or `Err(())`
+    /// otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # Bastion::init();
+    /// #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // This will block until a message has been received...
+    ///             let msg: SignedMessage = ctx.recv().await?;
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// ```
+    ///
+    /// [`try_recv`]: #method.try_recv
+    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, TimeoutError> {
+        debug!(
+            "BastionContext({}): Waiting to receive message within {} seconds.",
+            self.id,
+            timeout.as_secs()
+        );
+        futures::select! {
+            message = self.recv().fuse() => {
+                message.map_err(|_| TimeoutError {timeout: Duration::from_millis(0)})
+            },
+            duration = Delay::new(timeout).fuse() => {
+                Err(TimeoutError {timeout})
+            }
+        }
+    }
+
     /// Returns [`RefAddr`] of the current `BastionContext`
     ///
     /// # Example
@@ -571,6 +624,11 @@ impl BastionContext {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.broadcast_message(target, &msg);
     }
+}
+
+#[derive(Debug)]
+pub struct TimeoutError {
+    timeout: Duration,
 }
 
 impl ContextState {
