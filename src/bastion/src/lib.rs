@@ -87,6 +87,8 @@ pub mod path;
 pub mod resizer;
 pub mod supervisor;
 
+pub mod errors;
+
 distributed_api! {
     // pub mod dist_messages;
     pub mod distributed;
@@ -107,6 +109,7 @@ pub mod prelude {
         DispatcherType, NotificationType,
     };
     pub use crate::envelope::{RefAddr, SignedMessage};
+    pub use crate::errors::*;
     #[cfg(not(target_os = "windows"))]
     pub use crate::io::*;
     pub use crate::message::{Answer, AnswerSender, Message, Msg};

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bastion::context::TimeoutError;
 use bastion::prelude::*;
 
 use tracing::Level;
@@ -90,7 +89,7 @@ fn process_group(children: Children) -> Children {
         .with_exec(move |ctx: BastionContext| async move {
             println!("[Processing] Worker started!");
 
-            try_msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(0)).await,
+            msg! { ctx.recv().await?,
                 // We received the message from other actor wrapped in Arc<T>
                 // Let's unwrap it and do regular matching.
                 raw_message: Arc<SignedMessage> => {
@@ -116,9 +115,6 @@ fn process_group(children: Children) -> Children {
                         _: _ => ();
                     }
                 };
-                err error: TimeoutError => {
-                    println!("TIMEOUT");
-                }
                 _: _ => ();
             }
 
