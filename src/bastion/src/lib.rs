@@ -113,6 +113,7 @@ pub mod prelude {
     #[cfg(not(target_os = "windows"))]
     pub use crate::io::*;
     pub use crate::message::{Answer, AnswerSender, Message, Msg};
+    pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
     #[cfg(feature = "scaling")]
     pub use crate::resizer::{OptimalSizeExploringResizer, UpperBound, UpscaleStrategy};
@@ -121,7 +122,6 @@ pub mod prelude {
         SupervisorRef,
     };
     pub use crate::{answer, blocking, children, run, spawn, supervisor};
-    pub use crate::{msg, try_msg};
 
     distributed_api! {
         // pub use crate::dist_messages::*;
