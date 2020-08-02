@@ -726,7 +726,7 @@ macro_rules! msg {
             )*
             else {
                 { $handle }
-        }
+            }
         } else if sender.is_some() {
             let sender = sender.unwrap();
 
