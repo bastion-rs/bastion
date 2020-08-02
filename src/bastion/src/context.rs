@@ -389,6 +389,7 @@ impl BastionContext {
     ///
     /// ```rust
     /// # use bastion::prelude::*;
+    /// # use std::time::Duration;
     /// #
     /// # Bastion::init();
     /// #
@@ -396,9 +397,10 @@ impl BastionContext {
     ///     children.with_exec(|ctx: BastionContext| {
     ///         async move {
     ///             // This will block until a message has been received...
-    ///             let msg: SignedMessage = ctx.try_recv_timeout().await.map_err(|e| {
-    ///                if let TimeoutError(duration) = e {
-    ///                    // Timeout happened         
+    ///             let timeout = Duration::from_millis(10);
+    ///             let msg: SignedMessage = ctx.try_recv_timeout(timeout).await.map_err(|e| {
+    ///                if let ReceiveError::Timeout(duration) = e {
+    ///                    // Timeout happened      
     ///                }
     ///             })?;
     ///
