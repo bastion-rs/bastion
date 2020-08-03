@@ -8,9 +8,11 @@ use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
-use crate::system::SYSTEM;
+use crate::{prelude::ReceiveError, system::SYSTEM};
 use async_mutex::Mutex;
 use futures::pending;
+use futures::FutureExt;
+use futures_timer::Delay;
 #[cfg(feature = "scaling")]
 use lever::table::lotable::LOTable;
 use std::collections::VecDeque;
@@ -18,7 +20,7 @@ use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 #[cfg(feature = "scaling")]
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tracing::{debug, trace};
 use uuid::Uuid;
 
@@ -269,6 +271,9 @@ impl BastionContext {
     ///
     /// If you need to wait (always asynchronously) until at
     /// least one message can be retrieved, use [`recv`] instead.
+    ///    
+    /// If you want to wait for a certain amount of time before bailing out
+    /// use ['try_recv_timeout'] instead.
     ///
     /// This method returns [`SignedMessage`] if a message was available, or
     /// `None` otherwise.
@@ -319,6 +324,9 @@ impl BastionContext {
     ///
     /// If you don't need to wait until at least one message
     /// can be retrieved, use [`try_recv`] instead.
+    ///    
+    /// If you want to wait for a certain amount of time before bailing out
+    /// use ['try_recv_timeout'] instead.
     ///
     /// This method returns [`SignedMessage`] if it succeeded, or `Err(())`
     /// otherwise.
@@ -361,6 +369,66 @@ impl BastionContext {
 
             drop(guard);
             pending!();
+        }
+    }
+
+    /// Retrieves asynchronously a message received by the element
+    /// this `BastionContext` is linked to and waits until `timeout` (always
+    /// asynchronously) for one if none has been received yet.
+    ///
+    /// If you want to wait for ever until at least one message
+    /// can be retrieved, use ['recv'] instead.
+    ///
+    /// If you don't need to wait until at least one message
+    /// can be retrieved, use [`try_recv`] instead.
+    ///
+    /// This method returns [`SignedMessage`] if it succeeded, or `Err(TimeoutError)`
+    /// otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// # use std::time::Duration;
+    /// #
+    /// # Bastion::init();
+    /// #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // This will block until a message has been received...
+    ///             let timeout = Duration::from_millis(10);
+    ///             let msg: SignedMessage = ctx.try_recv_timeout(timeout).await.map_err(|e| {
+    ///                if let ReceiveError::Timeout(duration) = e {
+    ///                    // Timeout happened      
+    ///                }
+    ///             })?;
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// ```
+    ///
+    /// [`try_recv`]: #method.try_recv
+    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
+        debug!(
+            "BastionContext({}): Waiting to receive message within {} milliseconds.",
+            self.id,
+            timeout.as_millis()
+        );
+        futures::select! {
+            message = self.recv().fuse() => {
+                message.map_err(|_| ReceiveError::Other)
+            },
+            duration = Delay::new(timeout).fuse() => {
+                Err(ReceiveError::Timeout(timeout))
+            }
         }
     }
 
