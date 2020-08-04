@@ -60,7 +60,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::{env, thread};
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 
 use bastion_utils::math;
 use lazy_static::lazy_static;
@@ -98,6 +98,30 @@ static MAX_THREADS: AtomicU64 = AtomicU64::new(10_000);
 struct Pool {
     sender: Sender<LightProc>,
     receiver: Receiver<LightProc>,
+}
+
+lazy_static! {
+    static ref PINNED: Pool = {
+        // Pinned thread for tasks that cannot be run anywhere else
+        thread::Builder::new()
+            .name("bastion-pinned-driver".to_string())
+            .spawn(|| {
+                self::affinity_pinner();
+
+                // TODO [igni]: We might wanna circle back to this one and make it async :D
+                while let Ok(task) = PINNED.receiver.recv() {
+                    task.run();
+                }
+            })
+            .expect("pinned thread cannot be started");
+
+        // We only have one thread,
+        // let's try to keep as many messages
+        // in the buffer as possible.
+        let (sender, receiver) = unbounded();
+        Pool { sender, receiver }
+    }
+
 }
 
 lazy_static! {
