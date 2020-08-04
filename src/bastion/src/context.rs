@@ -303,6 +303,7 @@ impl BastionContext {
     /// ```
     ///
     /// [`recv`]: #method.recv
+    /// [`try_recv_timeout`]: #method.try_recv_timeout
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         debug!("BastionContext({}): Trying to receive message.", self.id);
@@ -355,6 +356,7 @@ impl BastionContext {
     /// ```
     ///
     /// [`try_recv`]: #method.try_recv
+    /// [`try_recv_timeout`]: #method.try_recv_timeout
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
@@ -414,6 +416,7 @@ impl BastionContext {
     /// # Bastion::block_until_stopped();
     /// ```
     ///
+    /// [`recv`]: #method.recv
     /// [`try_recv`]: #method.try_recv
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
