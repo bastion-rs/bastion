@@ -273,7 +273,7 @@ impl BastionContext {
     /// least one message can be retrieved, use [`recv`] instead.
     ///    
     /// If you want to wait for a certain amount of time before bailing out
-    /// use ['try_recv_timeout'] instead.
+    /// use [`try_recv_timeout`] instead.
     ///
     /// This method returns [`SignedMessage`] if a message was available, or
     /// `None` otherwise.
@@ -326,7 +326,7 @@ impl BastionContext {
     /// can be retrieved, use [`try_recv`] instead.
     ///    
     /// If you want to wait for a certain amount of time before bailing out
-    /// use ['try_recv_timeout'] instead.
+    /// use [`try_recv_timeout`] instead.
     ///
     /// This method returns [`SignedMessage`] if it succeeded, or `Err(())`
     /// otherwise.
@@ -377,7 +377,7 @@ impl BastionContext {
     /// asynchronously) for one if none has been received yet.
     ///
     /// If you want to wait for ever until at least one message
-    /// can be retrieved, use ['recv'] instead.
+    /// can be retrieved, use [`recv`] instead.
     ///
     /// If you don't need to wait until at least one message
     /// can be retrieved, use [`try_recv`] instead.
