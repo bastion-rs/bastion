@@ -420,7 +420,7 @@ impl BastionContext {
     /// [`try_recv`]: #method.try_recv
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
-        if timeout.is_zero() {
+        if timeout == std::time::Duration::from_nanos(0) {
             debug!("BastionContext({}): Trying to receive message.", self.id);
         } else {
             debug!(
