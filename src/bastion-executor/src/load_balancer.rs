@@ -6,6 +6,7 @@
 //!
 use crate::load_balancer;
 use crate::placement;
+use arrayvec::ArrayVec;
 use lazy_static::*;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -18,7 +19,7 @@ pub trait SmpStats {
     /// Stores the load of the given queue.
     fn store_load(&self, affinity: usize, load: usize);
     /// returns tuple of queue id and load in an sorted order.
-    fn get_sorted_load(&self) -> Vec<(usize, usize)>;
+    fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]>;
     /// mean of the all smp queue load.
     fn mean(&self) -> usize;
     /// update the smp mean.
@@ -112,13 +113,14 @@ impl SmpStats for Stats {
         self.smp_load[affinity].store(load, Ordering::SeqCst);
     }
 
-    fn get_sorted_load(&self) -> Vec<(usize, usize)> {
-        let mut sorted_load = self
-            .smp_load
-            .iter()
-            .map(|l| l.load(Ordering::SeqCst))
-            .enumerate()
-            .collect::<Vec<_>>();
+    fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]> {
+        let mut sorted_load = ArrayVec::<[(usize, usize); MAX_CORE]>::new();
+
+        for (i, load) in self.smp_load.iter().enumerate() {
+            // we know we're fine because smp_load's size is MAX_CORE
+            unsafe { sorted_load.push_unchecked((i, load.load(Ordering::SeqCst))) };
+        }
+
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
     }
