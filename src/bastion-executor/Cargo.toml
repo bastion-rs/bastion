@@ -44,7 +44,8 @@ pin-utils = "0.1.0"
 # Allocator
 numanji = { version = "^0.1", optional = true, default-features = false }
 allocator-suite = { version = "^0.1", optional = true, default-features = false }
-arrayvec = { version = "0.5.1", features= ["array-sizes-129-255"]}
+arrayvec = { version = "0.5.1", features = ["array-sizes-129-255"]}
+futures-timer = "3.0.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 jemallocator = { version = "^0.3", optional = true, default-features = false }

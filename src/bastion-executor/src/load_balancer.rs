@@ -116,14 +116,18 @@ impl SmpStats for Stats {
     fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]> {
         let mut sorted_load = ArrayVec::<[(usize, usize); MAX_CORE]>::new();
 
-        for (i, load) in self.smp_load.iter().enumerate() {
-            // we know we're fine because smp_load's size is MAX_CORE
-            unsafe { sorted_load.push_unchecked((i, load.load(Ordering::SeqCst))) };
+        for (i, item) in self.smp_load.iter().enumerate() {
+            let load = item.load(Ordering::SeqCst);
+            // load till maximum core.
+            if load == usize::MAX {
+                break;
+            }
+            unsafe { sorted_load.push_unchecked((i, load)) };
         }
-
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
     }
+
 
     fn mean(&self) -> usize {
         self.mean_level.load(Ordering::SeqCst)
