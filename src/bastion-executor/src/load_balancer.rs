@@ -122,6 +122,7 @@ impl SmpStats for Stats {
             if load == usize::MAX {
                 break;
             }
+            // unsafe is ok here because self.smp_load.len() is MAX_CORE
             unsafe { sorted_load.push_unchecked((i, load)) };
         }
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
