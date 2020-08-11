@@ -113,16 +113,12 @@ impl SmpStats for Stats {
     }
 
     fn get_sorted_load(&self) -> Vec<(usize, usize)> {
-        let mut sorted_load = Vec::new();
-
-        for (i, item) in self.smp_load.iter().enumerate() {
-            let load = item.load(Ordering::SeqCst);
-            // load till maximum core.
-            if load == usize::MAX {
-                break;
-            }
-            sorted_load.push((i, load));
-        }
+        let mut sorted_load = self
+            .smp_load
+            .iter()
+            .map(|l| l.load(Ordering::SeqCst))
+            .enumerate()
+            .collect::<Vec<_>>();
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
     }
