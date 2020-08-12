@@ -8,11 +8,16 @@ use crate::load_balancer;
 use crate::placement;
 use arrayvec::ArrayVec;
 use lazy_static::*;
+use lever::sync::prelude::TTas;
 use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
 use std::thread;
 use std::time::Duration;
-use std::{fmt, usize};
+use std::{collections::VecDeque, fmt, usize};
+use thread::Thread;
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -25,10 +30,24 @@ pub trait SmpStats {
     /// update the smp mean.
     fn update_mean(&self);
 }
-///
-/// Load-balancer struct which is just a convenience wrapper over the statistics calculations.
-#[derive(Debug)]
-pub struct LoadBalancer;
+
+/// Load-balancer struct which allows us to park and unpark threads.
+/// It also allows us to update the mean load
+pub struct LoadBalancer {
+    parked_threads: TTas<VecDeque<thread::Thread>>,
+    should_update: Arc<AtomicBool>,
+}
+
+impl Default for LoadBalancer {
+    fn default() -> Self {
+        Self {
+            parked_threads: TTas::new(VecDeque::with_capacity(
+                placement::get_core_ids().unwrap().len(),
+            )),
+            should_update: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
 
 impl LoadBalancer {
     ///
@@ -38,6 +57,7 @@ impl LoadBalancer {
             .name("bastion-load-balancer-thread".to_string())
             .spawn(move || {
                 loop {
+                    dbg!("busy looping");
                     load_balancer::stats().update_mean();
                     // We don't have β-reduction here… Life is unfair. Life is cruel.
                     //
@@ -49,6 +69,32 @@ impl LoadBalancer {
                 }
             })
             .expect("load-balancer couldn't start");
+    }
+
+    pub fn update_load_mean(&self) {
+        // Check if update should occur
+        self.should_update
+            .compare_and_swap(true, false, Ordering::SeqCst);
+
+        let cloned = Arc::clone(&self.should_update);
+        thread::Builder::new()
+            .name("bastion-load-balancer-thread".to_string())
+            .spawn(move || {
+                load_balancer::stats().update_mean();
+                (*cloned).store(true, Ordering::SeqCst);
+            });
+    }
+
+    pub fn park_thread(&self, thread: Thread) {
+        self.parked_threads.lock().push_back(thread);
+        std::thread::park();
+    }
+
+    pub fn unpark_thread(&self) {
+        self.parked_threads
+            .lock()
+            .pop_front()
+            .map(|thread| thread.unpark());
     }
 }
 
@@ -81,21 +127,18 @@ impl Stats {
         let smp_load: [AtomicUsize; MAX_CORE] = {
             let mut data: [MaybeUninit<AtomicUsize>; MAX_CORE] =
                 unsafe { MaybeUninit::uninit().assume_init() };
-            let mut i = 0;
-            while i < MAX_CORE {
-                if i < num_cores {
-                    unsafe {
-                        std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(0));
-                    }
-                    i += 1;
-                    continue;
+
+            for i in 0..num_cores {
+                unsafe {
+                    std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(0));
                 }
-                // MAX is for unused slot.
+            }
+            for i in num_cores..MAX_CORE {
                 unsafe {
                     std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(usize::MAX));
                 }
-                i += 1;
             }
+
             unsafe { std::mem::transmute::<_, [AtomicUsize; MAX_CORE]>(data) }
         };
         Stats {
@@ -135,19 +178,16 @@ impl SmpStats for Stats {
 
     fn update_mean(&self) {
         let mut sum: usize = 0;
+        let num_cores = placement::get_core_ids().unwrap().len();
 
-        for item in self.smp_load.iter() {
-            let load = item.load(Ordering::SeqCst);
-            if let Some(tmp) = sum.checked_add(load) {
+        for item in self.smp_load.iter().take(num_cores) {
+            if let Some(tmp) = sum.checked_add(item.load(Ordering::SeqCst)) {
                 sum = tmp;
-                continue;
             }
-            break;
         }
-        self.mean_level.store(
-            sum.wrapping_div(placement::get_core_ids().unwrap().len()),
-            Ordering::SeqCst,
-        );
+
+        self.mean_level
+            .store(sum.wrapping_div(num_cores), Ordering::SeqCst);
     }
 }
 

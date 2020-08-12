@@ -7,7 +7,7 @@ use crate::load_balancer;
 use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
-use load_balancer::SmpStats;
+use load_balancer::{LoadBalancer, SmpStats};
 use std::cell::{Cell, UnsafeCell};
 use std::{iter, ptr};
 ///
@@ -59,6 +59,14 @@ thread_local! {
     static QUEUE: UnsafeCell<Option<Worker<LightProc>>> = UnsafeCell::new(None);
 }
 
+static LOAD_BALANCER: once_cell::sync::Lazy<load_balancer::LoadBalancer> =
+    once_cell::sync::Lazy::new(|| {
+        // Start the load mean updater thread.
+        // LoadBalancer::amql_generation();
+
+        LoadBalancer::default()
+    });
+
 pub(crate) fn schedule(proc: LightProc) {
     QUEUE.with(|queue| {
         let local = unsafe { (*queue.get()).as_ref() };
@@ -68,6 +76,9 @@ pub(crate) fn schedule(proc: LightProc) {
             Some(q) => q.push(proc),
         }
     });
+
+    LOAD_BALANCER.update_load_mean();
+    LOAD_BALANCER.unpark_thread();
 
     pool::get().sleepers.notify_one();
 }
@@ -91,9 +102,14 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
 
         // First try to get procs from global queue
         pool.injector.steal_batch_and_pop(&local).or_else(|| {
-            if let Some((core, _)) = cores_and_loads.first() {
+            if let Some((core, load)) = cores_and_loads.first() {
+                if *load == 0 {
+                    LOAD_BALANCER.park_thread(std::thread::current());
+                    Steal::Retry
+                }
                 // If affinity is the one with the highest let other's do the stealing
-                if *core == affinity {
+                else if *core == affinity {
+                    LOAD_BALANCER.park_thread(std::thread::current());
                     Steal::Retry
                 } else {
                     // Try iterating through loads
@@ -109,12 +125,14 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                                     .unwrap()
                                     .steal_batch_and_pop_with_amount(&local, load_mean)
                             } else {
+                                LOAD_BALANCER.park_thread(std::thread::current());
                                 Steal::Retry
                             }
                         })
                         .collect()
                 }
             } else {
+                LOAD_BALANCER.park_thread(std::thread::current());
                 Steal::Retry
             }
         })
