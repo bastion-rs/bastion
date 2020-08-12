@@ -453,7 +453,6 @@ impl Children {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
-    /// # fn main() {
     ///     # Bastion::init();
     ///     #
     /// Bastion::children(|children| {
@@ -472,7 +471,6 @@ impl Children {
     ///     # Bastion::start();
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
-    /// # }
     /// ```
     /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
     pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {

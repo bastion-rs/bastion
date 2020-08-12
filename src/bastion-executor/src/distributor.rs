@@ -15,6 +15,10 @@ pub(crate) struct Distributor {
 
 impl Distributor {
     pub(crate) fn new() -> Self {
+        // We want to initialize the load balancer as early as possible
+        // Otherwise we will get the wrong core ids,
+        // Because set_affinity will have occured on the current thread
+        worker::load_balancer();
         Distributor {
             cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
         }

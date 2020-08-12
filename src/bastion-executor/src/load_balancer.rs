@@ -7,48 +7,149 @@
 use crate::load_balancer;
 use crate::placement;
 use arrayvec::ArrayVec;
+use crossbeam_queue::ArrayQueue;
+use fmt::{Debug, Formatter};
 use lazy_static::*;
 use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
 use std::thread;
 use std::time::Duration;
 use std::{fmt, usize};
+use thread::Thread;
+use tracing::*;
+
+/// The timeout we'll use when parking the last awaken thread  
+pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
     /// Stores the load of the given queue.
     fn store_load(&self, affinity: usize, load: usize);
-    /// returns tuple of queue id and load in an sorted order.
+    /// returns tuple of queue id and load ordered from highest load to lowest.
     fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]>;
     /// mean of the all smp queue load.
     fn mean(&self) -> usize;
     /// update the smp mean.
     fn update_mean(&self);
 }
-///
-/// Load-balancer struct which is just a convenience wrapper over the statistics calculations.
-#[derive(Debug)]
-pub struct LoadBalancer;
+
+/// Load-balancer struct which allows us to park and unpark threads.
+/// It also allows us to update the mean load
+pub struct LoadBalancer {
+    num_cores: usize,
+    parked_threads: ArrayQueue<Thread>,
+    should_update_load_mean: Arc<AtomicBool>,
+}
+
+impl Debug for LoadBalancer {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("LoadBalancer")
+            .field("num_cores", &self.num_cores)
+            .field(
+                "should_update_load_mean",
+                &self.should_update_load_mean.load(Ordering::Relaxed),
+            )
+            .field("num_parked_threads", &self.parked_threads.len())
+            .finish()
+    }
+}
+
+impl Default for LoadBalancer {
+    fn default() -> Self {
+        let num_cores = placement::get_num_cores().unwrap();
+        info!(
+            "Bastion-executor: Instanciating LoadBalancer with {} cores.",
+            num_cores
+        );
+        Self {
+            num_cores,
+            // The last parked thread will be parked with a timeout, we won't add it here
+            parked_threads: ArrayQueue::new(num_cores - 1),
+            should_update_load_mean: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
 
 impl LoadBalancer {
-    ///
-    /// AMQL sampling thread for run queue load balancing.
-    pub fn amql_generation() {
+    /// Iterates the statistics to get the mean load across the cores
+    pub fn update_load_mean(&self) {
+        // Check if update should occur
+        self.should_update_load_mean
+            .compare_and_swap(true, false, Ordering::SeqCst);
+
+        let cloned = Arc::clone(&self.should_update_load_mean);
         thread::Builder::new()
             .name("bastion-load-balancer-thread".to_string())
             .spawn(move || {
-                loop {
-                    load_balancer::stats().update_mean();
-                    // We don't have β-reduction here… Life is unfair. Life is cruel.
-                    //
-                    // Try sleeping for a while to wait
-                    // Should be smaller time slice than 4 times per second to not miss
-                    thread::sleep(Duration::from_millis(245));
-                    // Yield immediately back to os so we can advance in workers
-                    thread::yield_now();
-                }
+                load_balancer::stats().update_mean();
+                (*cloned).store(true, Ordering::SeqCst);
             })
-            .expect("load-balancer couldn't start");
+            .expect("couldn't create stats thread.");
+    }
+
+    /// Parks a thread for THREAD_PARK_TIMEOUT or until unpark_thread is called
+    /// depending on the number of remaining available threads
+    pub fn park_thread(&self) {
+        if self.parked_threads.is_full() {
+            debug!("Bastion-executor: parking the last thread");
+            self.park_timeout()
+        } else {
+            let _ = self
+                .parked_threads
+                .push(std::thread::current())
+                .map(|_| {
+                    debug!(
+                        "Bastion-executor: parking the thread {:?}",
+                        std::thread::current().id()
+                    );
+                    std::thread::park();
+                })
+                .map_err(|e| {
+                    warn!(
+                        "Bastion-executor: couldn't put thread {:?} in the parked_threads list - {}",
+                        std::thread::current().id(), e
+                    );
+                    e
+                });
+        }
+    }
+
+    /// Parks a thread for THREAD_PARK_TIMEOUT or until it receives a wakeup signal
+    pub fn park_timeout(&self) {
+        debug!(
+            "Bastion-executor: parking the thread {:?} for at least {}ms",
+            std::thread::current().id(),
+            THREAD_PARK_TIMEOUT.as_millis()
+        );
+        std::thread::park_timeout(THREAD_PARK_TIMEOUT);
+    }
+
+    /// Pops a thread from the parked_threads queue and unparks it
+    pub fn unpark_thread(&self) {
+        if self.parked_threads.is_empty() {
+            debug!("Bastion-executor: unpark_thread: no parked threads");
+        } else {
+            debug!("parked_threads: len is {}", self.parked_threads.len());
+            let _ = self
+                .parked_threads
+                .pop()
+                .map(|thread| {
+                    debug!(
+                        "Bastion-executor: unpark_thread: unparking {:?}",
+                        thread.id()
+                    );
+                    thread.unpark()
+                })
+                .map_err(|e| {
+                    debug!(
+                        "Bastion-executor: unpark_thread: couldn't unpark thread - {}",
+                        e
+                    );
+                });
+        }
     }
 }
 
@@ -81,21 +182,18 @@ impl Stats {
         let smp_load: [AtomicUsize; MAX_CORE] = {
             let mut data: [MaybeUninit<AtomicUsize>; MAX_CORE] =
                 unsafe { MaybeUninit::uninit().assume_init() };
-            let mut i = 0;
-            while i < MAX_CORE {
-                if i < num_cores {
-                    unsafe {
-                        std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(0));
-                    }
-                    i += 1;
-                    continue;
-                }
-                // MAX is for unused slot.
+
+            for core_data in data.iter_mut().take(num_cores) {
                 unsafe {
-                    std::ptr::write(data[i].as_mut_ptr(), AtomicUsize::new(usize::MAX));
+                    std::ptr::write(core_data.as_mut_ptr(), AtomicUsize::new(0));
                 }
-                i += 1;
             }
+            for core_data in data.iter_mut().take(MAX_CORE).skip(num_cores) {
+                unsafe {
+                    std::ptr::write(core_data.as_mut_ptr(), AtomicUsize::new(usize::MAX));
+                }
+            }
+
             unsafe { std::mem::transmute::<_, [AtomicUsize; MAX_CORE]>(data) }
         };
         Stats {
@@ -116,14 +214,14 @@ impl SmpStats for Stats {
     fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]> {
         let mut sorted_load = ArrayVec::<[(usize, usize); MAX_CORE]>::new();
 
-        for (i, item) in self.smp_load.iter().enumerate() {
-            let load = item.load(Ordering::SeqCst);
+        for (core, load) in self.smp_load.iter().enumerate() {
+            let load = load.load(Ordering::SeqCst);
             // load till maximum core.
             if load == usize::MAX {
                 break;
             }
             // unsafe is ok here because self.smp_load.len() is MAX_CORE
-            unsafe { sorted_load.push_unchecked((i, load)) };
+            unsafe { sorted_load.push_unchecked((core, load)) };
         }
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
@@ -135,19 +233,16 @@ impl SmpStats for Stats {
 
     fn update_mean(&self) {
         let mut sum: usize = 0;
+        let num_cores = placement::get_core_ids().unwrap().len();
 
-        for item in self.smp_load.iter() {
-            let load = item.load(Ordering::SeqCst);
-            if let Some(tmp) = sum.checked_add(load) {
+        for item in self.smp_load.iter().take(num_cores) {
+            if let Some(tmp) = sum.checked_add(item.load(Ordering::SeqCst)) {
                 sum = tmp;
-                continue;
             }
-            break;
         }
-        self.mean_level.store(
-            sum.wrapping_div(placement::get_core_ids().unwrap().len()),
-            Ordering::SeqCst,
-        );
+
+        self.mean_level
+            .store(sum.wrapping_div(num_cores), Ordering::SeqCst);
     }
 }
 
