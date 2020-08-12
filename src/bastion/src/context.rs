@@ -698,3 +698,134 @@ impl Display for BastionId {
         self.0.fmt(fmt)
     }
 }
+
+#[cfg(test)]
+mod context_tests {
+    use super::*;
+    use crate::prelude::*;
+    use crate::Bastion;
+
+    #[test]
+    fn test_recv() {
+        setup();
+
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                msg! { ctx.recv().await?,
+                    msg: &'static str => {
+                        assert_eq!(msg, "test recv");
+                    };
+                    _: _ => { panic!("didn't receive the expected message");};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test recv")
+            .expect("couldn't send message");
+
+        teardown();
+    }
+
+    #[test]
+    fn test_try_recv() {
+        setup();
+
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                msg! { ctx.try_recv().await.expect("no message"),
+                    msg: &'static str => {
+                        assert_eq!(msg, "test try recv");
+                    };
+                    _: _ => { panic!("didn't receive the expected message");};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test try recv")
+            .expect("couldn't send message");
+
+        teardown();
+    }
+
+    #[test]
+    fn test_try_recv_fail() {
+        setup();
+
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                assert!(ctx.try_recv().await.is_none());
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        // Not sending any message
+
+        teardown();
+    }
+
+    #[test]
+    fn test_try_recv_timeout() {
+        setup();
+
+        let children =
+        Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(1)).await.expect("recv_timeout failed"),
+                    msg: &'static str => {
+                        assert_eq!(msg, "test recv timeout");
+                    };
+                    _: _ => { panic!("didn't receive the expected message");};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test recv timeout")
+            .expect("couldn't send message");
+
+        teardown();
+    }
+
+    #[test]
+    fn test_try_recv_timeout_fail() {
+        setup();
+
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                assert!(ctx
+                    .try_recv_timeout(std::time::Duration::from_millis(1))
+                    .await
+                    .is_err());
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        // Triggering the timeout
+        run!(async { Delay::new(std::time::Duration::from_millis(2)).await });
+
+        // The child panicked, we should not be able to send things to it anymore
+        assert!(children.broadcast("test recv timeout").is_err());
+
+        teardown();
+    }
+
+    fn setup() {
+        Bastion::init();
+        Bastion::start();
+    }
+
+    fn teardown() {
+        Bastion::stop();
+        Bastion::block_until_stopped();
+    }
+}
