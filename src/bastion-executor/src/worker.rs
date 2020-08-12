@@ -140,7 +140,7 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                 trace!("Bastion-Executor: parking thread: no loads.");
                 LOAD_BALANCER.park_thread(std::thread::current());
                 trace!("Bastion-Executor: unparked thread: no loads.");
-                
+
                 LOAD_BALANCER.park_thread(std::thread::current());
                 Steal::Retry
             }
