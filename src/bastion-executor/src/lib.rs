@@ -32,6 +32,10 @@
     any(feature = "numanji", feature = "allocator-suite"),
     feature(allocator_api)
 )]
+#![cfg_attr(
+    any(feature = "numanji", feature = "allocator-suite"),
+    feature(nonnull_slice_from_raw_parts)
+)]
 #[macro_use]
 mod macros;
 
