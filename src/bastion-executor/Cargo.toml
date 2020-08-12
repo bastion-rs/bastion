@@ -48,6 +48,7 @@ arrayvec = { version = "0.5.1", features = ["array-sizes-129-255"]}
 futures-timer = "3.0.2"
 once_cell = "1.4.0"
 lever = "0.1.1-alpha.11"
+tracing = "0.1.19"
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 jemallocator = { version = "^0.3", optional = true, default-features = false }

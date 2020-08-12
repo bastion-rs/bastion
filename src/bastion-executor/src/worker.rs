@@ -10,6 +10,8 @@ use lightproc::prelude::*;
 use load_balancer::{LoadBalancer, SmpStats};
 use std::cell::{Cell, UnsafeCell};
 use std::{iter, ptr};
+use tracing::trace;
+
 ///
 /// Get the current process's stack
 pub fn current() -> ProcStack {
@@ -104,34 +106,41 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
         pool.injector.steal_batch_and_pop(&local).or_else(|| {
             if let Some((core, load)) = cores_and_loads.first() {
                 if *load == 0 {
+                    trace!("Bastion-Executor: parking thread: there is no load.");
                     LOAD_BALANCER.park_thread(std::thread::current());
+                    trace!("Bastion-Executor: unparked thread: there was no load.");
                     Steal::Retry
                 }
                 // If affinity is the one with the highest let other's do the stealing
                 else if *core == affinity {
+                    trace!("Bastion-Executor: parking thread: load has the same core affinity.");
                     LOAD_BALANCER.park_thread(std::thread::current());
+                    trace!("Bastion-Executor: unparked thread: load had the same core affinity.");
                     Steal::Retry
                 } else {
                     // Try iterating through loads
                     cores_and_loads
                         .iter()
                         .map(|(core_id, _)| {
-                            // We want to make sure the average load is higher than 1.
-                            // Otherwise we cannot guarantee stealing on a different core
-                            // Will be worth a context switch.
-                            if load_mean > 1 {
+                            if load_mean > 0 {
                                 pool.stealers
                                     .get(*core_id)
                                     .unwrap()
                                     .steal_batch_and_pop_with_amount(&local, load_mean)
                             } else {
+                                trace!("Bastion-Executor: parking thread: load mean is 0.");
                                 LOAD_BALANCER.park_thread(std::thread::current());
+                                trace!("Bastion-Executor: unparked thread: load mean was 0.");
                                 Steal::Retry
                             }
                         })
                         .collect()
                 }
             } else {
+                trace!("Bastion-Executor: parking thread: no loads.");
+                LOAD_BALANCER.park_thread(std::thread::current());
+                trace!("Bastion-Executor: unparked thread: no loads.");
+                
                 LOAD_BALANCER.park_thread(std::thread::current());
                 Steal::Retry
             }
