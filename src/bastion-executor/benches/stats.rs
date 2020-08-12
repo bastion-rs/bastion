@@ -60,7 +60,7 @@ fn lockless_stats_bad_load(b: &mut Bencher) {
 
     b.iter(|| {
         let mut handles = Vec::with_capacity(1000);
-        for i in 0..100 {
+        for i in 0..1_000 {
             let handle = thread::spawn(move || {
                 let _sorted_load = stats.get_sorted_load();
             });
@@ -90,7 +90,7 @@ fn lockless_stats_good_load(b: &mut Bencher) {
     b.iter(|| {
         let mut handles = Vec::with_capacity(1000);
 
-        for i in 0..100 {
+        for i in 0..1_000 {
             let handle = thread::spawn(move || {
                 let _sorted_load = stats.get_sorted_load();
             });
