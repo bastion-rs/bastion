@@ -306,17 +306,17 @@ impl BastionContext {
     /// [`try_recv_timeout`]: #method.try_recv_timeout
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv(&self) -> Option<SignedMessage> {
-        debug!("BastionContext({}): Trying to receive message.", self.id);
-        let state = self.state.clone();
-        let mut guard = state.lock().await;
-
-        if let Some(msg) = guard.pop_message() {
-            trace!("BastionContext({}): Received message: {:?}", self.id, msg);
-            Some(msg)
-        } else {
-            trace!("BastionContext({}): Received no message.", self.id);
-            None
-        }
+        self.try_recv_timeout(std::time::Duration::from_nanos(0))
+            .await
+            .map(|msg| {
+                trace!("BastionContext({}): Received message: {:?}", self.id, msg);
+                msg
+            })
+            .map_err(|e| {
+                trace!("BastionContext({}): Received no message.", self.id);
+                e
+            })
+            .ok()
     }
 
     /// Retrieves asynchronously a message received by the element
@@ -420,11 +420,15 @@ impl BastionContext {
     /// [`try_recv`]: #method.try_recv
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
-        debug!(
-            "BastionContext({}): Waiting to receive message within {} milliseconds.",
-            self.id,
-            timeout.as_millis()
-        );
+        if timeout == std::time::Duration::from_nanos(0) {
+            debug!("BastionContext({}): Trying to receive message.", self.id);
+        } else {
+            debug!(
+                "BastionContext({}): Waiting to receive message within {} milliseconds.",
+                self.id,
+                timeout.as_millis()
+            );
+        }
         futures::select! {
             message = self.recv().fuse() => {
                 message.map_err(|_| ReceiveError::Other)
@@ -692,5 +696,128 @@ impl ContextState {
 impl Display for BastionId {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         self.0.fmt(fmt)
+    }
+}
+
+#[cfg(test)]
+mod context_tests {
+    use super::*;
+    use crate::prelude::*;
+    use crate::Bastion;
+    use std::panic;
+
+    #[test]
+    fn test_context() {
+        Bastion::init();
+        Bastion::start();
+
+        run_test(test_recv);
+        run_test(test_try_recv);
+        run_test(test_try_recv_fail);
+        run_test(test_try_recv_timeout);
+        run_test(test_try_recv_timeout_fail);
+
+        Bastion::stop();
+        Bastion::block_until_stopped();
+    }
+
+    fn test_recv() {
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                msg! { ctx.recv().await?,
+                    ref msg: &'static str => {
+                        assert_eq!(msg, &"test recv");
+                    };
+                    msg: _ => { panic!("didn't receive the expected message {:?}", msg);};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test recv")
+            .expect("couldn't send message");
+    }
+
+    fn test_try_recv() {
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                // make sure the message has been sent
+                Delay::new(std::time::Duration::from_millis(1)).await;
+                msg! { ctx.try_recv().await.expect("no message"),
+                    ref msg: &'static str => {
+                        assert_eq!(msg, &"test try recv");
+                    };
+                    _: _ => { panic!("didn't receive the expected message");};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test try recv")
+            .expect("couldn't send message");
+    }
+
+    fn test_try_recv_fail() {
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                assert!(ctx.try_recv().await.is_none());
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        // Not sending any message
+    }
+
+    fn test_try_recv_timeout() {
+        let children =
+        Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(1)).await.expect("recv_timeout failed"),
+                    ref msg: &'static str => {
+                        assert_eq!(msg, &"test recv timeout");
+                    };
+                    _: _ => { panic!("didn't receive the expected message");};
+                }
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        children
+            .broadcast("test recv timeout")
+            .expect("couldn't send message");
+    }
+
+    fn test_try_recv_timeout_fail() {
+        let children = Bastion::children(|children| {
+            children.with_exec(|ctx: BastionContext| async move {
+                assert!(ctx
+                    .try_recv_timeout(std::time::Duration::from_millis(1))
+                    .await
+                    .is_err());
+                Ok(())
+            })
+        })
+        .expect("Couldn't create the children group.");
+
+        // Triggering the timeout
+        run!(async { Delay::new(std::time::Duration::from_millis(2)).await });
+
+        // The child panicked, but we should still be able to send things to it
+        assert!(children.broadcast("test recv timeout").is_ok());
+    }
+
+    fn run_test<T>(test: T) -> ()
+    where
+        T: FnOnce() -> () + panic::UnwindSafe,
+    {
+        let result = panic::catch_unwind(|| test());
+
+        assert!(result.is_ok())
     }
 }
