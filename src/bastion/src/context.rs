@@ -777,7 +777,7 @@ mod context_tests {
         let children =
         Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
-                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(1)).await.expect("recv_timeout failed"),
+                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(5)).await.expect("recv_timeout failed"),
                     msg: &'static str => {
                         assert_eq!(msg, "test recv timeout");
                     };
@@ -802,7 +802,7 @@ mod context_tests {
         let children = Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
                 assert!(ctx
-                    .try_recv_timeout(std::time::Duration::from_millis(1))
+                    .try_recv_timeout(std::time::Duration::from_millis(5))
                     .await
                     .is_err());
                 Ok(())
@@ -811,7 +811,7 @@ mod context_tests {
         .expect("Couldn't create the children group.");
 
         // Triggering the timeout
-        run!(async { Delay::new(std::time::Duration::from_millis(2)).await });
+        run!(async { Delay::new(std::time::Duration::from_millis(10)).await });
 
         // The child panicked, we should not be able to send things to it anymore
         assert!(children.broadcast("test recv timeout").is_err());
