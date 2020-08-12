@@ -85,49 +85,44 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
-    let load_mean = load_balancer::stats().mean();
-    // Pop a task from the local queue, if not empty.
-    local.pop().or_else(|| {
-        // Otherwise, we need to look for a task elsewhere.
-        iter::repeat_with(|| {
-            let core_vec = load_balancer::stats().get_sorted_load();
+    iter::repeat_with(|| {
+        let load_mean = load_balancer::stats().mean();
+        let cores_and_loads = load_balancer::stats().get_sorted_load();
 
-            // First try to get procs from global queue
-            pool.injector.steal_batch_and_pop(&local).or_else(|| {
-                match core_vec.get(0) {
-                    Some((core, _)) => {
-                        // If affinity is the one with the highest let other's do the stealing
-                        if *core == affinity {
-                            Steal::Retry
-                        } else {
-                            // Try iterating through biggest to smallest
-                            core_vec
-                                .iter()
-                                .map(|s| {
-                                    // Steal the mean amount to balance all queues considering incoming workloads
-                                    // Otherwise do an ignorant steal (which is going to be useless)
-                                    if load_mean > 0 {
-                                        pool.stealers
-                                            .get(s.0)
-                                            .unwrap()
-                                            .steal_batch_and_pop_with_amount(&local, load_mean)
-                                    } else {
-                                        pool.stealers.get(s.0).unwrap().steal_batch_and_pop(&local)
-                                        // TODO: Set evacuation flag in thread_local
-                                    }
-                                })
-                                .collect()
-                        }
-                    }
-                    _ => Steal::Retry,
+        // First try to get procs from global queue
+        pool.injector.steal_batch_and_pop(&local).or_else(|| {
+            if let Some((core, _)) = cores_and_loads.first() {
+                // If affinity is the one with the highest let other's do the stealing
+                if *core == affinity {
+                    Steal::Retry
+                } else {
+                    // Try iterating through loads
+                    cores_and_loads
+                        .iter()
+                        .map(|(core_id, _)| {
+                            // We want to make sure the average load is higher than 1.
+                            // Otherwise we cannot guarantee stealing on a different core
+                            // Will be worth a context switch.
+                            if load_mean > 1 {
+                                pool.stealers
+                                    .get(*core_id)
+                                    .unwrap()
+                                    .steal_batch_and_pop_with_amount(&local, load_mean)
+                            } else {
+                                Steal::Retry
+                            }
+                        })
+                        .collect()
                 }
-            })
+            } else {
+                Steal::Retry
+            }
         })
-        // Loop while no task was stolen and any steal operation needs to be retried.
-        .find(|s| !s.is_retry())
-        // Extract the stolen task, if there is one.
-        .and_then(|s| s.success())
     })
+    // Loop while no task was stolen and any steal operation needs to be retried.
+    .find(|s| !s.is_retry())
+    // Extract the stolen task, if there is one.
+    .and_then(|s| s.success())
 }
 
 pub(crate) fn stats_generator(affinity: usize, local: &Worker<LightProc>) {

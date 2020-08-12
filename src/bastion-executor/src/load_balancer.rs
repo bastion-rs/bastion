@@ -18,7 +18,7 @@ use std::{fmt, usize};
 pub trait SmpStats {
     /// Stores the load of the given queue.
     fn store_load(&self, affinity: usize, load: usize);
-    /// returns tuple of queue id and load in an sorted order.
+    /// returns tuple of queue id and load ordered from highest load to lowest.
     fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]>;
     /// mean of the all smp queue load.
     fn mean(&self) -> usize;
@@ -116,14 +116,14 @@ impl SmpStats for Stats {
     fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]> {
         let mut sorted_load = ArrayVec::<[(usize, usize); MAX_CORE]>::new();
 
-        for (i, item) in self.smp_load.iter().enumerate() {
-            let load = item.load(Ordering::SeqCst);
+        for (core, load) in self.smp_load.iter().enumerate() {
+            let load = load.load(Ordering::SeqCst);
             // load till maximum core.
             if load == usize::MAX {
                 break;
             }
             // unsafe is ok here because self.smp_load.len() is MAX_CORE
-            unsafe { sorted_load.push_unchecked((i, load)) };
+            unsafe { sorted_load.push_unchecked((core, load)) };
         }
         sorted_load.sort_by(|x, y| y.1.cmp(&x.1));
         sorted_load
