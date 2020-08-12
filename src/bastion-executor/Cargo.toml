@@ -42,7 +42,7 @@ num_cpus = "1.13"
 pin-utils = "0.1.0"
 
 # Allocator
-numanji = { git= "https://github.com/bastion-rs/numanji", branch="igni/allocator_api", optional = true, default-features = false } # { version = "^0.1", optional = true, default-features = false }
+numanji = { version = "^0.1", optional = true, default-features = false }
 allocator-suite = { version = "^0.1", optional = true, default-features = false }
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
