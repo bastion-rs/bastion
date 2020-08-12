@@ -129,7 +129,6 @@ impl SmpStats for Stats {
         sorted_load
     }
 
-
     fn mean(&self) -> usize {
         self.mean_level.load(Ordering::SeqCst)
     }

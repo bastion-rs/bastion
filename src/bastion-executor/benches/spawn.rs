@@ -5,11 +5,11 @@ extern crate test;
 use bastion_executor::prelude::spawn;
 use bastion_executor::run::run;
 use futures::future::join_all;
+use futures_timer::Delay;
 use lightproc::proc_stack::ProcStack;
 use lightproc::recoverable_handle::RecoverableHandle;
 use std::time::Duration;
 use test::Bencher;
-use futures_timer::Delay;
 
 // Benchmark for a 10K burst task spawn
 #[bench]
@@ -45,8 +45,11 @@ fn spawn_single(b: &mut Bencher) {
             },
             proc_stack.clone(),
         );
-        run( async {
-            handle.await;
-        }, proc_stack)
+        run(
+            async {
+                handle.await;
+            },
+            proc_stack,
+        )
     });
 }
