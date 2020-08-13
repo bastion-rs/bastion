@@ -4,6 +4,7 @@ extern crate test;
 use bastion_executor::load_balancer::{stats, SmpStats};
 use bastion_executor::placement;
 use std::thread;
+use test::Bencher;
 
 fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S) {
     let cores = placement::get_core_ids().expect("Core mapping couldn't be fetched");
@@ -26,11 +27,6 @@ fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S) {
     }
 }
 
-fn stress_stats_worst_merge_sort<S: SmpStats + Sync + Send>(stats: &'static S) {
-    let _sorted_load = stats.get_sorted_load();
-}
-use test::Bencher;
-
 // previous lock based stats benchmark 1,352,791 ns/iter (+/- 2,682,013)
 
 // 158,278 ns/iter (+/- 117,103)
@@ -45,8 +41,6 @@ fn lockless_stats_bench(b: &mut Bencher) {
 #[bench]
 fn lockless_stats_bad_load(b: &mut Bencher) {
     let stats = stats();
-    let cores = placement::get_core_ids().expect("Core mapping couldn't be fetched");
-    let total_cores = cores.len();
     const MAX_CORE: usize = 256;
     for i in 0..MAX_CORE {
         // Generating the worst possible mergesort scenario
@@ -67,8 +61,6 @@ fn lockless_stats_bad_load(b: &mut Bencher) {
 #[bench]
 fn lockless_stats_good_load(b: &mut Bencher) {
     let stats = stats();
-    let cores = placement::get_core_ids().expect("Core mapping couldn't be fetched");
-    let total_cores = cores.len();
     const MAX_CORE: usize = 256;
     for i in 0..MAX_CORE {
         // Generating the best possible mergesort scenario

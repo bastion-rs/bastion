@@ -59,6 +59,10 @@ where
             Pin<&'static mut dyn Future<Output = ()>>,
         >(future);
 
+        // Unpark a thread to make sure
+        // we'll be able to drive this to completion asap.
+        worker::load_balancer().unpark_thread();
+
         // Block on the future and and wait for it to complete.
         worker::set_stack(&stack, || block(future));
 

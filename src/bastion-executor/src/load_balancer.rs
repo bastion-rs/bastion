@@ -42,6 +42,7 @@ pub struct LoadBalancer {
     num_cores: usize,
     parked_threads: ArrayQueue<Thread>,
     should_update_load_mean: Arc<AtomicBool>,
+    draining_parked_threads: AtomicBool,
 }
 
 impl Debug for LoadBalancer {
@@ -53,6 +54,7 @@ impl Debug for LoadBalancer {
                 &self.should_update_load_mean.load(Ordering::Relaxed),
             )
             .field("num_parked_threads", &self.parked_threads.len())
+            .field("draining_parked_threads", &self.draining_parked_threads)
             .finish()
     }
 }
@@ -69,6 +71,7 @@ impl Default for LoadBalancer {
             // The last parked thread will be parked with a timeout, we won't add it here
             parked_threads: ArrayQueue::new(num_cores - 1),
             should_update_load_mean: Arc::new(AtomicBool::new(true)),
+            draining_parked_threads: AtomicBool::new(false),
         }
     }
 }
@@ -93,28 +96,25 @@ impl LoadBalancer {
     /// Parks a thread for THREAD_PARK_TIMEOUT or until unpark_thread is called
     /// depending on the number of remaining available threads
     pub fn park_thread(&self) {
-        if self.parked_threads.is_full() {
-            debug!("Bastion-executor: parking the last thread");
-            self.park_timeout()
-        } else {
-            let _ = self
-                .parked_threads
-                .push(std::thread::current())
-                .map(|_| {
-                    debug!(
-                        "Bastion-executor: parking the thread {:?}",
-                        std::thread::current().id()
-                    );
-                    std::thread::park();
-                })
-                .map_err(|e| {
-                    warn!(
-                        "Bastion-executor: couldn't put thread {:?} in the parked_threads list - {}",
-                        std::thread::current().id(), e
-                    );
-                    e
-                });
+        // We don't want to park threads while someone is asking for resources.
+        if self.draining_parked_threads.load(Ordering::Acquire) {
+            return;
         }
+        let _ = self
+            .parked_threads
+            .push(std::thread::current())
+            .map(|_| {
+                debug!(
+                    "Bastion-executor: parking the thread {:?}",
+                    std::thread::current().id()
+                );
+                std::thread::park();
+            })
+            .map_err(|e| {
+                debug!("Bastion-executor: park_thread: parking with timeout");
+                self.park_timeout();
+                e
+            });
     }
 
     /// Parks a thread for THREAD_PARK_TIMEOUT or until it receives a wakeup signal
@@ -127,8 +127,28 @@ impl LoadBalancer {
         std::thread::park_timeout(THREAD_PARK_TIMEOUT);
     }
 
+    /// Unparks all the threads from the queue
+    pub fn unpark_all_threads(&self) {
+        if !self
+            .draining_parked_threads
+            .compare_and_swap(false, true, Ordering::Release)
+        {
+            trace!("Bastion-executor: unparking all threads.");
+            // Not draining yet, let's do it
+            while let Ok(thread) = self.parked_threads.pop() {
+                thread.unpark();
+            }
+            // We're done
+            self.draining_parked_threads.store(false, Ordering::Release);
+        }
+    }
+
     /// Pops a thread from the parked_threads queue and unparks it
     pub fn unpark_thread(&self) {
+        // We don't want to unpark a thread while someone is already doing it.
+        if self.draining_parked_threads.load(Ordering::Acquire) {
+            return;
+        }
         if self.parked_threads.is_empty() {
             debug!("Bastion-executor: unpark_thread: no parked threads");
         } else {
