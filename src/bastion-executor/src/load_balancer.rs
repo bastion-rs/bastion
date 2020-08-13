@@ -19,6 +19,7 @@ use std::time::Duration;
 use std::{collections::VecDeque, fmt, usize};
 use thread::Thread;
 use tracing::warn;
+use std::sync::Mutex;
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -35,14 +36,14 @@ pub trait SmpStats {
 /// Load-balancer struct which allows us to park and unpark threads.
 /// It also allows us to update the mean load
 pub struct LoadBalancer {
-    parked_threads: TTas<VecDeque<thread::Thread>>,
+    parked_threads: Mutex<VecDeque<thread::Thread>>,
     should_update: Arc<AtomicBool>,
 }
 
 impl Default for LoadBalancer {
     fn default() -> Self {
         Self {
-            parked_threads: TTas::new(VecDeque::with_capacity(
+            parked_threads: Mutex::new(VecDeque::with_capacity(
                 placement::get_core_ids().unwrap().len(),
             )),
             should_update: Arc::new(AtomicBool::new(true)),
@@ -89,9 +90,9 @@ impl LoadBalancer {
     pub fn park_thread(&self, thread: Thread) {
         self.parked_threads
             .try_lock()
-            .or_else(|| {
-                warn!("Bastion-executor: park_thread: couldn't lock parked_threads");
-                None
+            .or_else(|e| {
+                warn!("Bastion-executor: park_thread: couldn't lock parked_threads - {}", e);
+                Err(e)
             })
             .map(|mut parked_threads| {
                 parked_threads.push_back(thread);
@@ -102,9 +103,9 @@ impl LoadBalancer {
     pub fn unpark_thread(&self) {
         self.parked_threads
             .try_lock()
-            .or_else(|| {
-                warn!("Bastion-executor: unpark_thread: couldn't lock parked_threads");
-                None
+            .or_else(|e| {
+                warn!("Bastion-executor: unpark_thread: couldn't lock parked_threads - {}", e);
+                Err(e)
             })
             .map(|mut parked_threads| {
                 parked_threads.pop_front().map(|thread| thread.unpark());
