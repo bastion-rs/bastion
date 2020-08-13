@@ -79,7 +79,6 @@ impl Signaller {
     pub fn wait_over(&self) {
         self.0.with_lock(|mut d| {
             while !*d { d.wait(); }
-            *d = false;
         });
     }
 }
