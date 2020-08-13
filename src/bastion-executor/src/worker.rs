@@ -78,6 +78,9 @@ pub(crate) fn schedule(proc: LightProc) {
     });
 
     pool::get().sleepers.notify_one();
+    // Unpark threads to make sure
+    // we'll be able to drive this to completion asap.
+    worker::load_balancer().unpark_thread();
 }
 
 ///
