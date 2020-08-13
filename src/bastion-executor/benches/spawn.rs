@@ -14,8 +14,8 @@ use test::Bencher;
 // Benchmark for a 10K burst task spawn
 #[bench]
 fn spawn_lot(b: &mut Bencher) {
+    let proc_stack = ProcStack::default();
     b.iter(|| {
-        let proc_stack = ProcStack::default();
         let handles = (0..10_000)
             .map(|_| {
                 spawn(
@@ -28,16 +28,15 @@ fn spawn_lot(b: &mut Bencher) {
             })
             .collect::<Vec<RecoverableHandle<()>>>();
 
-        run(join_all(handles), proc_stack);
+        run(join_all(handles), proc_stack.clone());
     });
 }
 
 // Benchmark for a single blocking task spawn
 #[bench]
 fn spawn_single(b: &mut Bencher) {
+    let proc_stack = ProcStack::default();
     b.iter(|| {
-        let proc_stack = ProcStack::default();
-
         let handle = spawn(
             async {
                 let duration = Duration::from_millis(0);
@@ -45,11 +44,6 @@ fn spawn_single(b: &mut Bencher) {
             },
             proc_stack.clone(),
         );
-        run(
-            async {
-                handle.await;
-            },
-            proc_stack,
-        )
+        run(handle, proc_stack.clone())
     });
 }

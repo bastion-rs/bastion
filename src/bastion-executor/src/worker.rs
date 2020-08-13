@@ -6,6 +6,7 @@
 use crate::load_balancer::{self, LoadBalancer, SmpStats};
 use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
+use crate::worker;
 use lightproc::prelude::*;
 use once_cell::sync::OnceCell;
 use std::cell::{Cell, UnsafeCell};
@@ -75,7 +76,11 @@ pub(crate) fn schedule(proc: LightProc) {
             Some(q) => q.push(proc),
         }
     });
+
     pool::get().sleepers.notify_one();
+    // Unpark threads to make sure
+    // we'll be able to drive this to completion asap.
+    worker::load_balancer().unpark_thread();
 }
 
 ///
