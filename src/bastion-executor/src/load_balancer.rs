@@ -89,7 +89,7 @@ impl LoadBalancer {
 
     pub fn park_thread(&self, thread: Thread) {
         self.parked_threads
-            .try_lock()
+            .lock()
             .or_else(|e| {
                 warn!("Bastion-executor: park_thread: couldn't lock parked_threads - {}", e);
                 Err(e)
@@ -102,7 +102,7 @@ impl LoadBalancer {
 
     pub fn unpark_thread(&self) {
         self.parked_threads
-            .try_lock()
+            .lock()
             .or_else(|e| {
                 warn!("Bastion-executor: unpark_thread: couldn't lock parked_threads - {}", e);
                 Err(e)
