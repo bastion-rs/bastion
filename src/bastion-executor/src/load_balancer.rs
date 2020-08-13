@@ -87,9 +87,8 @@ impl LoadBalancer {
             });
     }
 
-    pub fn park_thread(&self, thread: Thread) {
-        let parked = self
-            .parked_threads
+    pub fn park_thread(&self, thread: Thread) -> bool {
+        self.parked_threads
             .try_lock()
             .map(|mut parked_threads| {
                 parked_threads.push_back(thread);
@@ -101,12 +100,7 @@ impl LoadBalancer {
                     e
                 );
                 false
-            });
-
-        if parked {
-            info!("Bastion-executor: park_thread: parking");
-            std::thread::park();
-        }
+            })
     }
 
     pub fn unpark_thread(&self) {
