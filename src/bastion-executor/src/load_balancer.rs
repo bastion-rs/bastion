@@ -90,7 +90,7 @@ impl LoadBalancer {
     pub fn park_thread(&self, thread: Thread) {
         let parked = self
             .parked_threads
-            .lock()
+            .try_lock()
             .map(|mut parked_threads| {
                 parked_threads.push_back(thread);
                 true
@@ -110,7 +110,7 @@ impl LoadBalancer {
 
     pub fn unpark_thread(&self) {
         self.parked_threads
-            .lock()
+            .try_lock()
             .or_else(|e| {
                 warn!(
                     "Bastion-executor: unpark_thread: couldn't lock parked_threads - {}",
