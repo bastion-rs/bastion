@@ -10,6 +10,7 @@ use arrayvec::ArrayVec;
 use lazy_static::*;
 use lever::sync::prelude::TTas;
 use std::mem::MaybeUninit;
+use std::sync::Mutex;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
@@ -19,7 +20,6 @@ use std::time::Duration;
 use std::{collections::VecDeque, fmt, usize};
 use thread::Thread;
 use tracing::warn;
-use std::sync::Mutex;
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -88,23 +88,34 @@ impl LoadBalancer {
     }
 
     pub fn park_thread(&self, thread: Thread) {
-        self.parked_threads
+        let parked = self
+            .parked_threads
             .lock()
-            .or_else(|e| {
-                warn!("Bastion-executor: park_thread: couldn't lock parked_threads - {}", e);
-                Err(e)
-            })
             .map(|mut parked_threads| {
                 parked_threads.push_back(thread);
-                std::thread::park();
+                true
+            })
+            .unwrap_or_else(|e| {
+                warn!(
+                    "Bastion-executor: park_thread: couldn't lock parked_threads - {}",
+                    e
+                );
+                false
             });
+
+        if parked {
+            std::thread::park();
+        }
     }
 
     pub fn unpark_thread(&self) {
         self.parked_threads
             .lock()
             .or_else(|e| {
-                warn!("Bastion-executor: unpark_thread: couldn't lock parked_threads - {}", e);
+                warn!(
+                    "Bastion-executor: unpark_thread: couldn't lock parked_threads - {}",
+                    e
+                );
                 Err(e)
             })
             .map(|mut parked_threads| {
