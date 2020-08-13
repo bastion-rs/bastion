@@ -38,7 +38,7 @@ impl Distributor {
                     placement::set_for_current(core);
 
                     // run initial stats generation for cores
-                    worker::stats_generator(core.id, &wrk);
+                    worker::update_stats(core.id, &wrk);
                     // actual execution
                     worker::main_loop(core.id, wrk);
                 })

@@ -6,11 +6,10 @@
 use crate::load_balancer::{self, LoadBalancer, SmpStats};
 use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
-use crate::worker;
 use lightproc::prelude::*;
 use once_cell::sync::OnceCell;
 use std::cell::{Cell, UnsafeCell};
-use std::{iter, ptr};
+use std::ptr;
 
 ///
 /// Get the current process's stack
@@ -78,9 +77,6 @@ pub(crate) fn schedule(proc: LightProc) {
     });
 
     pool::get().sleepers.notify_one();
-    // Unpark threads to make sure
-    // we'll be able to drive this to completion asap.
-    worker::load_balancer().unpark_thread();
 }
 
 ///
@@ -96,16 +92,17 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
-    iter::repeat_with(|| {
-        // Maybe we now have work to do
-        if let Some(proc) = local.pop() {
-            return crate::run_queue::Steal::Success(proc);
-        }
+    // Maybe we now have work to do
+    if let Some(proc) = local.pop() {
+        return Some(proc);
+    }
 
-        let load_mean = load_balancer::stats().mean();
+    let load_mean = load_balancer::stats().mean();
 
-        // First try to get procs from global queue
-        pool.injector.steal_batch_and_pop(&local).or_else(|| {
+    // First try to get procs from global queue
+    pool.injector
+        .steal_batch_and_pop(&local)
+        .or_else(|| {
             if let Some((core_id, load)) = load_balancer::stats()
                 .get_sorted_load()
                 .iter()
@@ -129,19 +126,12 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                         .steal_batch_and_pop_with_amount(&local, *load);
                 }
             }
-
-            tracing::debug!("Bastion-Executor: parking thread: no load accross the cores.");
-            load_balancer().park_thread();
-            Steal::Retry
+            Steal::Empty
         })
-    })
-    // Loop while no task was stolen and any steal operation needs to be retried.
-    .find(|s| !s.is_retry())
-    // Extract the stolen task, if there is one.
-    .and_then(|s| s.success())
+        .success()
 }
 
-pub(crate) fn stats_generator(affinity: usize, local: &Worker<LightProc>) {
+pub(crate) fn update_stats(affinity: usize, local: &Worker<LightProc>) {
     load_balancer::stats().store_load(affinity, local.worker_run_queue_size());
 }
 
@@ -151,7 +141,7 @@ pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {
     loop {
         QUEUE.with(|queue| {
             let local = unsafe { (*queue.get()).as_ref().unwrap() };
-            stats_generator(affinity, local);
+            update_stats(affinity, local);
         });
 
         match fetch_proc(affinity) {
