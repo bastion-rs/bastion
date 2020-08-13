@@ -9,7 +9,10 @@ use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
 use once_cell::sync::OnceCell;
 use std::cell::{Cell, UnsafeCell};
-use std::ptr;
+use std::{iter, ptr, time::Duration};
+
+/// The timeout we'll use when parking before an other Steal attempt
+pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
 ///
 /// Get the current process's stack
@@ -60,12 +63,6 @@ thread_local! {
     static QUEUE: UnsafeCell<Option<Worker<LightProc>>> = UnsafeCell::new(None);
 }
 
-static LOAD_BALANCER: once_cell::sync::OnceCell<LoadBalancer> = OnceCell::new();
-
-pub(crate) fn load_balancer() -> &'static LoadBalancer {
-    LOAD_BALANCER.get_or_init(LoadBalancer::default)
-}
-
 pub(crate) fn schedule(proc: LightProc) {
     QUEUE.with(|queue| {
         let local = unsafe { (*queue.get()).as_ref() };
@@ -92,17 +89,14 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
-    // Maybe we now have work to do
-    if let Some(proc) = local.pop() {
-        return Some(proc);
-    }
+    iter::repeat_with(|| {
+        // Maybe we now have work to do
+        if let Some(proc) = local.pop() {
+            return Steal::Success(proc);
+        }
 
-    let load_mean = load_balancer::stats().mean();
-
-    // First try to get procs from global queue
-    pool.injector
-        .steal_batch_and_pop(&local)
-        .or_else(|| {
+        // First try to get procs from global queue
+        pool.injector.steal_batch_and_pop(&local).or_else(|| {
             if let Some((core_id, load)) = load_balancer::stats()
                 .get_sorted_load()
                 .iter()
@@ -112,27 +106,35 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                 .collect::<Vec<_>>()
                 .first()
             {
+                let load_mean = load_balancer::stats().mean();
                 if load_mean > 0 {
-                    return pool
-                        .stealers
+                    pool.stealers
                         .get(*core_id)
                         .unwrap()
-                        .steal_batch_and_pop_with_amount(&local, load_mean);
+                        .steal_batch_and_pop_with_amount(&local, load_mean)
                 } else {
-                    return pool
-                        .stealers
+                    pool.stealers
                         .get(*core_id)
                         .unwrap()
-                        .steal_batch_and_pop_with_amount(&local, *load);
+                        .steal_batch_and_pop_with_amount(&local, *load)
                 }
+            } else {
+                let load_mean = load_balancer::stats().mean();
+                // No load to steal
+                std::thread::park_timeout(THREAD_PARK_TIMEOUT);
+                Steal::Retry
             }
-            Steal::Empty
         })
-        .success()
+    })
+    // Loop while no task was stolen and any steal operation needs to be retried.
+    .find(|s| !s.is_retry())
+    // Extract the stolen task, if there is one.
+    .and_then(|s| s.success())
 }
 
 pub(crate) fn update_stats(affinity: usize, local: &Worker<LightProc>) {
     load_balancer::stats().store_load(affinity, local.worker_run_queue_size());
+    load_balancer::update()
 }
 
 pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {

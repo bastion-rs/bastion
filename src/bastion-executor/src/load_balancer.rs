@@ -10,6 +10,8 @@ use arrayvec::ArrayVec;
 use crossbeam_queue::ArrayQueue;
 use fmt::{Debug, Formatter};
 use lazy_static::*;
+use once_cell::sync::Lazy;
+use placement::CoreId;
 use std::mem::MaybeUninit;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -20,9 +22,6 @@ use std::time::Duration;
 use std::{fmt, usize};
 use thread::Thread;
 use tracing::*;
-
-/// The timeout we'll use when parking the last awaken thread  
-pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -36,43 +35,36 @@ pub trait SmpStats {
     fn update_mean(&self);
 }
 
-/// Load-balancer struct which allows us to park and unpark threads.
-/// It also allows us to update the mean load
+pub static LOAD_BALANCER: Lazy<LoadBalancer> =
+    Lazy::new(|| LoadBalancer::new(placement::get_core_ids().unwrap()));
+
+/// Load-balancer struct which allows us to update the mean load
 pub struct LoadBalancer {
-    num_cores: usize,
-    parked_threads: ArrayQueue<Thread>,
+    pub num_cores: usize,
+    pub cores: Vec<CoreId>,
     should_update_load_mean: Arc<AtomicBool>,
-    draining_parked_threads: AtomicBool,
+}
+
+impl LoadBalancer {
+    pub fn new(cores: Vec<CoreId>) -> Self {
+        Self {
+            num_cores: cores.len(),
+            cores,
+            should_update_load_mean: Arc::new(AtomicBool::new(true)),
+        }
+    }
 }
 
 impl Debug for LoadBalancer {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         fmt.debug_struct("LoadBalancer")
             .field("num_cores", &self.num_cores)
+            .field("cores", &self.cores)
             .field(
                 "should_update_load_mean",
                 &self.should_update_load_mean.load(Ordering::Relaxed),
             )
-            .field("num_parked_threads", &self.parked_threads.len())
-            .field("draining_parked_threads", &self.draining_parked_threads)
             .finish()
-    }
-}
-
-impl Default for LoadBalancer {
-    fn default() -> Self {
-        let num_cores = placement::get_num_cores().unwrap();
-        info!(
-            "Bastion-executor: Instanciating LoadBalancer with {} cores.",
-            num_cores
-        );
-        Self {
-            num_cores,
-            // The last parked thread will be parked with a timeout, we won't add it here
-            parked_threads: ArrayQueue::new(num_cores - 1),
-            should_update_load_mean: Arc::new(AtomicBool::new(true)),
-            draining_parked_threads: AtomicBool::new(false),
-        }
     }
 }
 
@@ -94,6 +86,11 @@ impl LoadBalancer {
     }
 }
 
+/// Update the mean load on the singleton
+pub fn update() {
+    LOAD_BALANCER.update_load_mean()
+}
+
 /// Maximum number of core supported by modern computers.
 const MAX_CORE: usize = 256;
 
@@ -106,6 +103,7 @@ const MAX_CORE: usize = 256;
 pub struct Stats {
     smp_load: [AtomicUsize; MAX_CORE],
     mean_level: AtomicUsize,
+    updating_mean: AtomicBool,
 }
 
 impl fmt::Debug for Stats {
@@ -113,6 +111,7 @@ impl fmt::Debug for Stats {
         fmt.debug_struct("Stats")
             .field("smp_load", &&self.smp_load[..])
             .field("mean_level", &self.mean_level)
+            .field("updating_mean", &self.updating_mean)
             .finish()
     }
 }
@@ -140,6 +139,7 @@ impl Stats {
         Stats {
             smp_load,
             mean_level: AtomicUsize::new(0),
+            updating_mean: AtomicBool::new(false),
         }
     }
 }
@@ -169,21 +169,29 @@ impl SmpStats for Stats {
     }
 
     fn mean(&self) -> usize {
-        self.mean_level.load(Ordering::SeqCst)
+        self.mean_level.load(Ordering::Acquire)
     }
 
     fn update_mean(&self) {
+        // Don't update if it's updating already
+        if self.updating_mean.load(Ordering::Acquire) {
+            return;
+        }
+
+        self.updating_mean.store(true, Ordering::Release);
         let mut sum: usize = 0;
-        let num_cores = placement::get_core_ids().unwrap().len();
+        let num_cores = LOAD_BALANCER.num_cores;
 
         for item in self.smp_load.iter().take(num_cores) {
-            if let Some(tmp) = sum.checked_add(item.load(Ordering::SeqCst)) {
+            if let Some(tmp) = sum.checked_add(item.load(Ordering::Acquire)) {
                 sum = tmp;
             }
         }
 
         self.mean_level
-            .store(sum.wrapping_div(num_cores), Ordering::SeqCst);
+            .store(sum.wrapping_div(num_cores), Ordering::Release);
+
+        self.updating_mean.store(false, Ordering::Release);
     }
 }
 
@@ -192,7 +200,7 @@ impl SmpStats for Stats {
 #[inline]
 pub fn stats() -> &'static Stats {
     lazy_static! {
-        static ref LOCKLESS_STATS: Stats = Stats::new(*core_retrieval());
+        static ref LOCKLESS_STATS: Stats = Stats::new(*core_count());
     }
     &*LOCKLESS_STATS
 }
@@ -200,10 +208,13 @@ pub fn stats() -> &'static Stats {
 ///
 /// Retrieve core count for the runtime scheduling purposes
 #[inline]
-pub fn core_retrieval() -> &'static usize {
-    lazy_static! {
-        static ref CORE_COUNT: usize = placement::get_core_ids().unwrap().len();
-    }
+pub fn core_count() -> &'static usize {
+    &LOAD_BALANCER.num_cores
+}
 
-    &*CORE_COUNT
+///
+/// Retrieve cores for the runtime scheduling purposes
+#[inline]
+pub fn get_cores() -> &'static [CoreId] {
+    &*LOAD_BALANCER.cores
 }

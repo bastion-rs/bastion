@@ -1,17 +1,16 @@
 #![feature(test)]
 
 extern crate test;
-use bastion_executor::load_balancer::{stats, SmpStats};
+use bastion_executor::load_balancer::{core_count, get_cores, stats, SmpStats};
 use bastion_executor::placement;
 use std::thread;
 use test::Bencher;
 
 fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S) {
-    let cores = placement::get_core_ids().expect("Core mapping couldn't be fetched");
-    let mut handles = Vec::new();
-    for core in cores {
+    let mut handles = Vec::with_capacity(*core_count());
+    for core in get_cores() {
         let handle = thread::spawn(move || {
-            placement::set_for_current(core);
+            placement::set_for_current(*core);
             for i in 0..100 {
                 stats.store_load(core.id, 10);
                 if i % 3 == 0 {

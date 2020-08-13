@@ -352,9 +352,9 @@ pub fn low_watermark() -> &'static u64 {
 /// Pinning isn't going to be enabled for single core systems.
 #[inline]
 pub fn affinity_pinner() {
-    if 1 != *load_balancer::core_retrieval() {
+    if 1 != *load_balancer::core_count() {
         let mut core = ROUND_ROBIN_PIN.lock().unwrap();
         placement::set_for_current(*core);
-        core.id = (core.id + 1) % *load_balancer::core_retrieval();
+        core.id = (core.id + 1) % *load_balancer::core_count();
     }
 }
