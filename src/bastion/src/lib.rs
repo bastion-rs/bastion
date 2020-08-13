@@ -70,6 +70,7 @@ mod broadcast;
 mod callbacks;
 mod child;
 mod config;
+mod routing;
 mod system;
 
 pub mod child_ref;
