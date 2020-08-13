@@ -106,16 +106,16 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
         pool.injector.steal_batch_and_pop(&local).or_else(|| {
             if let Some((core, load)) = cores_and_loads.first() {
                 if *load == 0 {
-                    tracing::debug!("before: noload");
-                    LOAD_BALANCER.park_thread();
-                    tracing::debug!("after: noload");
+                    // tracing::debug!("before: noload");
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                    // tracing::debug!("after: noload");
                     Steal::Retry
                 }
                 // If affinity is the one with the highest let other's do the stealing
                 else if *core == affinity {
-                    tracing::debug!("before: *core == affinity");
+                    // tracing::debug!("before: *core == affinity");
                     LOAD_BALANCER.park_thread();
-                    tracing::debug!("after: *core == affinity");
+                    // tracing::debug!("after: *core == affinity");
 
                     Steal::Retry
                 } else {
@@ -129,18 +129,18 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                                     .unwrap()
                                     .steal_batch_and_pop_with_amount(&local, load_mean)
                             } else {
-                                tracing::debug!("before: cores_and_loads");
+                                // tracing::debug!("before: cores_and_loads");
                                 LOAD_BALANCER.park_thread();
-                                tracing::debug!("after: cores_and_loads");
+                                // tracing::debug!("after: cores_and_loads");
                                 Steal::Retry
                             }
                         })
                         .collect()
                 }
             } else {
-                tracing::debug!("before: steal_batch_and_pop fail");
+                // tracing::debug!("before: steal_batch_and_pop fail");
                 LOAD_BALANCER.park_thread();
-                tracing::debug!("after: steal_batch_and_pop fail");
+                // tracing::debug!("after: steal_batch_and_pop fail");
                 Steal::Retry
             }
         })
