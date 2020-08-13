@@ -19,7 +19,7 @@ use std::thread;
 use std::time::Duration;
 use std::{collections::VecDeque, fmt, usize};
 use thread::Thread;
-use tracing::warn;
+use tracing::{info, warn};
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -104,6 +104,7 @@ impl LoadBalancer {
             });
 
         if parked {
+            info!("Bastion-executor: park_thread: parking");
             std::thread::park();
         }
     }
@@ -119,6 +120,7 @@ impl LoadBalancer {
                 Err(e)
             })
             .map(|mut parked_threads| {
+                info!("Bastion-executor: unpark_thread: unparking");
                 parked_threads.pop_front().map(|thread| thread.unpark());
             });
     }
