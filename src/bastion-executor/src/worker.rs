@@ -106,24 +106,17 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
         pool.injector.steal_batch_and_pop(&local).or_else(|| {
             if let Some((core, load)) = cores_and_loads.first() {
                 if *load == 0 {
-                    if LOAD_BALANCER.park_thread(std::thread::current()) {
-                        trace!("Bastion-Executor: parking thread: there is no load.");
-                        std::thread::park();
-                        trace!("Bastion-Executor: unparked thread: there was no load.");
-                    } else {
-                        warn!("Bastion-Executor: couldn't park thread: there is no load.");
-                    }
+                    tracing::debug!("before: noload");
+                    LOAD_BALANCER.park_thread();
+                    tracing::debug!("after: noload");
                     Steal::Retry
                 }
                 // If affinity is the one with the highest let other's do the stealing
                 else if *core == affinity {
-                    if LOAD_BALANCER.park_thread(std::thread::current()) {
-                        trace!("Bastion-Executor: parking thread: load has the same core affinity.");
-                        std::thread::park();
-                        trace!("Bastion-Executor: unparked thread: load had the same core affinity.");
-                    } else {
-                        warn!("Bastion-Executor: couldn't park thread:  load has the same core affinity.");
-                    }
+                    tracing::debug!("before: *core == affinity");
+                    LOAD_BALANCER.park_thread();
+                    tracing::debug!("after: *core == affinity");
+
                     Steal::Retry
                 } else {
                     // Try iterating through loads
@@ -136,26 +129,18 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                                     .unwrap()
                                     .steal_batch_and_pop_with_amount(&local, load_mean)
                             } else {
-                                if LOAD_BALANCER.park_thread(std::thread::current()) {
-                                    trace!("Bastion-Executor: parking thread: load mean is 0.");
-                                    std::thread::park();
-                                    trace!("Bastion-Executor: unparked thread: load mean was 0.");
-                                } else {
-                                    warn!("Bastion-Executor: couldn't park thread:  load mean is 0.");
-                                }
+                                tracing::debug!("before: cores_and_loads");
+                                LOAD_BALANCER.park_thread();
+                                tracing::debug!("after: cores_and_loads");
                                 Steal::Retry
                             }
                         })
                         .collect()
                 }
             } else {
-                if LOAD_BALANCER.park_thread(std::thread::current()) {
-                    trace!("Bastion-Executor: parking thread: no loads.");
-                    std::thread::park();
-                    trace!("Bastion-Executor: unparked thread: no loads.");
-                } else {
-                    warn!("Bastion-Executor: couldn't park thread:  no loads.");
-                }
+                tracing::debug!("before: steal_batch_and_pop fail");
+                LOAD_BALANCER.park_thread();
+                tracing::debug!("after: steal_batch_and_pop fail");
                 Steal::Retry
             }
         })

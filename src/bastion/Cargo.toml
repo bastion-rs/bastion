@@ -50,9 +50,9 @@ features = ["docs"]
 rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
-bastion-executor = { git = "https://github.com/bastion-rs/bastion", branch = "igni/affine_steal_sort" } # "0.3.6"
+# bastion-executor = { git = "https://github.com/bastion-rs/bastion", branch = "igni/affine_steal_sort" } # "0.3.6"
 lightproc = "0.3.5"
-# bastion-executor = { version = "= 0.3.7-alpha.0", path = "../bastion-executor" }
+bastion-executor = { version = "= 0.3.7-alpha.0", path = "../bastion-executor" }
 # lightproc = { version = "= 0.3.6-alpha.0", path = "../lightproc" }
 
 lever = "0.1.1-alpha.11"

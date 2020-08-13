@@ -8,13 +8,13 @@ use crate::load_balancer;
 use crate::placement;
 use arrayvec::ArrayVec;
 use lazy_static::*;
-use lever::sync::prelude::TTas;
+use lever::sync::prelude::*;
 use std::mem::MaybeUninit;
-use std::sync::Mutex;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
+    Arc, WaitTimeoutResult, Mutex, Condvar, MutexGuard
 };
+use std::ops::{Deref, DerefMut};
 use std::thread;
 use std::time::Duration;
 use std::{collections::VecDeque, fmt, usize};
@@ -33,19 +33,113 @@ pub trait SmpStats {
     fn update_mean(&self);
 }
 
+#[derive(Default)]
+pub struct Monitor<T> {
+    pub mutex: Mutex<T>,
+    pub cvar: Condvar,
+}
+
+impl<T> Monitor<T> {
+    fn new(t: T) -> Self {
+        Self {
+            mutex: Mutex::new(t),
+            cvar: Condvar::new(),
+        }
+    }
+
+    pub fn with_lock<U, F> (&self, f: F) -> U
+    where F: FnOnce(MonitGuard<T>) -> U
+    {
+        let g = self.mutex.lock().unwrap();
+        f(MonitGuard::new(&self.cvar, g))
+    }
+}
+
+pub struct Signaller(Monitor<bool>);
+
+impl Signaller {
+    pub fn new() -> Self {
+        Self(Monitor::new(false))
+    }
+
+    pub fn signal_one(&self) {
+        self.0.with_lock(|mut d| {
+            *d = true;
+            d.notify_one();
+        });
+    }
+
+    pub fn signal_all(&self) {
+        self.0.with_lock(|mut d| {
+            *d = true;
+            d.notify_all();
+        });
+    }
+
+    pub fn wait_over(&self) {
+        self.0.with_lock(|mut d| {
+            while !*d { d.wait(); }
+            *d = false;
+        });
+    }
+}
+
+pub struct MonitGuard<'a, T: 'a> {
+    cvar: &'a Condvar,
+    guard: Option<MutexGuard<'a, T>>
+}
+
+impl<'a, T: 'a> MonitGuard<'a, T> {
+    pub fn new(cvar: &'a Condvar, guard: MutexGuard<'a, T>) -> MonitGuard<'a, T> {
+        MonitGuard { cvar: cvar, guard: Some(guard) }
+    }
+
+    pub fn wait(&mut self) {
+        let g = self.cvar.wait(self.guard.take().unwrap()).unwrap();
+        self.guard = Some(g)
+    }
+
+    pub fn wait_timeout(&mut self, t: Duration) -> WaitTimeoutResult {
+		let (g, finished) = self.cvar.wait_timeout(self.guard.take().unwrap(), t).unwrap();
+        self.guard = Some(g);
+        finished
+    }
+
+    pub fn notify_one(&self) {
+        self.cvar.notify_one();
+    }
+
+    pub fn notify_all(&self) {
+        self.cvar.notify_all();
+    }
+}
+
+
+impl<'a, T> Deref for MonitGuard<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.guard.as_ref().unwrap()
+    }
+}
+
+impl<'a, T> DerefMut for MonitGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.guard.as_mut().unwrap()
+    }
+}
+
 /// Load-balancer struct which allows us to park and unpark threads.
 /// It also allows us to update the mean load
 pub struct LoadBalancer {
-    parked_threads: Mutex<VecDeque<thread::Thread>>,
+    signaller: Signaller,
     should_update: Arc<AtomicBool>,
 }
 
 impl Default for LoadBalancer {
     fn default() -> Self {
         Self {
-            parked_threads: Mutex::new(VecDeque::with_capacity(
-                placement::get_core_ids().unwrap().len(),
-            )),
+            signaller: Signaller::new(),
             should_update: Arc::new(AtomicBool::new(true)),
         }
     }
@@ -87,36 +181,12 @@ impl LoadBalancer {
             });
     }
 
-    pub fn park_thread(&self, thread: Thread) -> bool {
-        self.parked_threads
-            .try_lock()
-            .map(|mut parked_threads| {
-                parked_threads.push_back(thread);
-                true
-            })
-            .unwrap_or_else(|e| {
-                warn!(
-                    "Bastion-executor: park_thread: couldn't lock parked_threads - {}",
-                    e
-                );
-                false
-            })
+    pub fn park_thread(&self) {
+        self.signaller.wait_over()
     }
 
     pub fn unpark_thread(&self) {
-        self.parked_threads
-            .try_lock()
-            .or_else(|e| {
-                warn!(
-                    "Bastion-executor: unpark_thread: couldn't lock parked_threads - {}",
-                    e
-                );
-                Err(e)
-            })
-            .map(|mut parked_threads| {
-                info!("Bastion-executor: unpark_thread: unparking");
-                parked_threads.pop_front().map(|thread| thread.unpark());
-            });
+        self.signaller.signal_one()
     }
 }
 
