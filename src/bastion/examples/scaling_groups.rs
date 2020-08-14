@@ -36,7 +36,7 @@ fn auto_resize_group_supervisor(supervisor: Supervisor) -> Supervisor {
 
 fn input_group(children: Children) -> Children {
     // we would have fully chained the children builder if it wasn't for the feature flag
-    let mut children = children.with_redundancy(1);
+    let children = children.with_redundancy(1);
     #[cfg(feature = "scaling")]
     {
         // Don't start new actors after finishing execution
@@ -68,7 +68,7 @@ fn input_group(children: Children) -> Children {
 
 fn auto_resize_group(children: Children) -> Children {
     // we would have fully chained the children builder if it wasn't for the feature flag
-    let mut children = children
+    let children = children
         .with_redundancy(3) // Start with 3 actors
         .with_heartbeat_tick(Duration::from_secs(5)); // Do heartbeat each 5 seconds
 

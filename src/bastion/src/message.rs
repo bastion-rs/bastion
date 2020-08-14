@@ -33,6 +33,18 @@ use tracing::{debug, trace};
 pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
+/// A trait that message needs to implement for typed actors (it is
+/// already automatically implemented but forces message to
+/// implement the following traits: [`Any`], [`Send`],
+/// [`Sync`] and [`Debug`]).
+///
+/// [`Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
+/// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
+pub trait TypedMessage: Clone + Send + Debug + 'static {}
+impl<T> TypedMessage for T where T: Clone + Send + Debug + 'static {}
+
 #[derive(Debug)]
 #[doc(hidden)]
 pub struct AnswerSender(oneshot::Sender<SignedMessage>);
@@ -703,9 +715,9 @@ macro_rules! msg {
         ($($avar:ident, $aty:ty, $ahandle:expr,)*),
         $var:ident: _ => $handle:expr;
     ) => { {
-        let mut signed = $msg;
+        let signed = $msg;
 
-        let (mut $var, sign) = signed.extract();
+        let (mut $var, _sign) = signed.extract();
 
         macro_rules! signature {
             () => {
@@ -728,7 +740,7 @@ macro_rules! msg {
                 { $handle }
             }
         } else if sender.is_some() {
-            let sender = sender.unwrap();
+            let _sender = sender.unwrap();
 
             macro_rules! answer {
                 ($ctx:expr, $answer:expr) => {

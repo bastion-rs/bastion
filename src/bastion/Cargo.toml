@@ -64,6 +64,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 pin-utils = "0.1"
 
+async-channel = "1.4.0"
 async-mutex = "1.1"
 uuid = { version = "0.8", features = ["v4"] }
 

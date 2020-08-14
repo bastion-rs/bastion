@@ -1,3 +1,3 @@
 pub mod path;
 
-pub use crate::routing::path::{NodeType, Scope};
+pub use crate::routing::path::{ActorNodeType, ActorScope};
