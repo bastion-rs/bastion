@@ -97,33 +97,45 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
 
         // First try to get procs from global queue
         pool.injector.steal_batch_and_pop(&local).or_else(|| {
-            if let Some((core_id, load)) = load_balancer::stats()
-                .get_sorted_load()
+            let sorted_load = load_balancer::stats().get_sorted_load();
+            let mean_load = load_balancer::stats().mean();
+            sorted_load
                 .iter()
                 // We don't wanna steal from ourselves
-                // and we don't wanna steal from cores that are idle
-                .filter(|(core_id, load)| *load > 0 && *core_id != affinity)
+                // and we don't wanna steal from cores that have less tasks than the mean
+                .filter(|(core_id, load)| *load > mean_load && *core_id != affinity)
                 .collect::<Vec<_>>()
                 .first()
-            {
-                let load_mean = load_balancer::stats().mean();
-                if load_mean > 0 {
-                    pool.stealers
-                        .get(*core_id)
-                        .unwrap()
-                        .steal_batch_and_pop_with_amount(&local, load_mean)
-                } else {
-                    pool.stealers
-                        .get(*core_id)
-                        .unwrap()
-                        .steal_batch_and_pop_with_amount(&local, *load)
-                }
-            } else {
-                let load_mean = load_balancer::stats().mean();
-                // No load to steal
-                std::thread::park_timeout(THREAD_PARK_TIMEOUT);
-                Steal::Retry
-            }
+                .map(|(core_id, load)| {
+                    let items_to_steal = load / 2;
+                    // tracing::debug!(
+                    //     "{:?} - items to steal {:?}",
+                    //     std::thread::current().id(),
+                    //     items_to_steal
+                    // );
+                    if items_to_steal > 0 {
+                        pool.stealers
+                            .get(*core_id)
+                            .unwrap()
+                            .steal_batch_and_pop_with_amount(&local, items_to_steal)
+                    } else {
+                        pool.stealers
+                            .get(*core_id)
+                            .unwrap()
+                            .steal_batch_and_pop(&local)
+                    }
+                })
+                .map(|steal| {
+                    if steal.is_retry() {
+                        tracing::debug!("{:?} - steal attempt failed", std::thread::current().id());
+                    }
+                    steal
+                })
+                .unwrap_or_else(|| {
+                    tracing::debug!("{:?} - no load to steal", std::thread::current().id());
+                    std::thread::park_timeout(THREAD_PARK_TIMEOUT);
+                    Steal::Retry
+                })
         })
     })
     // Loop while no task was stolen and any steal operation needs to be retried.
