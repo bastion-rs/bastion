@@ -19,15 +19,13 @@ fn blocking(b: &mut Bencher) {
             .map(|_| {
                 blocking::spawn_blocking(
                     async {
-                        let duration = Duration::from_millis(1);
+                        let duration = Duration::from_millis(0);
                         thread::sleep(duration);
                     },
                     ProcStack::default(),
                 )
             })
-            .collect::<Vec<RecoverableHandle<()>>>();
-
-        run(join_all(handles), ProcStack::default());
+            .collect::<Vec<_>>();
     });
 }
 
@@ -37,7 +35,7 @@ fn blocking_single(b: &mut Bencher) {
     b.iter(|| {
         blocking::spawn_blocking(
             async {
-                let duration = Duration::from_millis(1);
+                let duration = Duration::from_millis(0);
                 thread::sleep(duration);
             },
             ProcStack::default(),

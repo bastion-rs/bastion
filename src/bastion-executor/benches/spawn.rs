@@ -28,13 +28,11 @@ fn spawn_lot(b: &mut Bencher) {
                     proc_stack.clone(),
                 )
             })
-            .collect::<Vec<RecoverableHandle<()>>>();
-
-        run(join_all(handles), proc_stack.clone());
+            .collect::<Vec<_>>();
     });
 }
 
-// Benchmark for a single blocking task spawn
+// Benchmark for a single task spawn
 #[bench]
 fn spawn_single(b: &mut Bencher) {
     let proc_stack = ProcStack::default();
@@ -46,6 +44,5 @@ fn spawn_single(b: &mut Bencher) {
             },
             proc_stack.clone(),
         );
-        run(handle, proc_stack.clone())
     });
 }
