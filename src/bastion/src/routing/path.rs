@@ -89,6 +89,11 @@ impl ActorPath {
         self.id = id.to_string();
         self
     }
+
+    /// Method for checking is this actor remote or local in respect to this system
+    pub fn is_remote(&self) -> bool {
+        self.node_type != ActorNodeType::Local
+    }
 }
 
 impl Default for ActorPath {
@@ -130,7 +135,7 @@ impl ActorScope {
 }
 
 #[cfg(test)]
-mod tests {
+mod actor_path_tests {
     use crate::routing::path::{ActorNodeType, ActorPath, ActorScope};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -282,6 +287,8 @@ mod tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/temporary/1");
+
+        assert!(instance.is_remote() == false);
     }
 
     #[test]
@@ -293,6 +300,8 @@ mod tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node@127.0.0.1:8080/user/1");
+
+        assert!(instance.is_remote() == true);
     }
 
     #[test]
@@ -321,6 +330,8 @@ mod tests {
             instance.to_string(),
             "bastion://node@127.0.0.1:8080/dead_letter/1"
         );
+
+        assert!(instance.is_remote() == true);
     }
 
     #[test]
@@ -335,5 +346,7 @@ mod tests {
             instance.to_string(),
             "bastion://node@127.0.0.1:8080/temporary/1"
         );
+
+        assert!(instance.is_remote() == true);
     }
 }
