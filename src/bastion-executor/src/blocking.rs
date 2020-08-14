@@ -62,7 +62,6 @@ use std::{env, thread};
 use crossbeam_channel::{bounded, Receiver, Sender};
 use crossbeam_queue::ArrayQueue;
 
-use bastion_utils::math;
 use lazy_static::lazy_static;
 use lightproc::lightproc::LightProc;
 use lightproc::proc_stack::ProcStack;
@@ -336,22 +335,17 @@ impl DynamicThreadManager {
     /// Initialize the dynamic pool
     /// That will be scaled
     fn initialize_thread_pool(num_threads: usize) {
-        for _ in 0..num_threads {
+        for i in 0..num_threads {
             let _ = thread::Builder::new()
                 .name("bastion-blocking-driver-dynamic".to_string())
                 .spawn(move || {
                     self::affinity_pinner();
-                    // We want to avoid having all threads terminate at
+                    // We want to avoid parking all threads terminate at
                     // exactly the same time, causing thundering herd
-                    // effects. We want to stagger their destruction over
-                    // 10 seconds or so to make the costs fade into
-                    // background noise.
-                    //
-                    // Generate a simple random number of milliseconds
-                    let rand_sleep_ms = 1000_u64
-                        .checked_add(u64::from(math::random(10_000)))
-                        .expect("shouldn't overflow");
-                    let wait_limit = Duration::from_millis(rand_sleep_ms);
+                    // effects or gaps in performance.
+                    // Each thread will be idle with a different timeout.
+                    let wait_limit = Duration::from_millis(i as u64);
+                    error!("wait limit is {}", wait_limit.as_millis());
                     loop {
                         // Adjust the pool size counter before and after spawn
                         while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
