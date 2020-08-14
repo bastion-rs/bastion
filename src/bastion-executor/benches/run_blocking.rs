@@ -6,11 +6,9 @@ use bastion_executor::blocking;
 use bastion_executor::run::run;
 use futures::future::join_all;
 use lightproc::proc_stack::ProcStack;
-use lightproc::recoverable_handle::RecoverableHandle;
 use std::thread;
 use std::time::Duration;
 use test::Bencher;
-use tracing::Level;
 
 // Benchmark for a 10K burst task spawn
 #[bench]

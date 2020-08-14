@@ -26,16 +26,18 @@ fn main() {
 
 // Supervisor that tracks only the single actor with input data
 fn input_supervisor(supervisor: Supervisor) -> Supervisor {
-    supervisor.children(|children| input_group(children))
+    supervisor.children(input_group)
 }
 
 // Supervisor that tracks the actor group with rescaling in runtime.
 fn auto_resize_group_supervisor(supervisor: Supervisor) -> Supervisor {
-    supervisor.children(|children| auto_resize_group(children))
+    supervisor.children(auto_resize_group)
 }
 
+#[allow(clippy::unnecessary_mut_passed)]
 fn input_group(children: Children) -> Children {
     // we would have fully chained the children builder if it wasn't for the feature flag
+    #[allow(unused_mut)]
     let mut children = children.with_redundancy(1);
     #[cfg(feature = "scaling")]
     {
@@ -68,6 +70,7 @@ fn input_group(children: Children) -> Children {
 
 fn auto_resize_group(children: Children) -> Children {
     // we would have fully chained the children builder if it wasn't for the feature flag
+    #[allow(unused_mut)]
     let mut children = children
         .with_redundancy(3) // Start with 3 actors
         .with_heartbeat_tick(Duration::from_secs(5)); // Do heartbeat each 5 seconds
