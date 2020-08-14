@@ -7,7 +7,6 @@
 use crate::load_balancer;
 use crate::placement;
 use arrayvec::ArrayVec;
-use crossbeam_queue::ArrayQueue;
 use fmt::{Debug, Formatter};
 use lazy_static::*;
 use once_cell::sync::Lazy;
@@ -18,10 +17,8 @@ use std::sync::{
     Arc,
 };
 use std::thread;
-use std::time::Duration;
 use std::{fmt, usize};
-use thread::Thread;
-use tracing::*;
+use tracing::debug;
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -35,17 +32,30 @@ pub trait SmpStats {
     fn update_mean(&self);
 }
 
-pub static LOAD_BALANCER: Lazy<LoadBalancer> =
-    Lazy::new(|| LoadBalancer::new(placement::get_core_ids().unwrap()));
+static LOAD_BALANCER: Lazy<LoadBalancer> = Lazy::new(|| {
+    debug!(
+        "Instanciated load_balancer: {:?}",
+        *load_balancer::LOAD_BALANCER
+    );
+    LoadBalancer::new(placement::get_core_ids().unwrap())
+});
 
 /// Load-balancer struct which allows us to update the mean load
 pub struct LoadBalancer {
+    /// The number of cores
+    /// available for this program
     pub num_cores: usize,
+    /// The core Ids available for this program
+    /// This doesn't take affinity into account
     pub cores: Vec<CoreId>,
     should_update_load_mean: Arc<AtomicBool>,
 }
 
 impl LoadBalancer {
+    /// Creates a new LoadBalancer.
+    /// if you're looking for `num_cores` and `cores`
+    /// Have a look at `load_balancer::core_count()` 
+    /// and `load_balancer::get_cores()` respectively.
     pub fn new(cores: Vec<CoreId>) -> Self {
         Self {
             num_cores: cores.len(),

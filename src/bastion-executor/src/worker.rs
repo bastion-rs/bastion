@@ -3,11 +3,10 @@
 //!
 //! This worker implementation relies on worker run queue statistics which are hold in the pinned global memory
 //! where workload distribution calculated and amended to their own local queues.
-use crate::load_balancer::{self, LoadBalancer, SmpStats};
+use crate::load_balancer::{self, SmpStats};
 use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
-use once_cell::sync::OnceCell;
 use std::cell::{Cell, UnsafeCell};
 use std::{iter, ptr, time::Duration};
 

@@ -8,7 +8,6 @@ use crate::run_queue::{Stealer, Worker};
 use crate::{load_balancer, worker};
 use lightproc::prelude::*;
 use std::thread;
-use tracing::debug;
 
 pub(crate) struct Distributor {
     pub(crate) cores: Vec<CoreId>,
@@ -19,12 +18,8 @@ impl Distributor {
         // We want to initialize the load balancer as early as possible
         // Otherwise we will get the wrong core ids,
         // Because set_affinity will have occured on the current thread
-        debug!(
-            "Bastion-executor: Instanciated load_balancer: {:?}",
-            *load_balancer::LOAD_BALANCER
-        );
         Distributor {
-            cores: placement::get_core_ids().expect("Core mapping couldn't be fetched"),
+            cores: load_balancer::get_cores().to_vec(),
         }
     }
 

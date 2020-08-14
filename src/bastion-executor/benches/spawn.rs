@@ -2,8 +2,8 @@
 
 extern crate test;
 
-use bastion_executor::prelude::spawn;
 use bastion_executor::load_balancer;
+use bastion_executor::prelude::spawn;
 use bastion_executor::run::run;
 use futures::future::join_all;
 use futures_timer::Delay;
