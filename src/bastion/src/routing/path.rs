@@ -9,7 +9,7 @@ use uuid::Uuid;
 /// Special wrapper for handling actor's path and
 /// message distribution.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct ActorPath {
+pub struct ActorPath {
     // Node name in the cluster.
     node_name: String,
     // Defines actors in the local or the remote node.
@@ -90,9 +90,37 @@ impl ActorPath {
         self
     }
 
-    /// Method for checking is this actor remote or local in respect to this system
+    /// Method for checking that the path is related to the local node
+    pub fn is_local(&self) -> bool {
+        self.node_type == ActorNodeType::Local
+    }
+
+    /// Method for checking that the path is related to the remote node
     pub fn is_remote(&self) -> bool {
-        self.node_type != ActorNodeType::Local
+        match self.node_type {
+            ActorNodeType::Remote(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Method for checking that path is addressing to user-defined actors
+    pub fn is_user_scope(&self) -> bool {
+        self.scope == ActorScope::User
+    }
+
+    /// Method for checking that path is addressing to system actors
+    pub fn is_system_scope(&self) -> bool {
+        self.scope == ActorScope::System
+    }
+
+    /// Method for checking that path is addressing to dead letter scope
+    pub fn is_deadletter_scope(&self) -> bool {
+        self.scope == ActorScope::DeadLetter
+    }
+
+    /// Method for checking that path is addressing to temporary actors
+    pub fn is_temporary_scope(&self) -> bool {
+        self.scope == ActorScope::Temporary
     }
 }
 
@@ -148,6 +176,8 @@ mod actor_path_tests {
             .name("processing/1");
 
         assert_eq!(instance.to_string(), "bastion://test/user/processing/1");
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_user_scope(), true);
     }
 
     #[test]
@@ -159,6 +189,8 @@ mod actor_path_tests {
             .name("processing/1");
 
         assert_eq!(instance.to_string(), "bastion://test/system/processing/1");
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_system_scope(), true);
     }
 
     #[test]
@@ -173,6 +205,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://test/dead_letter/processing/1"
         );
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_deadletter_scope(), true);
     }
 
     #[test]
@@ -187,6 +221,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://test/temporary/processing/1"
         );
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_temporary_scope(), true);
     }
 
     #[test]
@@ -195,13 +231,15 @@ mod actor_path_tests {
         let instance = ActorPath::default()
             .node_name("test")
             .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::Temporary)
+            .scope(ActorScope::User)
             .name("processing/1");
 
         assert_eq!(
             instance.to_string(),
-            "bastion://test@127.0.0.1:8080/temporary/processing/1"
+            "bastion://test@127.0.0.1:8080/user/processing/1"
         );
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_temporary_scope(), true);
     }
 
     #[test]
@@ -217,6 +255,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://test@127.0.0.1:8080/system/processing/1"
         );
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_system_scope(), true);
     }
 
     #[test]
@@ -232,6 +272,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://test@127.0.0.1:8080/dead_letter/processing/1"
         );
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_deadletter_scope(), true);
     }
 
     #[test]
@@ -247,6 +289,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://test@127.0.0.1:8080/temporary/processing/1"
         );
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_temporary_scope(), true);
     }
 
     #[test]
@@ -257,6 +301,8 @@ mod actor_path_tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/user/1");
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_user_scope(), true);
     }
 
     #[test]
@@ -267,6 +313,8 @@ mod actor_path_tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/system/1");
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_system_scope(), true);
     }
 
     #[test]
@@ -277,6 +325,8 @@ mod actor_path_tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/dead_letter/1");
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_deadletter_scope(), true);
     }
 
     #[test]
@@ -287,8 +337,8 @@ mod actor_path_tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/temporary/1");
-
-        assert!(instance.is_remote() == false);
+        assert_eq!(instance.is_local(), true);
+        assert_eq!(instance.is_temporary_scope(), true);
     }
 
     #[test]
@@ -300,8 +350,8 @@ mod actor_path_tests {
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node@127.0.0.1:8080/user/1");
-
-        assert!(instance.is_remote() == true);
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_user_scope(), true);
     }
 
     #[test]
@@ -316,6 +366,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://node@127.0.0.1:8080/system/1"
         );
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_system_scope(), true);
     }
 
     #[test]
@@ -330,8 +382,8 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://node@127.0.0.1:8080/dead_letter/1"
         );
-
-        assert!(instance.is_remote() == true);
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_deadletter_scope(), true);
     }
 
     #[test]
@@ -346,7 +398,7 @@ mod actor_path_tests {
             instance.to_string(),
             "bastion://node@127.0.0.1:8080/temporary/1"
         );
-
-        assert!(instance.is_remote() == true);
+        assert_eq!(instance.is_remote(), true);
+        assert_eq!(instance.is_temporary_scope(), true);
     }
 }
