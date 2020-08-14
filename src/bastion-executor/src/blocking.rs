@@ -110,7 +110,7 @@ lazy_static! {
         // Dynamic thread manager that will allow us to unpark threads
         // According to the needs
         trace!("setting up the dynamic thread manager");
-        DYNAMIC_THREAD_MANAGER.set(DynamicThreadManager::new(0.max(num_cpus::get() - *low_watermark() as usize))).expect("couldn't setup the dynamic thread manager");
+        DYNAMIC_THREAD_MANAGER.set(DynamicThreadManager::new(1.max(num_cpus::get() - *low_watermark() as usize))).expect("couldn't setup the dynamic thread manager");
 
         // Static thread manager that will always be available
         trace!("setting up the static thread manager");
@@ -401,17 +401,11 @@ impl DynamicThreadManager {
                 .parked_threads
                 .pop()
                 .map(|thread| {
-                    debug!(
-                        "Bastion-executor: unpark_thread: unparking {:?}",
-                        thread.id()
-                    );
+                    debug!("Executor: unpark_thread: unparking {:?}", thread.id());
                     thread.unpark()
                 })
                 .map_err(|e| {
-                    debug!(
-                        "Bastion-executor: unpark_thread: couldn't unpark thread - {}",
-                        e
-                    );
+                    debug!("Executor: unpark_thread: couldn't unpark thread - {}", e);
                 });
         }
     }

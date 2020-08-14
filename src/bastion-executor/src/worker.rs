@@ -107,11 +107,6 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                 .first()
                 .map(|(core_id, load)| {
                     let items_to_steal = load / 2;
-                    // tracing::debug!(
-                    //     "{:?} - items to steal {:?}",
-                    //     std::thread::current().id(),
-                    //     items_to_steal
-                    // );
                     if items_to_steal > 0 {
                         pool.stealers
                             .get(*core_id)
