@@ -53,7 +53,6 @@
 
 use std::collections::VecDeque;
 use std::future::Future;
-use std::io::ErrorKind;
 use std::iter::Iterator;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -61,6 +60,7 @@ use std::time::Duration;
 use std::{env, thread};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_queue::ArrayQueue;
 
 use bastion_utils::math;
 use lazy_static::lazy_static;
@@ -70,10 +70,16 @@ use lightproc::recoverable_handle::RecoverableHandle;
 
 use crate::placement::CoreId;
 use crate::{load_balancer, placement};
+use once_cell::sync::OnceCell;
+use thread::Thread;
+use tracing::{debug, error, trace};
 
 /// If low watermark isn't configured this is the default scaler value.
 /// This value is used for the heuristics of the scaler
 const DEFAULT_LOW_WATERMARK: u64 = 2;
+
+/// The default thread park timeout before checking for new tasks.
+const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
@@ -91,9 +97,6 @@ const EMA_COEFFICIENT: f64 = 2_f64 / (FREQUENCY_QUEUE_SIZE as f64 + 1_f64);
 /// Holds scheduled tasks onto the thread pool for the calculation time window.
 static FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
-/// Possible max threads (without OS contract).
-static MAX_THREADS: AtomicU64 = AtomicU64::new(10_000);
-
 /// Pool interface between the scheduler and thread pool
 struct Pool {
     sender: Sender<LightProc>,
@@ -103,14 +106,27 @@ struct Pool {
 lazy_static! {
     /// Blocking pool with static starting thread count.
     static ref POOL: Pool = {
+
+        // Dynamic thread manager that will allow us to unpark threads
+        // According to the needs
+        trace!("setting up the dynamic thread manager");
+        DYNAMIC_THREAD_MANAGER.set(DynamicThreadManager::new(0.max(num_cpus::get() - *low_watermark() as usize))).expect("couldn't setup the dynamic thread manager");
+
+        // Static thread manager that will always be available
+        trace!("setting up the static thread manager");
         for _ in 0..*low_watermark() {
             thread::Builder::new()
                 .name("bastion-blocking-driver".to_string())
                 .spawn(|| {
                     self::affinity_pinner();
+                    loop {
+                        for task in &POOL.receiver {
+                            trace!("static thread: running task");
+                            task.run();
+                        }
 
-                    for task in &POOL.receiver {
-                        task.run();
+                        trace!("static thread: empty queue, parking_timeout before polling again");
+                        thread::park_timeout(THREAD_PARK_TIMEOUT);
                     }
                 })
                 .expect("cannot start a thread driving blocking tasks");
@@ -122,9 +138,10 @@ lazy_static! {
             .name("bastion-pool-manager".to_string())
             .spawn(|| {
                 let poll_interval = Duration::from_millis(MANAGER_POLL_INTERVAL);
+                trace!("setting up the pool manager");
                 loop {
                     scale_pool();
-                    thread::sleep(poll_interval);
+                    thread::park_timeout(poll_interval);
                 }
             })
             .expect("thread pool manager cannot be started");
@@ -146,9 +163,6 @@ lazy_static! {
     static ref FREQ_QUEUE: Mutex<VecDeque<u64>> = {
         Mutex::new(VecDeque::with_capacity(FREQUENCY_QUEUE_SIZE.saturating_add(1)))
     };
-
-    /// Dynamic pool thread count variable
-    static ref POOL_SIZE: Mutex<u64> = Mutex::new(*low_watermark());
 }
 
 /// Exponentially Weighted Moving Average calculation
@@ -224,11 +238,10 @@ fn scale_pool() {
         let scale = num_cpus::get().min(
             ((DEFAULT_LOW_WATERMARK as f64 * scale_by) + DEFAULT_LOW_WATERMARK as f64) as usize,
         );
+        trace!("unparking {} threads", scale);
 
         // It is time to scale the pool!
-        (0..scale).for_each(|_| {
-            create_blocking_thread();
-        });
+        dynamic_thread_manager().unpark_threads(scale);
     } else if (curr_ema_frequency - prev_ema_frequency).abs() < std::f64::EPSILON
         && current_frequency != 0
     {
@@ -236,70 +249,9 @@ fn scale_pool() {
         // If we fall to this case, scheduler is congested by longhauling tasks.
         // For unblock the flow we should add up some threads to the pool, but not that many to
         // stagger the program's operation.
-        (0..DEFAULT_LOW_WATERMARK).for_each(|_| {
-            create_blocking_thread();
-        });
+        trace!("unparking {} threads", DEFAULT_LOW_WATERMARK);
+        dynamic_thread_manager().unpark_threads(DEFAULT_LOW_WATERMARK as usize);
     }
-}
-
-/// Creates blocking thread to receive tasks
-/// Dynamic threads will terminate themselves if they don't
-/// receive any work after between one and ten seconds.
-fn create_blocking_thread() {
-    // Check that thread is spawnable.
-    // If it hits to the OS limits don't spawn it.
-    {
-        let pool_size = *POOL_SIZE.lock().unwrap();
-        if pool_size >= MAX_THREADS.load(Ordering::SeqCst) {
-            MAX_THREADS.store(10_000, Ordering::SeqCst);
-            return;
-        }
-    }
-    // We want to avoid having all threads terminate at
-    // exactly the same time, causing thundering herd
-    // effects. We want to stagger their destruction over
-    // 10 seconds or so to make the costs fade into
-    // background noise.
-    //
-    // Generate a simple random number of milliseconds
-    let rand_sleep_ms = 1000_u64
-        .checked_add(u64::from(math::random(10_000)))
-        .expect("shouldn't overflow");
-
-    let _ = thread::Builder::new()
-        .name("bastion-blocking-driver-dynamic".to_string())
-        .spawn(move || {
-            self::affinity_pinner();
-
-            let wait_limit = Duration::from_millis(rand_sleep_ms);
-
-            // Adjust the pool size counter before and after spawn
-            *POOL_SIZE.lock().unwrap() += 1;
-            while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
-                task.run();
-            }
-            *POOL_SIZE.lock().unwrap() -= 1;
-        })
-        .map_err(|err| {
-            match err.kind() {
-                ErrorKind::WouldBlock => {
-                    // Maximum allowed threads per process is varying from system to system.
-                    // Also, some systems have it(like macOS), and some don't(Linux).
-                    // This case expected not to happen.
-                    // But when happened this shouldn't throw a panic.
-                    let guarded_count = POOL_SIZE
-                        .lock()
-                        .unwrap()
-                        .checked_sub(1)
-                        .expect("shouldn't underflow");
-                    MAX_THREADS.store(guarded_count, Ordering::SeqCst);
-                }
-                _ => eprintln!(
-                    "cannot start a dynamic thread driving blocking tasks: {}",
-                    err
-                ),
-            }
-        });
 }
 
 /// Enqueues work, attempting to send to the thread pool in a
@@ -356,5 +308,111 @@ pub fn affinity_pinner() {
         let mut core = ROUND_ROBIN_PIN.lock().unwrap();
         placement::set_for_current(*core);
         core.id = (core.id + 1) % *load_balancer::core_count();
+    }
+}
+
+static DYNAMIC_THREAD_MANAGER: OnceCell<DynamicThreadManager> = OnceCell::new();
+
+fn dynamic_thread_manager() -> &'static DynamicThreadManager {
+    DYNAMIC_THREAD_MANAGER.get().unwrap_or_else(|| {
+        error!("couldn't get the dynamic thread manager");
+        panic!("couldn't get the dynamic thread manager");
+    })
+}
+
+#[derive(Debug)]
+struct DynamicThreadManager {
+    parked_threads: ArrayQueue<Thread>,
+}
+
+impl DynamicThreadManager {
+    pub fn new(num_threads: usize) -> Self {
+        Self::initialize_thread_pool(num_threads);
+        Self {
+            parked_threads: ArrayQueue::new(num_threads),
+        }
+    }
+
+    /// Initialize the dynamic pool
+    /// That will be scaled
+    fn initialize_thread_pool(num_threads: usize) {
+        for _ in 0..num_threads {
+            let _ = thread::Builder::new()
+                .name("bastion-blocking-driver-dynamic".to_string())
+                .spawn(move || {
+                    self::affinity_pinner();
+                    // We want to avoid having all threads terminate at
+                    // exactly the same time, causing thundering herd
+                    // effects. We want to stagger their destruction over
+                    // 10 seconds or so to make the costs fade into
+                    // background noise.
+                    //
+                    // Generate a simple random number of milliseconds
+                    let rand_sleep_ms = 1000_u64
+                        .checked_add(u64::from(math::random(10_000)))
+                        .expect("shouldn't overflow");
+                    let wait_limit = Duration::from_millis(rand_sleep_ms);
+                    loop {
+                        // Adjust the pool size counter before and after spawn
+                        while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
+                            trace!("dynamic thread: running task");
+                            task.run();
+                        }
+                        trace!(
+                            "dynamic thread: parking - {:?}",
+                            std::thread::current().id()
+                        );
+                        dynamic_thread_manager().park_thread();
+                    }
+                });
+        }
+    }
+
+    /// Parks a thread until unpark_thread unparks it
+    pub fn park_thread(&self) {
+        let _ = self
+            .parked_threads
+            .push(std::thread::current())
+            .map(|_| {
+                trace!("parking thread {:?}", std::thread::current().id());
+                std::thread::park();
+            })
+            .map_err(|e| {
+                debug!(
+                    "couldn't park thread {:?} - {}",
+                    std::thread::current().id(),
+                    e
+                );
+            });
+    }
+
+    /// Pops at most n threads from the parked_threads queue and unpark them
+    pub fn unpark_threads(&self, n: usize) {
+        (0..n).for_each(|_| self.unpark_thread())
+    }
+
+    /// Pops a thread from the parked_threads queue and unparks it
+    fn unpark_thread(&self) {
+        if self.parked_threads.is_empty() {
+            trace!("no parked threads");
+        } else {
+            trace!("parked_threads: len is {}", self.parked_threads.len());
+            let _ = self
+                .parked_threads
+                .pop()
+                .map(|thread| {
+                    debug!(
+                        "Bastion-executor: unpark_thread: unparking {:?}",
+                        thread.id()
+                    );
+                    thread.unpark()
+                })
+                .map_err(|e| {
+                    debug!(
+                        "Bastion-executor: unpark_thread: couldn't unpark thread - {}",
+                        e
+                    );
+                });
+        }
     }
 }

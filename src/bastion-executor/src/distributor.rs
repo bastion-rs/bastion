@@ -25,7 +25,6 @@ impl Distributor {
 
     pub(crate) fn assign(self) -> Vec<Stealer<LightProc>> {
         let mut stealers = Vec::<Stealer<LightProc>>::new();
-
         for core in self.cores {
             let wrk = Worker::new_fifo();
             stealers.push(wrk.stealer());

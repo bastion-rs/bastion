@@ -33,11 +33,9 @@ pub trait SmpStats {
 }
 
 static LOAD_BALANCER: Lazy<LoadBalancer> = Lazy::new(|| {
-    debug!(
-        "Instanciated load_balancer: {:?}",
-        *load_balancer::LOAD_BALANCER
-    );
-    LoadBalancer::new(placement::get_core_ids().unwrap())
+    let lb = LoadBalancer::new(placement::get_core_ids().unwrap());
+    debug!("Instanciated load_balancer: {:?}", lb);
+    lb
 });
 
 /// Load-balancer struct which allows us to update the mean load
@@ -54,7 +52,7 @@ pub struct LoadBalancer {
 impl LoadBalancer {
     /// Creates a new LoadBalancer.
     /// if you're looking for `num_cores` and `cores`
-    /// Have a look at `load_balancer::core_count()` 
+    /// Have a look at `load_balancer::core_count()`
     /// and `load_balancer::get_cores()` respectively.
     pub fn new(cores: Vec<CoreId>) -> Self {
         Self {

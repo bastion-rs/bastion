@@ -18,7 +18,7 @@ fn spawn_lot(b: &mut Bencher) {
     let core_count = *load_balancer::core_count();
     let proc_stack = ProcStack::default();
     b.iter(|| {
-        let handles = (0..core_count)
+        (0..core_count)
             .map(|_| {
                 spawn(
                     async {
@@ -37,7 +37,7 @@ fn spawn_lot(b: &mut Bencher) {
 fn spawn_single(b: &mut Bencher) {
     let proc_stack = ProcStack::default();
     b.iter(|| {
-        let handle = spawn(
+        spawn(
             async {
                 let duration = Duration::from_millis(0);
                 Delay::new(duration).await;

@@ -10,12 +10,13 @@ use lightproc::recoverable_handle::RecoverableHandle;
 use std::thread;
 use std::time::Duration;
 use test::Bencher;
+use tracing::Level;
 
 // Benchmark for a 10K burst task spawn
 #[bench]
-fn blocking(b: &mut Bencher) {
+fn run_blocking(b: &mut Bencher) {
     b.iter(|| {
-        (0..100)
+        let handles = (0..10_000)
             .map(|_| {
                 blocking::spawn_blocking(
                     async {
@@ -25,19 +26,24 @@ fn blocking(b: &mut Bencher) {
                     ProcStack::default(),
                 )
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+
+        run(join_all(handles), ProcStack::default())
     });
 }
 
 // Benchmark for a single blocking task spawn
 #[bench]
-fn blocking_single(b: &mut Bencher) {
+fn run_blocking_single(b: &mut Bencher) {
     b.iter(|| {
-        blocking::spawn_blocking(
-            async {
-                let duration = Duration::from_millis(0);
-                thread::sleep(duration);
-            },
+        run(
+            blocking::spawn_blocking(
+                async {
+                    let duration = Duration::from_millis(0);
+                    thread::sleep(duration);
+                },
+                ProcStack::default(),
+            ),
             ProcStack::default(),
         )
     });
