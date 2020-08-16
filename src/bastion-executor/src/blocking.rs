@@ -80,6 +80,9 @@ const DEFAULT_LOW_WATERMARK: u64 = 2;
 /// The default thread park timeout before checking for new tasks.
 const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
+/// The default dynamic thread receive timeout before we park / terminate.
+const THREAD_RECV_TIMEOUT_MILLIS: u64 = 100;
+
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
 const MANAGER_POLL_INTERVAL: u64 = 200;
@@ -106,44 +109,9 @@ lazy_static! {
     /// Blocking pool with static starting thread count.
     static ref POOL: Pool = {
 
-        // Dynamic thread manager that will allow us to unpark threads
-        // According to the needs
-        trace!("setting up the dynamic thread manager");
-        DYNAMIC_THREAD_MANAGER.set(DynamicThreadManager::new(1.max(num_cpus::get() - *low_watermark() as usize))).expect("couldn't setup the dynamic thread manager");
-
-        // Static thread manager that will always be available
-        trace!("setting up the static thread manager");
-        for _ in 0..*low_watermark() {
-            thread::Builder::new()
-                .name("bastion-blocking-driver".to_string())
-                .spawn(|| {
-                    self::affinity_pinner();
-                    loop {
-                        for task in &POOL.receiver {
-                            trace!("static thread: running task");
-                            task.run();
-                        }
-
-                        trace!("static thread: empty queue, parking_timeout before polling again");
-                        thread::park_timeout(THREAD_PARK_TIMEOUT);
-                    }
-                })
-                .expect("cannot start a thread driving blocking tasks");
-        }
-
-        // Pool manager to check frequency of task rates
-        // and take action by scaling the pool accordingly.
-        thread::Builder::new()
-            .name("bastion-pool-manager".to_string())
-            .spawn(|| {
-                let poll_interval = Duration::from_millis(MANAGER_POLL_INTERVAL);
-                trace!("setting up the pool manager");
-                loop {
-                    scale_pool();
-                    thread::park_timeout(poll_interval);
-                }
-            })
-            .expect("thread pool manager cannot be started");
+        DYNAMIC_THREAD_MANAGER
+            .set(DynamicThreadManager::new(*low_watermark() as usize))
+            .expect("couldn't setup the dynamic thread manager");
 
         // We want to use an unbuffered channel here to help
         // us drive our dynamic control. In effect, the
@@ -240,7 +208,7 @@ fn scale_pool() {
         trace!("unparking {} threads", scale);
 
         // It is time to scale the pool!
-        dynamic_thread_manager().unpark_threads(scale);
+        dynamic_thread_manager().provision_threads(scale);
     } else if (curr_ema_frequency - prev_ema_frequency).abs() < std::f64::EPSILON
         && current_frequency != 0
     {
@@ -249,7 +217,7 @@ fn scale_pool() {
         // For unblock the flow we should add up some threads to the pool, but not that many to
         // stagger the program's operation.
         trace!("unparking {} threads", DEFAULT_LOW_WATERMARK);
-        dynamic_thread_manager().unpark_threads(DEFAULT_LOW_WATERMARK as usize);
+        dynamic_thread_manager().provision_threads(DEFAULT_LOW_WATERMARK as usize);
     }
 }
 
@@ -325,27 +293,46 @@ struct DynamicThreadManager {
 }
 
 impl DynamicThreadManager {
-    pub fn new(num_threads: usize) -> Self {
-        Self::initialize_thread_pool(num_threads);
+    pub fn new(static_threads: usize) -> Self {
+        let dynamic_threads = 1.max(num_cpus::get() - static_threads);
+        Self::initialize_thread_pool(static_threads, dynamic_threads);
         Self {
-            parked_threads: ArrayQueue::new(num_threads),
+            parked_threads: ArrayQueue::new(dynamic_threads),
         }
     }
 
     /// Initialize the dynamic pool
     /// That will be scaled
-    fn initialize_thread_pool(num_threads: usize) {
-        for i in 0..num_threads {
+    fn initialize_thread_pool(static_threads: usize, dynamic_threads: usize) {
+        // Static thread manager that will always be available
+        trace!("setting up the static thread manager");
+        (0..static_threads).for_each(|_| {
+            thread::Builder::new()
+                .name("bastion-blocking-driver".to_string())
+                .spawn(|| {
+                    self::affinity_pinner();
+                    loop {
+                        for task in &POOL.receiver {
+                            trace!("static thread: running task");
+                            task.run();
+                        }
+
+                        trace!("static thread: empty queue, parking_timeout before polling again");
+                        thread::park_timeout(THREAD_PARK_TIMEOUT);
+                    }
+                })
+                .expect("cannot start a thread driving blocking tasks");
+        });
+
+        // Dynamic thread manager that will allow us to unpark threads
+        // According to the needs
+        trace!("setting up the dynamic thread manager");
+        (0..dynamic_threads).for_each(|_| {
             let _ = thread::Builder::new()
                 .name("bastion-blocking-driver-dynamic".to_string())
                 .spawn(move || {
                     self::affinity_pinner();
-                    // We want to avoid parking all threads terminate at
-                    // exactly the same time, causing thundering herd
-                    // effects or gaps in performance.
-                    // Each thread will be idle with a different timeout.
-                    let wait_limit = Duration::from_millis(i as u64);
-                    error!("wait limit is {}", wait_limit.as_millis());
+                    let wait_limit = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
                     loop {
                         // Adjust the pool size counter before and after spawn
                         while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
@@ -359,7 +346,55 @@ impl DynamicThreadManager {
                         dynamic_thread_manager().park_thread();
                     }
                 });
+        });
+
+        // Pool manager to check frequency of task rates
+        // and take action by scaling the pool accordingly.
+        thread::Builder::new()
+            .name("bastion-pool-manager".to_string())
+            .spawn(|| {
+                let poll_interval = Duration::from_millis(MANAGER_POLL_INTERVAL);
+                trace!("setting up the pool manager");
+                loop {
+                    scale_pool();
+                    thread::park_timeout(poll_interval);
+                }
+            })
+            .expect("thread pool manager cannot be started");
+    }
+
+    /// Provision threads takes a number of threads that need to be made available.
+    /// It will try to unpark threads from the dynamic pool, and spawn more threads if needs be.
+    pub fn provision_threads(&self, n: usize) {
+        for i in 0..n {
+            if !self.unpark_thread() {
+                let new_threads = n - i;
+                trace!(
+                    "no more threads to unpark, spawning {} new threads",
+                    new_threads
+                );
+                return self.spawn_threads(new_threads);
+            }
         }
+    }
+
+    fn spawn_threads(&self, n: usize) {
+        (0..n).for_each(|_| {
+            let _ = thread::Builder::new()
+                .name("bastion-blocking-driver-standalone".to_string())
+                .spawn(move || {
+                    self::affinity_pinner();
+                    let wait_limit = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
+                    loop {
+                        // Adjust the pool size counter before and after spawn
+                        while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
+                            trace!("standalone thread: running task");
+                            task.run();
+                        }
+                        trace!("standalone thread: quitting.");
+                    }
+                });
+        })
     }
 
     /// Parks a thread until unpark_thread unparks it
@@ -380,27 +415,24 @@ impl DynamicThreadManager {
             });
     }
 
-    /// Pops at most n threads from the parked_threads queue and unpark them
-    pub fn unpark_threads(&self, n: usize) {
-        (0..n).for_each(|_| self.unpark_thread())
-    }
-
-    /// Pops a thread from the parked_threads queue and unparks it
-    fn unpark_thread(&self) {
+    /// Pops a thread from the parked_threads queue and unparks it.
+    /// returns true on success.
+    fn unpark_thread(&self) -> bool {
         if self.parked_threads.is_empty() {
             trace!("no parked threads");
+            false
         } else {
             trace!("parked_threads: len is {}", self.parked_threads.len());
-            let _ = self
-                .parked_threads
+            self.parked_threads
                 .pop()
                 .map(|thread| {
                     debug!("Executor: unpark_thread: unparking {:?}", thread.id());
-                    thread.unpark()
+                    thread.unpark();
                 })
                 .map_err(|e| {
                     debug!("Executor: unpark_thread: couldn't unpark thread - {}", e);
-                });
+                })
+                .is_ok()
         }
     }
 }

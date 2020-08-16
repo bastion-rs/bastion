@@ -12,13 +12,13 @@ use lazy_static::*;
 use once_cell::sync::Lazy;
 use placement::CoreId;
 use std::mem::MaybeUninit;
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
-};
-use std::thread;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 use std::{fmt, usize};
-use tracing::debug;
+use tracing::{debug, error};
+
+const MEAN_UPDATE_TRESHOLD: Duration = Duration::from_millis(200);
 
 /// Stats of all the smp queues.
 pub trait SmpStats {
@@ -46,7 +46,7 @@ pub struct LoadBalancer {
     /// The core Ids available for this program
     /// This doesn't take affinity into account
     pub cores: Vec<CoreId>,
-    should_update_load_mean: Arc<AtomicBool>,
+    mean_last_updated_at: RwLock<Instant>,
 }
 
 impl LoadBalancer {
@@ -58,7 +58,7 @@ impl LoadBalancer {
         Self {
             num_cores: cores.len(),
             cores,
-            should_update_load_mean: Arc::new(AtomicBool::new(true)),
+            mean_last_updated_at: RwLock::new(Instant::now()),
         }
     }
 }
@@ -68,10 +68,7 @@ impl Debug for LoadBalancer {
         fmt.debug_struct("LoadBalancer")
             .field("num_cores", &self.num_cores)
             .field("cores", &self.cores)
-            .field(
-                "should_update_load_mean",
-                &self.should_update_load_mean.load(Ordering::Relaxed),
-            )
+            .field("mean_last_updated_at", &self.mean_last_updated_at)
             .finish()
     }
 }
@@ -80,17 +77,26 @@ impl LoadBalancer {
     /// Iterates the statistics to get the mean load across the cores
     pub fn update_load_mean(&self) {
         // Check if update should occur
-        self.should_update_load_mean
-            .compare_and_swap(true, false, Ordering::SeqCst);
-
-        let cloned = Arc::clone(&self.should_update_load_mean);
-        thread::Builder::new()
-            .name("bastion-load-balancer-thread".to_string())
-            .spawn(move || {
-                load_balancer::stats().update_mean();
-                (*cloned).store(true, Ordering::SeqCst);
+        if !self.should_update() {
+            return;
+        }
+        self.mean_last_updated_at
+            .write()
+            .map(|mut last_updated_at| {
+                *last_updated_at = Instant::now();
             })
-            .expect("couldn't create stats thread.");
+            .unwrap_or_else(|e| error!("couldn't update mean timestamp - {}", e));
+
+        load_balancer::stats().update_mean();
+    }
+
+    fn should_update(&self) -> bool {
+        // If we couldn't acquire a lock on the mean last_updated_at,
+        // There is probably someone else updating already
+        self.mean_last_updated_at
+            .try_read()
+            .map(|last_updated_at| last_updated_at.elapsed() > MEAN_UPDATE_TRESHOLD)
+            .unwrap_or(false)
     }
 }
 
