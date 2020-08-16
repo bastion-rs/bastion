@@ -8,10 +8,15 @@ use crate::pool::{self, Pool};
 use crate::run_queue::{Steal, Worker};
 use lightproc::prelude::*;
 use std::cell::{Cell, UnsafeCell};
-use std::{iter, ptr, time::Duration};
+use std::time::{Duration, Instant};
+use std::{iter, ptr};
+use tracing::{trace};
 
 /// The timeout we'll use when parking before an other Steal attempt
 pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
+
+/// The amount of time we'll try to steal tasks before we start parking.
+const STEAL_ATTEMPTS_TIMEOUT: Duration = Duration::from_millis(100);
 
 ///
 /// Get the current process's stack
@@ -88,6 +93,7 @@ pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
 }
 
 fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
+    let steal_start = Instant::now();
     iter::repeat_with(|| {
         // Maybe we now have work to do
         if let Some(proc) = local.pop() {
@@ -101,7 +107,6 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
             sorted_load
                 .iter()
                 // We don't wanna steal from ourselves
-                // and we don't wanna steal from cores that have less tasks than the mean
                 .filter(|(core_id, load)| *load > mean_load && *core_id != affinity)
                 .collect::<Vec<_>>()
                 .first()
@@ -121,13 +126,15 @@ fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Opti
                 })
                 .map(|steal| {
                     if steal.is_retry() {
-                        tracing::debug!("{:?} - steal attempt failed", std::thread::current().id());
+                        trace!("{:?} - steal attempt failed", std::thread::current().id());
                     }
                     steal
                 })
                 .unwrap_or_else(|| {
-                    tracing::debug!("{:?} - no load to steal", std::thread::current().id());
-                    std::thread::park_timeout(THREAD_PARK_TIMEOUT);
+                    if steal_start.elapsed() > STEAL_ATTEMPTS_TIMEOUT {
+                        trace!("{:?} - no load to steal", std::thread::current().id());
+                        std::thread::park_timeout(THREAD_PARK_TIMEOUT);
+                    }
                     Steal::Retry
                 })
         })
