@@ -762,7 +762,7 @@ mod context_tests {
     }
 
     fn test_try_recv_fail() {
-        let children = Bastion::children(|children| {
+        let _children = Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
                 assert!(ctx.try_recv().await.is_none());
                 Ok(())

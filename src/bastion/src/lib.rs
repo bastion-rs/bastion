@@ -65,11 +65,13 @@ pub use self::config::Config;
 #[macro_use]
 mod macros;
 
+mod actor;
 mod bastion;
 mod broadcast;
 mod callbacks;
 mod child;
 mod config;
+mod routing;
 mod system;
 
 pub mod child_ref;
