@@ -306,6 +306,10 @@ impl BastionContext {
     /// [`try_recv_timeout`]: #method.try_recv_timeout
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv(&self) -> Option<SignedMessage> {
+        // We want to let a tick pass
+        // otherwise guard will never contain anything.
+        pending!();
+
         trace!("BastionContext({}): Trying to receive message.", self.id);
         let state = self.state.clone();
         let mut guard = state.lock().await;
