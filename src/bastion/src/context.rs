@@ -308,7 +308,7 @@ impl BastionContext {
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         // We want to let a tick pass
         // otherwise guard will never contain anything.
-        pending!();
+        Delay::new(Duration::from_millis(0)).await;
 
         trace!("BastionContext({}): Trying to receive message.", self.id);
         let state = self.state.clone();
