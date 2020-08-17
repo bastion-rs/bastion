@@ -1,5 +1,7 @@
 use bastion::prelude::*;
 #[cfg(not(target_os = "windows"))]
+use std::net::TcpListener;
+#[cfg(not(target_os = "windows"))]
 use futures::io;
 #[cfg(target_os = "windows")]
 use std::io::{self, Read, Write};
