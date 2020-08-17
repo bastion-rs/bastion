@@ -306,17 +306,17 @@ impl BastionContext {
     /// [`try_recv_timeout`]: #method.try_recv_timeout
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv(&self) -> Option<SignedMessage> {
-        self.try_recv_timeout(std::time::Duration::from_nanos(0))
-            .await
-            .map(|msg| {
-                trace!("BastionContext({}): Received message: {:?}", self.id, msg);
-                msg
-            })
-            .map_err(|e| {
-                trace!("BastionContext({}): Received no message.", self.id);
-                e
-            })
-            .ok()
+        trace!("BastionContext({}): Trying to receive message.", self.id);
+        let state = self.state.clone();
+        let mut guard = state.lock().await;
+
+        if let Some(msg) = guard.pop_message() {
+            trace!("BastionContext({}): Received message: {:?}", self.id, msg);
+            Some(msg)
+        } else {
+            trace!("BastionContext({}): Received no message.", self.id);
+            None
+        }
     }
 
     /// Retrieves asynchronously a message received by the element
@@ -420,15 +420,11 @@ impl BastionContext {
     /// [`try_recv`]: #method.try_recv
     /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
-        if timeout == std::time::Duration::from_nanos(0) {
-            debug!("BastionContext({}): Trying to receive message.", self.id);
-        } else {
-            debug!(
-                "BastionContext({}): Waiting to receive message within {} milliseconds.",
-                self.id,
-                timeout.as_millis()
-            );
-        }
+        debug!(
+            "BastionContext({}): Waiting to receive message within {} milliseconds.",
+            self.id,
+            timeout.as_millis()
+        );
         futures::select! {
             message = self.recv().fuse() => {
                 message.map_err(|_| ReceiveError::Other)
