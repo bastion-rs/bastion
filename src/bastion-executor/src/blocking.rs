@@ -70,8 +70,9 @@ use lightproc::recoverable_handle::RecoverableHandle;
 use crate::placement::CoreId;
 use crate::{load_balancer, placement};
 use once_cell::sync::OnceCell;
+use std::sync::atomic::AtomicUsize;
 use thread::Thread;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
 /// If low watermark isn't configured this is the default scaler value.
 /// This value is used for the heuristics of the scaler
@@ -82,6 +83,8 @@ const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// The default dynamic thread receive timeout before we park / terminate.
 const THREAD_RECV_TIMEOUT_MILLIS: u64 = 100;
+
+const THREAD_RECV_TIMEOUT: Duration = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
 
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
@@ -98,6 +101,9 @@ const EMA_COEFFICIENT: f64 = 2_f64 / (FREQUENCY_QUEUE_SIZE as f64 + 1_f64);
 /// Pool task frequency variable.
 /// Holds scheduled tasks onto the thread pool for the calculation time window.
 static FREQUENCY: AtomicU64 = AtomicU64::new(0);
+
+/// Possible max threads (without OS contract).
+static MAX_THREADS: usize = 10_000;
 
 /// Pool interface between the scheduler and thread pool
 struct Pool {
@@ -211,6 +217,8 @@ fn scale_pool() {
         // stagger the program's operation.
         trace!("unparking {} threads", DEFAULT_LOW_WATERMARK);
         dynamic_thread_manager().provision_threads(DEFAULT_LOW_WATERMARK as usize);
+    } else {
+        trace!("no need to provision threads");
     }
 }
 
@@ -305,7 +313,7 @@ impl DynamicThreadManager {
                 .spawn(|| {
                     self::affinity_pinner();
                     loop {
-                        for task in &POOL.receiver {
+                        for task in POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
                             trace!("static thread: running task");
                             task.run();
                         }
@@ -325,10 +333,9 @@ impl DynamicThreadManager {
                 .name("bastion-blocking-driver-dynamic".to_string())
                 .spawn(move || {
                     self::affinity_pinner();
-                    let wait_limit = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
                     loop {
                         // Adjust the pool size counter before and after spawn
-                        while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
+                        while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
                             trace!("dynamic thread: running task");
                             task.run();
                         }
@@ -373,20 +380,15 @@ impl DynamicThreadManager {
 
     fn spawn_threads(&self, n: usize) {
         (0..n).for_each(|_| {
-            let _ = thread::Builder::new()
+            thread::Builder::new()
                 .name("bastion-blocking-driver-standalone".to_string())
                 .spawn(move || {
-                    self::affinity_pinner();
-                    let wait_limit = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
-                    loop {
-                        // Adjust the pool size counter before and after spawn
-                        while let Ok(task) = POOL.receiver.recv_timeout(wait_limit) {
-                            trace!("standalone thread: running task");
-                            task.run();
-                        }
-                        trace!("standalone thread: quitting.");
+                    while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
+                        task.run();
                     }
-                });
+                    trace!("standalone thread: quitting.");
+                })
+                .unwrap();
         })
     }
 
