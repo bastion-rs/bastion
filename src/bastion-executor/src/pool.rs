@@ -99,14 +99,9 @@ const DEFAULT_LOW_WATERMARK: u64 = 2;
 /// The default thread park timeout before checking for new tasks.
 const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
-/// The default dynamic thread receive timeout before we park / terminate.
-const THREAD_RECV_TIMEOUT_MILLIS: u64 = 100;
-
-const THREAD_RECV_TIMEOUT: Duration = Duration::from_millis(THREAD_RECV_TIMEOUT_MILLIS);
-
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
-const MANAGER_POLL_INTERVAL: u64 = 10000;
+const MANAGER_POLL_INTERVAL: u64 = 90;
 
 /// Frequency histogram's sliding window size.
 /// Defines how many frequencies will be considered for adaptation.
@@ -357,7 +352,7 @@ impl DynamicThreadManager {
                 .spawn(move || {
                     self::affinity_pinner();
                     loop {
-                        while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
+                        while let Ok(task) = POOL.receiver.try_recv() {
                             trace!("dynamic thread: running task");
                             task.run();
                         }
@@ -367,7 +362,8 @@ impl DynamicThreadManager {
                         );
                         dynamic_thread_manager().park_thread();
                     }
-                }) .expect("cannot start dynamic thread");
+                })
+                .expect("cannot start dynamic thread");
         });
 
         // Pool manager to check frequency of task rates
@@ -417,12 +413,13 @@ impl DynamicThreadManager {
                 .name("bastion-blocking-driver-standalone".to_string())
                 .spawn(move || {
                     self::affinity_pinner();
-                    while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
+                    while let Ok(task) = POOL.receiver.try_recv() {
                         task.run();
                     }
                     trace!("standalone thread: quitting.");
                     POOL_SIZE.get().unwrap().fetch_sub(1, Ordering::SeqCst);
-                }).unwrap();
+                })
+                .unwrap();
         })
     }
 
