@@ -604,7 +604,7 @@ impl Children {
         }
     }
 
-    fn restart_child(&mut self, old_id: &BastionId, old_state: Arc<Mutex<Pin<Box<ContextState>>>>) {
+    fn restart_child(&mut self, old_id: &BastionId, old_state: Arc<Pin<Box<ContextState>>>) {
         let parent = Parent::children(self.as_ref());
         let bcast = Broadcast::new(parent, BastionPathElement::Child(old_id.clone()));
 
@@ -616,7 +616,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
+        let state = Arc::new(Box::pin(ContextState::new()));
 
         let ctx = BastionContext::new(
             id.clone(),
@@ -890,7 +890,7 @@ impl Children {
         #[cfg(feature = "scaling")]
         self.init_data_for_scaling(&mut state);
 
-        let state = Arc::new(Mutex::new(Box::pin(state)));
+        let state = Arc::new(Box::pin(state));
 
         let ctx = BastionContext::new(
             id.clone(),
@@ -939,7 +939,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Arc::new(Mutex::new(Box::pin(ContextState::new())));
+        let state = Arc::new(Box::pin(ContextState::new()));
 
         let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
         let init = self.get_heartbeat_fut();

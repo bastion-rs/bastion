@@ -15,7 +15,6 @@ use futures::FutureExt;
 use futures_timer::Delay;
 #[cfg(feature = "scaling")]
 use lever::table::lotable::LOTable;
-use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 #[cfg(feature = "scaling")]
@@ -23,6 +22,7 @@ use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, trace};
 use uuid::Uuid;
+use crossbeam_queue::SegQueue;
 
 /// Identifier for a root supervisor and dead-letters children.
 pub const NIL_ID: BastionId = BastionId(Uuid::nil());
@@ -109,12 +109,12 @@ pub struct BastionContext {
     child: ChildRef,
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
-    state: Arc<Mutex<Pin<Box<ContextState>>>>,
+    state: Arc<Pin<Box<ContextState>>>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ContextState {
-    messages: VecDeque<SignedMessage>,
+    messages: SegQueue<SignedMessage>,
     #[cfg(feature = "scaling")]
     stats: Arc<AtomicU64>,
     #[cfg(feature = "scaling")]
@@ -135,7 +135,7 @@ impl BastionContext {
         child: ChildRef,
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -311,10 +311,8 @@ impl BastionContext {
         Delay::new(Duration::from_millis(0)).await;
 
         trace!("BastionContext({}): Trying to receive message.", self.id);
-        let state = self.state.clone();
-        let mut guard = state.lock().await;
 
-        if let Some(msg) = guard.pop_message() {
+        if let Some(msg) = self.state.pop_message() {
             trace!("BastionContext({}): Received message: {:?}", self.id, msg);
             Some(msg)
         } else {
@@ -365,15 +363,10 @@ impl BastionContext {
     pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
-            let state = self.state.clone();
-            let mut guard = state.lock().await;
-
-            if let Some(msg) = guard.pop_message() {
+            if let Some(msg) = self.state.pop_message() {
                 trace!("BastionContext({}): Received message: {:?}", self.id, msg);
                 return Ok(msg);
             }
-
-            drop(guard);
             pending!();
         }
     }
@@ -651,7 +644,7 @@ impl BastionContext {
 impl ContextState {
     pub(crate) fn new() -> Self {
         ContextState {
-            messages: VecDeque::new(),
+            messages: SegQueue::new(),
             #[cfg(feature = "scaling")]
             stats: Arc::new(AtomicU64::new(0)),
             #[cfg(feature = "scaling")]
@@ -679,12 +672,12 @@ impl ContextState {
         self.actor_stats.clone()
     }
 
-    pub(crate) fn push_message(&mut self, msg: Msg, sign: RefAddr) {
-        self.messages.push_back(SignedMessage::new(msg, sign))
+    pub(crate) fn push_message(&self, msg: Msg, sign: RefAddr) {
+        self.messages.push(SignedMessage::new(msg, sign))
     }
 
-    pub(crate) fn pop_message(&mut self) -> Option<SignedMessage> {
-        self.messages.pop_front()
+    pub(crate) fn pop_message(&self) -> Option<SignedMessage> {
+        self.messages.pop().ok()
     }
 
     #[cfg(feature = "scaling")]

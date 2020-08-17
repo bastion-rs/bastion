@@ -35,11 +35,11 @@ pub(crate) struct Child {
     callbacks: Callbacks,
     // The future that this child is executing.
     exec: Exec,
-    // A lock behind which is the child's context state.
+    // The child's context state.
     // This is used to store the messages that were received
     // for the child's associated future to be able to
     // retrieve them.
-    state: Arc<Mutex<Pin<Box<ContextState>>>>,
+    state: Arc<Pin<Box<ContextState>>>,
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -71,7 +71,7 @@ impl Child {
         exec: Exec,
         callbacks: Callbacks,
         bcast: Broadcast,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
         child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
@@ -200,9 +200,7 @@ impl Child {
                 sign,
             } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
-                let state = self.state.clone();
-                let mut guard = state.lock().await;
-                guard.push_message(msg, sign);
+                self.state.push_message(msg, sign);
             }
             Envelope {
                 msg: BastionMessage::RestartRequired { .. },
