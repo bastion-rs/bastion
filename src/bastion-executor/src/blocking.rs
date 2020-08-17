@@ -59,7 +59,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::{env, thread};
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use crossbeam_queue::ArrayQueue;
 
 use lazy_static::lazy_static;
@@ -85,7 +85,7 @@ const THREAD_RECV_TIMEOUT_MILLIS: u64 = 100;
 
 /// Pool managers interval time (milliseconds).
 /// This is the actual interval which makes adaptation calculation.
-const MANAGER_POLL_INTERVAL: u64 = 200;
+const MANAGER_POLL_INTERVAL: u64 = 90;
 
 /// Frequency histogram's sliding window size.
 /// Defines how many frequencies will be considered for adaptation.
@@ -113,14 +113,7 @@ lazy_static! {
             .set(DynamicThreadManager::new(*low_watermark() as usize))
             .expect("couldn't setup the dynamic thread manager");
 
-        // We want to use an unbuffered channel here to help
-        // us drive our dynamic control. In effect, the
-        // kernel's scheduler becomes the queue, reducing
-        // the number of buffers that work must flow through
-        // before being acted on by a core. This helps keep
-        // latency snappy in the overall async system by
-        // reducing bufferbloat.
-        let (sender, receiver) = bounded(0);
+        let (sender, receiver) = unbounded();
         Pool { sender, receiver }
     };
 

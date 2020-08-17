@@ -41,7 +41,6 @@ mod macros;
 
 pub mod allocator;
 pub mod blocking;
-pub mod distributor;
 pub mod load_balancer;
 pub mod placement;
 pub mod pool;
