@@ -83,7 +83,7 @@ fn main() {
                 let port = TCP_SERVERS.fetch_sub(1, Ordering::SeqCst) + 2000;
                 let addr = format!("127.0.0.1:{}", port);
 
-                run(addr);
+                run(addr).await.unwrap();
 
                 Ok(())
             })
