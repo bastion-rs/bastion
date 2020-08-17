@@ -1,6 +1,7 @@
 use bastion::prelude::*;
-use futures::*;
 use std::fs::OpenOptions;
+#[cfg(not(target_os = "windows"))]
+use std::fs::File;
 #[cfg(target_os = "windows")]
 use std::io::Write;
 use std::path::PathBuf;
