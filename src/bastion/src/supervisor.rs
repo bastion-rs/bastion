@@ -9,7 +9,7 @@ use crate::context::{BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::path::{BastionPath, BastionPathElement};
-use async_mutex::Mutex;
+
 use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;

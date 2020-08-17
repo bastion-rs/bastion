@@ -14,7 +14,7 @@ use crate::path::BastionPathElement;
 use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
-use async_mutex::Mutex;
+
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;

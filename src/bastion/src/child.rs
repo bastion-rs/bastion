@@ -10,7 +10,7 @@ use crate::message::BastionMessage;
 use crate::resizer::ActorGroupStats;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
-use async_mutex::Mutex;
+
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;

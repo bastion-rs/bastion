@@ -11,7 +11,7 @@ use crate::children::Children;
 use crate::context::{BastionId, ContextState};
 use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
-use async_mutex::Mutex;
+
 use futures::channel::oneshot::{self, Receiver};
 use std::any::{type_name, Any};
 use std::fmt::Debug;

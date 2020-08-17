@@ -9,7 +9,8 @@ use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
 use crate::{prelude::ReceiveError, system::SYSTEM};
-use async_mutex::Mutex;
+
+use crossbeam_queue::SegQueue;
 use futures::pending;
 use futures::FutureExt;
 use futures_timer::Delay;
@@ -22,7 +23,6 @@ use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, trace};
 use uuid::Uuid;
-use crossbeam_queue::SegQueue;
 
 /// Identifier for a root supervisor and dead-letters children.
 pub const NIL_ID: BastionId = BastionId(Uuid::nil());
@@ -755,7 +755,7 @@ mod context_tests {
     }
 
     fn test_try_recv_fail() {
-        let children = Bastion::children(|children| {
+        Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
                 assert!(ctx.try_recv().await.is_none());
                 Ok(())

@@ -3,14 +3,13 @@
 //!
 //! This worker implementation relies on worker run queue statistics which are hold in the pinned global memory
 //! where workload distribution calculated and amended to their own local queues.
-use crate::load_balancer::{self, SmpStats};
+
 use crate::pool::{self};
-use crate::run_queue::{Steal, Worker};
+
 use lightproc::prelude::*;
-use std::cell::{Cell, UnsafeCell};
-use std::time::{Duration, Instant};
-use std::{iter, ptr};
-use tracing::trace;
+use std::cell::Cell;
+use std::ptr;
+use std::time::Duration;
 
 /// The timeout we'll use when parking before an other Steal attempt
 pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);

@@ -70,7 +70,7 @@ use lightproc::recoverable_handle::RecoverableHandle;
 use crate::placement::CoreId;
 use crate::{load_balancer, placement};
 use once_cell::sync::OnceCell;
-use std::sync::atomic::AtomicUsize;
+
 use thread::Thread;
 use tracing::{debug, error, trace, warn};
 
@@ -101,9 +101,6 @@ const EMA_COEFFICIENT: f64 = 2_f64 / (FREQUENCY_QUEUE_SIZE as f64 + 1_f64);
 /// Pool task frequency variable.
 /// Holds scheduled tasks onto the thread pool for the calculation time window.
 static FREQUENCY: AtomicU64 = AtomicU64::new(0);
-
-/// Possible max threads (without OS contract).
-static MAX_THREADS: usize = 10_000;
 
 /// Pool interface between the scheduler and thread pool
 struct Pool {
@@ -313,7 +310,7 @@ impl DynamicThreadManager {
                 .spawn(|| {
                     self::affinity_pinner();
                     loop {
-                        for task in POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
+                        while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
                             trace!("static thread: running task");
                             task.run();
                         }
@@ -380,7 +377,7 @@ impl DynamicThreadManager {
 
     fn spawn_threads(&self, n: usize) {
         (0..n).for_each(|_| {
-            thread::Builder::new()
+            let _ = thread::Builder::new()
                 .name("bastion-blocking-driver-standalone".to_string())
                 .spawn(move || {
                     while let Ok(task) = POOL.receiver.recv_timeout(THREAD_RECV_TIMEOUT) {
@@ -388,7 +385,9 @@ impl DynamicThreadManager {
                     }
                     trace!("standalone thread: quitting.");
                 })
-                .unwrap();
+                .map_err(|e| {
+                    warn!("couldn't spawn standalone thread. - {}", e);
+                });
         })
     }
 
