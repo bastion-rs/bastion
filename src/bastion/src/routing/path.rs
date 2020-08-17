@@ -239,7 +239,7 @@ mod actor_path_tests {
             "bastion://test@127.0.0.1:8080/user/processing/1"
         );
         assert_eq!(instance.is_remote(), true);
-        assert_eq!(instance.is_temporary_scope(), true);
+        assert_eq!(instance.is_user_scope(), true);
     }
 
     #[test]
