@@ -413,7 +413,10 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn cleanup_actors_stats(&mut self) {
-        self.state.actor_stats().remove(&self.bcast.id().clone()).ok();
+        self.state
+            .actor_stats()
+            .remove(&self.bcast.id().clone())
+            .ok();
     }
 }
 
