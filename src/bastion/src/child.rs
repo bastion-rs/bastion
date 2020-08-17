@@ -286,17 +286,16 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn update_stats(&mut self) {
-        let guard = self.state.lock().await;
-        let context_state = guard.as_ref();
-        let storage = guard.stats();
+        let mailbox_size = self.state.mailbox_size();
+        let storage = self.state.stats();
 
         let mut stats = ActorGroupStats::load(storage.clone());
-        stats.update_average_mailbox_size(context_state.mailbox_size());
+        stats.update_average_mailbox_size(mailbox_size);
         stats.store(storage);
 
-        let actor_stats_table = guard.actor_stats();
+        let actor_stats_table = self.state.actor_stats();
         actor_stats_table
-            .insert(self.bcast.id().clone(), context_state.mailbox_size())
+            .insert(self.bcast.id().clone(), mailbox_size)
             .ok();
     }
 
@@ -414,9 +413,7 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn cleanup_actors_stats(&mut self) {
-        let guard = self.state.lock().await;
-        let actor_stats_table = guard.actor_stats();
-        actor_stats_table.remove(&self.bcast.id().clone()).ok();
+        self.state.actor_stats().remove(&self.bcast.id().clone()).ok();
     }
 }
 
