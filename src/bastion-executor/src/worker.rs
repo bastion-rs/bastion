@@ -14,6 +14,9 @@ use std::time::Duration;
 /// The timeout we'll use when parking before an other Steal attempt
 pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
 
+/// The amount of time we'll try to steal tasks before we start parking.
+const STEAL_ATTEMPTS_TIMEOUT: Duration = Duration::from_millis(100);
+
 ///
 /// Get the current process's stack
 pub fn current() -> ProcStack {
