@@ -47,6 +47,7 @@ pub mod pool;
 pub mod run;
 pub mod run_queue;
 pub mod sleepers;
+mod thread_manager;
 pub mod worker;
 
 ///

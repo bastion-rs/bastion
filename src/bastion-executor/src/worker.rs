@@ -4,7 +4,7 @@
 //! This worker implementation relies on worker run queue statistics which are hold in the pinned global memory
 //! where workload distribution calculated and amended to their own local queues.
 
-use crate::pool::{self};
+use crate::pool;
 
 use lightproc::prelude::*;
 use std::cell::Cell;
