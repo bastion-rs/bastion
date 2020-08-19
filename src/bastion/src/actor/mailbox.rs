@@ -1,6 +1,7 @@
 use crate::actor::actor_ref::ActorRef;
 use crate::message::TypedMessage;
 use async_channel::{Receiver, Sender};
+use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -10,7 +11,8 @@ pub struct Mailbox<T>
 where
     T: TypedMessage,
 {
-    inner: Arc<MailboxInner<T>>,
+    receiver: Arc<MailboxInner<T>>,
+    envelopes: VecDeque<Arc<Envelope<T>>>,
 }
 
 pub struct MailboxInner<T>
@@ -63,6 +65,40 @@ pub enum MessageType {
     /// A message was sent directly and doesn't require confirmation for the
     /// delivery and being processed.
     Tell,
+}
+
+impl<T> Mailbox<T>
+where
+    T: TypedMessage,
+{
+    /// Creates a new mailbox for the actor.
+    pub fn new(receiver: Arc<MailboxInner<T>>) -> Self {
+        Mailbox {
+            receiver,
+            envelopes: VecDeque::new(),
+        }
+    }
+
+    /// Adds a new envelope into the actor's mailbox.
+    pub(crate) fn push_envelope(&mut self, envelope: Envelope<T>) {
+        self.envelopes.push_back(Arc::new(envelope));
+    }
+
+    /// Returns the latest envelope from the mailbox.
+    pub(crate) fn pop_envelope(&self) -> Option<Arc<Envelope<T>>> {
+        match self.envelopes.get(0) {
+            Some(envelope) => Some(envelope.clone()),
+            None => None,
+        }
+    }
+
+    /// Drops the latest envelope from the mailbox, when it's processed.
+    pub(crate) fn ack_envelope(&mut self) {
+        match self.envelopes.pop_front() {
+            Some(_) => {}
+            None => {}
+        }
+    }
 }
 
 impl<T> Envelope<T>
