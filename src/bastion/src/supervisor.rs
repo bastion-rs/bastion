@@ -1901,9 +1901,9 @@ impl RestartStrategy {
                 timeout,
                 multiplier,
             } => {
-                let start_in =
-                    timeout.as_secs() + (timeout.as_secs() * multiplier * restarts_count as u64);
-                Delay::new(Duration::from_secs(start_in)).await;
+                let factor = multiplier as u32 * restarts_count as u32;
+                let delay = timeout * factor;
+                Delay::new(timeout + delay).await;
             }
             _ => {}
         };
