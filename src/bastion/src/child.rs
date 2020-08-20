@@ -74,6 +74,7 @@ impl Child {
         state: Arc<Mutex<Pin<Box<ContextState>>>>,
         child_ref: ChildRef,
     ) -> Self {
+        debug!("Child({}): Initializing.", bcast.id());
         let pre_start_msgs = Vec::new();
         let started = false;
 
