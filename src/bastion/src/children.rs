@@ -936,7 +936,7 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
+        let child_ref = ChildRef::new_internal(id.clone(), sender.clone(), name, path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();

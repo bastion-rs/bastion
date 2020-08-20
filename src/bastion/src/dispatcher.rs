@@ -80,16 +80,19 @@ impl DispatcherHandler for RoundRobinHandler {
     }
     // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
-        if entries.len() <= 1 {
+        let entries = entries
+            .iter()
+            .filter(|entry| entry.0.is_public())
+            .collect::<Vec<_>>();
+
+        if entries.is_empty() {
+            debug!("no public children to broadcast message to");
             return;
         }
-
-        let entries = entries.iter().skip(1).collect::<Vec<_>>();
-
         let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
-        if let Some (entry) = entries.get(current_index) {
-            debug!(
+        if let Some(entry) = entries.get(current_index) {
+            warn!(
                 "sending message to child {}/{} - {}",
                 current_index + 1,
                 entries.len(),
