@@ -1,6 +1,6 @@
 use bastion::prelude::*;
-use std::sync::Arc;
 use futures_timer::Delay;
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::Level;
 
@@ -43,8 +43,8 @@ fn main() {
     // Initialize tracing logger
     // so we get nice output on the console.
     let subscriber = tracing_subscriber::fmt()
-    .with_max_level(Level::WARN)
-    .finish();
+        .with_max_level(Level::WARN)
+        .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // We need bastion to run our program

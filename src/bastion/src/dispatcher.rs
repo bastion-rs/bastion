@@ -12,7 +12,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::{trace, warn, debug};
+use tracing::{debug, trace, warn};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -89,7 +89,12 @@ impl DispatcherHandler for RoundRobinHandler {
         let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
         entries.iter().nth(current_index).map(|entry| {
-            debug!("sending message to child {}/{} - {}", current_index + 1, entries.len(), entry.0.path());
+            debug!(
+                "sending message to child {}/{} - {}",
+                current_index + 1,
+                entries.len(),
+                entry.0.path()
+            );
             entry.0.tell_anonymously(message.clone()).unwrap();
             self.index.store(current_index + 1, Ordering::SeqCst);
         });
