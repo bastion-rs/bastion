@@ -242,7 +242,6 @@ impl ActorRestartStrategy {
             _ => None,
         }
     }
-
 }
 
 impl Supervisor {
