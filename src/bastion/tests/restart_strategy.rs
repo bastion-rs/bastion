@@ -75,7 +75,7 @@ fn calculate_linear_strategy() {
 fn calculate_exp_strategy_with_multiplier_zero() {
     let strategy = ActorRestartStrategy::ExponentialBackOff {
         timeout: Duration::from_millis(100),
-        multiplier: 0,
+        multiplier: 0.0,
     };
 
     assert_eq!(strategy.calculate(0), Some(Duration::from_millis(100)));
@@ -87,7 +87,7 @@ fn calculate_exp_strategy_with_multiplier_zero() {
 fn calculate_exp_strategy_with_multiplier_non_zero() {
     let strategy = ActorRestartStrategy::ExponentialBackOff {
         timeout: Duration::from_millis(100),
-        multiplier: 5,
+        multiplier: 5.0,
     };
 
     assert_eq!(strategy.calculate(0), Some(Duration::from_millis(100)));

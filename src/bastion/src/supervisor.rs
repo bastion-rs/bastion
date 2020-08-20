@@ -189,13 +189,13 @@ pub enum RestartPolicy {
 ///
 /// The default strategy used is `ActorRestartStrategy::Immediate`
 /// with the `RestartPolicy::Always` restart policy.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RestartStrategy {
     restart_policy: RestartPolicy,
     strategy: ActorRestartStrategy,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// The strategy for restating an actor as far as it
 /// returned an failure.
 ///
@@ -219,7 +219,7 @@ pub enum ActorRestartStrategy {
         /// An initial delay before the restarting an actor.
         timeout: Duration,
         /// Defines a multiplier how fast the timeout will be increasing.
-        multiplier: u32,
+        multiplier: f64,
     },
 }
 
@@ -228,15 +228,15 @@ impl ActorRestartStrategy {
     pub fn calculate(&self, restarts_count: usize) -> Option<Duration> {
         match *self {
             ActorRestartStrategy::LinearBackOff { timeout } => {
-                let delay = timeout * restarts_count as u32;
+                let delay = timeout.mul_f64(restarts_count as f64);
                 Some(timeout + delay)
             }
             ActorRestartStrategy::ExponentialBackOff {
                 timeout,
                 multiplier,
             } => {
-                let factor = multiplier * restarts_count as u32;
-                let delay = timeout * factor;
+                let factor = multiplier * restarts_count as f64;
+                let delay = timeout.mul_f64(factor);
                 Some(timeout + delay)
             }
             _ => None 
@@ -755,7 +755,7 @@ impl Supervisor {
     ///         .with_actor_restart_strategy(           
     ///             ActorRestartStrategy::ExponentialBackOff {
     ///                 timeout: Duration::from_millis(5000),
-    ///                 multiplier: 3,
+    ///                 multiplier: 3.0,
     ///             }
     ///         )
     /// )
