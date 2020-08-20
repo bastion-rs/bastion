@@ -219,8 +219,30 @@ pub enum ActorRestartStrategy {
         /// An initial delay before the restarting an actor.
         timeout: Duration,
         /// Defines a multiplier how fast the timeout will be increasing.
-        multiplier: u64,
+        multiplier: u32,
     },
+}
+
+impl ActorRestartStrategy {
+    /// Calculate the expected restart delay for given strategy after n restarts.
+    pub fn calculate(&self, restarts_count: usize) -> Option<Duration> {
+        match *self {
+            ActorRestartStrategy::LinearBackOff { timeout } => {
+                let delay = timeout * restarts_count as u32;
+                Some(timeout + delay)
+            }
+            ActorRestartStrategy::ExponentialBackOff {
+                timeout,
+                multiplier,
+            } => {
+                let factor = multiplier * restarts_count as u32;
+                let delay = timeout * factor;
+                Some(timeout + delay)
+            }
+            _ => None 
+        }
+    }
+
 }
 
 impl Supervisor {
@@ -1891,22 +1913,11 @@ impl RestartStrategy {
         self
     }
 
+
     pub(crate) async fn apply_strategy(&self, restarts_count: usize) {
-        match self.strategy {
-            ActorRestartStrategy::LinearBackOff { timeout } => {
-                let start_in = timeout.as_secs() + (timeout.as_secs() * restarts_count as u64);
-                Delay::new(Duration::from_secs(start_in)).await;
-            }
-            ActorRestartStrategy::ExponentialBackOff {
-                timeout,
-                multiplier,
-            } => {
-                let factor = multiplier as u32 * restarts_count as u32;
-                let delay = timeout * factor;
-                Delay::new(timeout + delay).await;
-            }
-            _ => {}
-        };
+        if let Some(dur) = self.strategy.calculate(restarts_count) {
+            Delay::new(dur).await;
+        }
     }
 }
 
