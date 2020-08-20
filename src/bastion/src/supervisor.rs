@@ -239,7 +239,7 @@ impl ActorRestartStrategy {
                 let delay = timeout.mul_f64(factor);
                 Some(timeout + delay)
             }
-            _ => None 
+            _ => None,
         }
     }
 
@@ -1912,7 +1912,6 @@ impl RestartStrategy {
         self.strategy = strategy;
         self
     }
-
 
     pub(crate) async fn apply_strategy(&self, restarts_count: usize) {
         if let Some(dur) = self.strategy.calculate(restarts_count) {
