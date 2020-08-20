@@ -88,7 +88,7 @@ impl DispatcherHandler for RoundRobinHandler {
 
         let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
-        entries.iter().nth(current_index).map(|entry| {
+        if let Some (entry) = entries.get(current_index) {
             debug!(
                 "sending message to child {}/{} - {}",
                 current_index + 1,
@@ -97,7 +97,7 @@ impl DispatcherHandler for RoundRobinHandler {
             );
             entry.0.tell_anonymously(message.clone()).unwrap();
             self.index.store(current_index + 1, Ordering::SeqCst);
-        });
+        };
     }
 }
 /// Generic trait which any custom dispatcher handler must implement for
