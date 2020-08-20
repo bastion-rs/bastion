@@ -453,24 +453,24 @@ impl Children {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
-    ///     children
-    ///         .with_heartbeat_tick(Duration::from_secs(5))
-    ///         .with_exec(|ctx| {
-    ///             // -- Children group started.
-    ///             async move {
-    ///                 // ...
-    ///                 # Ok(())
-    ///             }
-    ///             // -- Children group stopped.
-    ///         })
+    /// children
+    ///     .with_heartbeat_tick(Duration::from_secs(5))
+    ///     .with_exec(|ctx| {
+    ///         // -- Children group started.
+    ///         async move {
+    ///             // ...
+    ///             # Ok(())
+    ///         }
+    ///         // -- Children group stopped.
+    ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
     pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {
@@ -934,7 +934,7 @@ impl Children {
         let id = bcast.id().clone();
         let sender = bcast.sender().clone();
         let path = bcast.path().clone();
-        let child_ref = ChildRef::new(id.clone(), sender.clone(), name, path);
+        let child_ref = ChildRef::new_internal(id.clone(), sender.clone(), name, path);
 
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();

@@ -19,9 +19,28 @@ pub struct ChildRef {
     sender: Sender,
     name: String,
     path: Arc<BastionPath>,
+    // True if the ChildRef references a child that will receive user defined messages.
+    // use `ChildRef::new_internal` to set it to false, for internal use children,
+    // such as the heartbeat children for example
+    is_public: bool,
 }
 
 impl ChildRef {
+    pub(crate) fn new_internal(
+        id: BastionId,
+        sender: Sender,
+        name: String,
+        path: Arc<BastionPath>,
+    ) -> ChildRef {
+        ChildRef {
+            id,
+            sender,
+            name,
+            path,
+            is_public: false,
+        }
+    }
+
     pub(crate) fn new(
         id: BastionId,
         sender: Sender,
@@ -33,6 +52,7 @@ impl ChildRef {
             sender,
             name,
             path,
+            is_public: true,
         }
     }
 
@@ -65,6 +85,38 @@ impl ChildRef {
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
+    }
+
+    /// Returns true if the child this `ChildRef` is referencing is public,
+    /// Which means it can receive messages. private `ChildRef`s
+    /// reference bastion internal children, such as the heartbeat child for example.
+    /// This function comes in handy when implementing your own dispatchers.
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # Bastion::init();
+    /// #
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx| {
+    ///         async move {
+    ///             if ctx.current().is_public() {
+    ///                 // ...
+    ///             }
+    ///             # Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// ```
+    pub fn is_public(&self) -> bool {
+        self.is_public
     }
 
     /// Sends a message to the child this `ChildRef` is referencing.
