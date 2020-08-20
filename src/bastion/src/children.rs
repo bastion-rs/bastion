@@ -453,26 +453,24 @@ impl Children {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
-    /// # fn main() {
-    ///     # Bastion::init();
-    ///     #
+    /// # Bastion::init();
+    /// #
     /// Bastion::children(|children| {
-    ///     children
-    ///         .with_heartbeat_tick(Duration::from_secs(5))
-    ///         .with_exec(|ctx| {
-    ///             // -- Children group started.
-    ///             async move {
-    ///                 // ...
-    ///                 # Ok(())
-    ///             }
-    ///             // -- Children group stopped.
-    ///         })
+    /// children
+    ///     .with_heartbeat_tick(Duration::from_secs(5))
+    ///     .with_exec(|ctx| {
+    ///         // -- Children group started.
+    ///         async move {
+    ///             // ...
+    ///             # Ok(())
+    ///         }
+    ///         // -- Children group stopped.
+    ///     })
     /// }).expect("Couldn't create the children group.");
-    ///     #
-    ///     # Bastion::start();
-    ///     # Bastion::stop();
-    ///     # Bastion::block_until_stopped();
-    /// # }
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
     /// ```
     /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
     pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {
