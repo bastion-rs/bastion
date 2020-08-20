@@ -9,10 +9,10 @@ use lever::prelude::*;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::{trace, warn};
+use tracing::{trace, warn, debug};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -66,7 +66,7 @@ pub type DefaultDispatcherHandler = RoundRobinHandler;
 /// Dispatcher that will do simple round-robin distribution
 #[derive(Default, Debug)]
 pub struct RoundRobinHandler {
-    index: AtomicU64,
+    index: AtomicUsize,
 }
 
 impl DispatcherHandler for RoundRobinHandler {
@@ -80,25 +80,19 @@ impl DispatcherHandler for RoundRobinHandler {
     }
     // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
-        if entries.len() == 0 {
+        if entries.len() <= 1 {
             return;
         }
 
-        let current_index = self.index.load(Ordering::SeqCst) % entries.len() as u64;
+        let entries = entries.iter().skip(1).collect::<Vec<_>>();
 
-        let mut skipped = 0;
-        for pair in entries.iter() {
-            if skipped != current_index {
-                skipped += 1;
-                continue;
-            }
+        let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
-            let entry = pair.0;
-            entry.tell_anonymously(message.clone()).unwrap();
-            break;
-        }
-
-        self.index.store(current_index + 1, Ordering::SeqCst);
+        entries.iter().nth(current_index).map(|entry| {
+            debug!("sending message to child {}/{} - {}", current_index + 1, entries.len(), entry.0.path());
+            entry.0.tell_anonymously(message.clone()).unwrap();
+            self.index.store(current_index + 1, Ordering::SeqCst);
+        });
     }
 }
 /// Generic trait which any custom dispatcher handler must implement for
