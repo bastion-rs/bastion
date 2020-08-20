@@ -189,13 +189,13 @@ pub enum RestartPolicy {
 ///
 /// The default strategy used is `ActorRestartStrategy::Immediate`
 /// with the `RestartPolicy::Always` restart policy.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RestartStrategy {
     restart_policy: RestartPolicy,
     strategy: ActorRestartStrategy,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// The strategy for restating an actor as far as it
 /// returned an failure.
 ///
@@ -219,8 +219,29 @@ pub enum ActorRestartStrategy {
         /// An initial delay before the restarting an actor.
         timeout: Duration,
         /// Defines a multiplier how fast the timeout will be increasing.
-        multiplier: u64,
+        multiplier: f64,
     },
+}
+
+impl ActorRestartStrategy {
+    /// Calculate the expected restart delay for given strategy after n restarts.
+    pub fn calculate(&self, restarts_count: usize) -> Option<Duration> {
+        match *self {
+            ActorRestartStrategy::LinearBackOff { timeout } => {
+                let delay = timeout.mul_f64(restarts_count as f64);
+                Some(timeout + delay)
+            }
+            ActorRestartStrategy::ExponentialBackOff {
+                timeout,
+                multiplier,
+            } => {
+                let factor = multiplier * restarts_count as f64;
+                let delay = timeout.mul_f64(factor);
+                Some(timeout + delay)
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Supervisor {
@@ -733,7 +754,7 @@ impl Supervisor {
     ///         .with_actor_restart_strategy(           
     ///             ActorRestartStrategy::ExponentialBackOff {
     ///                 timeout: Duration::from_millis(5000),
-    ///                 multiplier: 3,
+    ///                 multiplier: 3.0,
     ///             }
     ///         )
     /// )
@@ -1892,21 +1913,9 @@ impl RestartStrategy {
     }
 
     pub(crate) async fn apply_strategy(&self, restarts_count: usize) {
-        match self.strategy {
-            ActorRestartStrategy::LinearBackOff { timeout } => {
-                let start_in = timeout.as_secs() + (timeout.as_secs() * restarts_count as u64);
-                Delay::new(Duration::from_secs(start_in)).await;
-            }
-            ActorRestartStrategy::ExponentialBackOff {
-                timeout,
-                multiplier,
-            } => {
-                let start_in =
-                    timeout.as_secs() + (timeout.as_secs() * multiplier * restarts_count as u64);
-                Delay::new(Duration::from_secs(start_in)).await;
-            }
-            _ => {}
-        };
+        if let Some(dur) = self.strategy.calculate(restarts_count) {
+            Delay::new(dur).await;
+        }
     }
 }
 
