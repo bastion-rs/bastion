@@ -1,5 +1,5 @@
 use bastion::supervisor::{ActorRestartStrategy, RestartPolicy, RestartStrategy};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[test]
 fn check_default_values() {
