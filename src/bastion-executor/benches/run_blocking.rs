@@ -18,7 +18,7 @@ fn run_blocking(b: &mut Bencher) {
             .map(|_| {
                 blocking::spawn_blocking(
                     async {
-                        let duration = Duration::from_millis(0);
+                        let duration = Duration::from_millis(1);
                         thread::sleep(duration);
                     },
                     ProcStack::default(),
@@ -37,7 +37,7 @@ fn run_blocking_single(b: &mut Bencher) {
         run(
             blocking::spawn_blocking(
                 async {
-                    let duration = Duration::from_millis(0);
+                    let duration = Duration::from_millis(1);
                     thread::sleep(duration);
                 },
                 ProcStack::default(),

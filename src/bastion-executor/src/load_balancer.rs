@@ -34,7 +34,7 @@ pub trait SmpStats {
 
 static LOAD_BALANCER: Lazy<LoadBalancer> = Lazy::new(|| {
     let lb = LoadBalancer::new(placement::get_core_ids().unwrap());
-    debug!("Instanciated load_balancer: {:?}", lb);
+    debug!("Instantiated load_balancer: {:?}", lb);
     lb
 });
 

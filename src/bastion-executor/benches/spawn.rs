@@ -12,14 +12,13 @@ use test::Bencher;
 // Benchmark for a 10K burst task spawn
 #[bench]
 fn spawn_lot(b: &mut Bencher) {
-    let core_count = *load_balancer::core_count();
     let proc_stack = ProcStack::default();
     b.iter(|| {
-        let _ = (0..core_count)
+        let _ = (0..10_000)
             .map(|_| {
                 spawn(
                     async {
-                        let duration = Duration::from_millis(0);
+                        let duration = Duration::from_millis(1);
                         Delay::new(duration).await;
                     },
                     proc_stack.clone(),
@@ -36,7 +35,7 @@ fn spawn_single(b: &mut Bencher) {
     b.iter(|| {
         spawn(
             async {
-                let duration = Duration::from_millis(0);
+                let duration = Duration::from_millis(1);
                 Delay::new(duration).await;
             },
             proc_stack.clone(),

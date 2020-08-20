@@ -12,11 +12,11 @@ use test::Bencher;
 #[bench]
 fn blocking(b: &mut Bencher) {
     b.iter(|| {
-        (0..100)
+        (0..10_000)
             .map(|_| {
                 blocking::spawn_blocking(
                     async {
-                        let duration = Duration::from_millis(0);
+                        let duration = Duration::from_millis(1);
                         thread::sleep(duration);
                     },
                     ProcStack::default(),
@@ -32,7 +32,7 @@ fn blocking_single(b: &mut Bencher) {
     b.iter(|| {
         blocking::spawn_blocking(
             async {
-                let duration = Duration::from_millis(0);
+                let duration = Duration::from_millis(1);
                 thread::sleep(duration);
             },
             ProcStack::default(),

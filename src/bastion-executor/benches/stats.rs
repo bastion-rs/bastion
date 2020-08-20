@@ -36,7 +36,6 @@ fn lockless_stats_bench(b: &mut Bencher) {
     });
 }
 
-// 158,278 ns/iter (+/- 117,103)
 #[bench]
 fn lockless_stats_bad_load(b: &mut Bencher) {
     let stats = stats();
@@ -56,7 +55,6 @@ fn lockless_stats_bad_load(b: &mut Bencher) {
     });
 }
 
-// 158,278 ns/iter (+/- 117,103)
 #[bench]
 fn lockless_stats_good_load(b: &mut Bencher) {
     let stats = stats();

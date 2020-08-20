@@ -50,6 +50,7 @@ use core::fmt;
 use crossbeam_queue::ArrayQueue;
 use fmt::{Debug, Formatter};
 use lazy_static::lazy_static;
+use lever::prelude::TTas;
 use placement::CoreId;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -87,9 +88,9 @@ lazy_static! {
 
 /// The `DynamicRunner` is piloted by `DynamicPoolManager`.
 /// Upon request it needs to be able to provide runner routines for:
-/// Static threads.
-/// Dynamic threads.
-/// Standalone threads.
+/// * Static threads.
+/// * Dynamic threads.
+/// * Standalone threads.
 ///
 /// Your implementation of `DynamicRunner`
 /// will allow you to define what tasks must be accomplished.
@@ -126,20 +127,20 @@ pub trait DynamicRunner {
 ///
 /// Kinds of threads:
 ///
-/// Static threads:
+/// ## Static threads:
 /// Defined in the constructor, they will always be available. They park for `THREAD_PARK_TIMEOUT` on idle.
 ///
-/// Dynamic threads:
+/// ## Dynamic threads:
 /// Created during `DynamicPoolManager` initialization, they will park on idle.
 /// The `DynamicPoolManager` grows the number of Dynamic threads
 /// so the total number of Static threads + Dynamic threads
 /// is the number of available cores on the machine. (`num_cpus::get()`)
 ///
-/// Standalone threads:
+/// ## Standalone threads:
 /// They are created when there aren't enough static and dynamic threads to process the expected load.
 /// They will be destroyed on idle.
 ///
-/// Spawn order:
+/// ## Spawn order:
 /// In order to handle a growing load, the pool manager will ask to:
 /// - Use Static threads
 /// - Unpark Dynamic threads
@@ -155,7 +156,7 @@ pub struct DynamicPoolManager {
     parked_threads: ArrayQueue<Thread>,
     runner: Arc<dyn DynamicRunner + Send + Sync>,
     last_frequency: AtomicU64,
-    frequencies: Mutex<VecDeque<u64>>,
+    frequencies: TTas<VecDeque<u64>>,
 }
 
 impl Debug for DynamicPoolManager {
@@ -166,21 +167,21 @@ impl Debug for DynamicPoolManager {
             .field("parked_threads", &self.parked_threads.len())
             .field("parked_threads", &self.parked_threads.len())
             .field("last_frequency", &self.last_frequency)
-            .field("frequencies", &self.frequencies)
+            .field("frequencies", &self.frequencies.try_lock())
             .finish()
     }
 }
 
 impl DynamicPoolManager {
     pub fn new(static_threads: usize, runner: Arc<dyn DynamicRunner + Send + Sync>) -> Self {
-        let dynamic_threads = 1.max(num_cpus::get() - static_threads);
+        let dynamic_threads = 1.max(num_cpus::get().checked_sub(static_threads).unwrap_or(0));
         Self {
             static_threads,
             dynamic_threads,
             parked_threads: ArrayQueue::new(dynamic_threads),
             runner,
             last_frequency: AtomicU64::new(0),
-            frequencies: Mutex::new(VecDeque::with_capacity(
+            frequencies: TTas::new(VecDeque::with_capacity(
                 FREQUENCY_QUEUE_SIZE.saturating_add(1),
             )),
         }
@@ -353,7 +354,7 @@ impl DynamicPoolManager {
     fn scale_pool(&'static self) {
         // Fetch current frequency, it does matter that operations are ordered in this approach.
         let current_frequency = self.last_frequency.swap(0, Ordering::SeqCst);
-        let mut freq_queue = self.frequencies.lock().unwrap();
+        let mut freq_queue = self.frequencies.lock();
 
         // Make it safe to start for calculations by adding initial frequency scale
         if freq_queue.len() == 0 {
