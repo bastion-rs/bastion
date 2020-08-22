@@ -665,6 +665,76 @@ impl BastionContext {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.broadcast_message(target, &msg);
     }
+
+    /// Sends a message (unicast) to a recipient among the target.
+    pub fn notify_one<M: Message>(&self, target: BroadcastTarget, message: M) {
+        debug!(
+            "{:?}: notifying one member of {:?} (message type: {})",
+            self.current().path(),
+            target,
+            std::any::type_name::<M>(),
+        );
+
+        let msg = SignedMessage {
+            msg: Msg::tell(message),
+            sign: self.signature(),
+        };
+
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.notify_one(target, msg);
+    }
+
+    /// Sends a message (unicast) to a recipient among the target.
+    pub fn notify_all<M: Message>(&self, target: BroadcastTarget, message: M) {
+        debug!(
+            "{:?}: notifying all members of {:?} (message type: {})",
+            self.current().path(),
+            target,
+            std::any::type_name::<M>(),
+        );
+
+        let msg = Arc::new(SignedMessage {
+            msg: Msg::tell(message),
+            sign: self.signature(),
+        });
+
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.notify_all(target, msg);
+    }
+
+    pub fn ask_one<M:Message>(&self, target: BroadcastTarget, message: M) {
+        debug!(
+            "{:?}: asking one member of {:?} (message type: {})",
+            self.current().path(),
+            target,
+            std::any::type_name::<M>(),
+        );
+
+        let msg = SignedMessage {
+            msg: Msg::ask(message).0,
+            sign: self.signature(),
+        };
+
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.notify_one(target, msg);
+    }
+
+    pub fn ask_all<M:Message>(&self, target: BroadcastTarget, message: M) -> Result<usize, ()> {
+        debug!(
+            "{:?}: asking all members of {:?} (message type: {})",
+            self.current().path(),
+            target,
+            std::any::type_name::<M>(),
+        );
+
+        let msg = Arc::new(SignedMessage {
+            msg: Msg::ask(message).0,
+            sign: self.signature(),
+        });
+
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.notify_all(target, msg)
+    }
 }
 
 impl ContextState {

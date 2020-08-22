@@ -12,7 +12,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace, warn, error};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -362,7 +362,61 @@ impl GlobalDispatcher {
             }
         }
     }
-    
+
+    /// Gives the message to one of the dispatchers
+    /// according to the specified target.
+    pub(crate) fn notify_one(
+        &self,
+        target: BroadcastTarget,
+        message: SignedMessage,
+    ) -> Result<usize, ()> {
+        let target_dispatcher = if let BroadcastTarget::Group(name) = target {
+            self.dispatchers.get(&name.into())
+        } else {
+            self.dispatchers.iter().map(|pair| pair.0.name().into()).collect::<Vec<_>>().first()
+        };
+
+        if let Some(dispatcher) = target_dispatcher {
+            dispatcher.notify_one(message);
+            Ok(1)
+        } else {
+            error!(
+                "The message can't be delivered. No available dispatcher."
+            );
+            Err(())
+        }
+    }
+
+    /// Gives the message to all of the dispatchers
+    /// according to the specified target.
+    pub(crate) fn notify_all(
+        &self,
+        target: BroadcastTarget,
+        message: Arc<SignedMessage>,
+    ) -> Result<usize, ()> {
+        let target_dispatchers = if let BroadcastTarget::Group(name) = target {
+            self.dispatchers.get(&name.into())
+        } else {
+            self.dispatchers.iter().map(|pair| pair.0.name().into())
+        }
+        .filter(|dispatcher| self.dispatchers.get(dispatcher).is_some())
+        .collect::<Vec<_>>();
+
+        if target_dispatchers.is_empty() {
+            error!("The message can't be broadcasted.  No available dispatchers.");
+            Err(())
+        } else {
+            let mut recipients = 0;
+            target_dispatchers.for_each(|dispatcher| {
+                self.dispatchers.get(&target_dispatchers).map(|d| {
+                    d.broadcast_message(&message.clone());
+                    recipients += 1; // TODO: append result of new broadcast_message
+                });
+            });
+            Ok(recipients);
+        }
+    }
+
     /// Asks the given message to the first recipient of the specified target.
     pub(crate) fn ask_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
         let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
