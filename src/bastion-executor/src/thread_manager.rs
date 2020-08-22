@@ -275,7 +275,7 @@ impl DynamicPoolManager {
                 std::thread::park();
             })
             .map_err(|e| {
-                debug!(
+                trace!(
                     "couldn't park thread {:?} - {}",
                     std::thread::current().id(),
                     e
@@ -294,11 +294,11 @@ impl DynamicPoolManager {
             self.parked_threads
                 .pop()
                 .map(|thread| {
-                    debug!("Executor: unpark_thread: unparking {:?}", thread.id());
+                    trace!("Executor: unpark_thread: unparking {:?}", thread.id());
                     thread.unpark();
                 })
                 .map_err(|e| {
-                    debug!("Executor: unpark_thread: couldn't unpark thread - {}", e);
+                    trace!("Executor: unpark_thread: couldn't unpark thread - {}", e);
                 })
                 .is_ok()
         }

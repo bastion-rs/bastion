@@ -92,7 +92,7 @@ impl DispatcherHandler for RoundRobinHandler {
         let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
         if let Some(entry) = entries.get(current_index) {
-            warn!(
+            trace!(
                 "sending message to child {}/{} - {}",
                 current_index + 1,
                 entries.len(),
@@ -332,6 +332,39 @@ impl GlobalDispatcher {
 
     /// Broadcasts the given message in according with the specified target.
     pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
+        let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
+
+        match target {
+            BroadcastTarget::All => self
+                .dispatchers
+                .iter()
+                .map(|pair| pair.0.name().into())
+                .for_each(|group_name| acked_dispatchers.push(group_name)),
+            BroadcastTarget::Group(name) => {
+                let target_dispatcher = name.into();
+                acked_dispatchers.push(target_dispatcher);
+            }
+        }
+
+        for dispatcher_type in acked_dispatchers {
+            match self.dispatchers.get(&dispatcher_type) {
+                Some(dispatcher) => {
+                    dispatcher.broadcast_message(&message.clone());
+                }
+                // TODO: Put the message into the dead queue
+                None => {
+                    let name = dispatcher_type.name();
+                    warn!(
+                        "The message can't be delivered to the group with the '{}' name.",
+                        name
+                    );
+                }
+            }
+        }
+    }
+    
+    /// Asks the given message to the first recipient of the specified target.
+    pub(crate) fn ask_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
         let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
 
         match target {

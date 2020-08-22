@@ -9,19 +9,20 @@ use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
 use crate::{prelude::ReceiveError, system::SYSTEM};
-
+use async_mutex::Mutex;
 use crossbeam_queue::SegQueue;
 use futures::pending;
 use futures::FutureExt;
 use futures_timer::Delay;
 #[cfg(feature = "scaling")]
 use lever::table::lotable::LOTable;
+use lightproc::proc_state::{EmptyState, State};
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 #[cfg(feature = "scaling")]
 use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Duration};
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 /// Identifier for a root supervisor and dead-letters children.
@@ -110,6 +111,7 @@ pub struct BastionContext {
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
     state: Arc<Pin<Box<ContextState>>>,
+    shared_state: Option<Arc<Mutex<Box<dyn State>>>>,
 }
 
 #[derive(Debug)]
@@ -130,12 +132,13 @@ impl BastionId {
 }
 
 impl BastionContext {
-    pub(crate) fn new(
+    pub(crate) fn with_shared_state(
         id: BastionId,
         child: ChildRef,
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
         state: Arc<Pin<Box<ContextState>>>,
+        shared_state: Option<Arc<Mutex<Box<dyn State>>>>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -144,7 +147,21 @@ impl BastionContext {
             children,
             supervisor,
             state,
+            shared_state: shared_state,
         }
+    }
+    pub(crate) fn new(
+        id: BastionId,
+        child: ChildRef,
+        children: ChildrenRef,
+        supervisor: Option<SupervisorRef>,
+        state: Arc<Pin<Box<ContextState>>>,
+    ) -> Self {
+        Self::with_shared_state(id, child, children, supervisor, state, None)
+    }
+
+    pub fn state(&self) -> Option<&Arc<Mutex<Box<dyn State>>>> {
+        self.shared_state.as_ref()
     }
 
     /// Returns a [`ChildRef`] referencing the children group's
@@ -501,9 +518,10 @@ impl BastionContext {
     /// [`RefAddr`]: ../prelude/struct.RefAddr.html
     pub fn tell<M: Message>(&self, to: &RefAddr, msg: M) -> Result<(), M> {
         debug!(
-            "{:?}: Telling message: {:?} to: {:?}",
+            "{:?}: Telling message: {:?}  (type: {}) to: {:?}",
             self.current().path(),
             msg,
+            std::any::type_name::<M>(),
             to.path()
         );
         let msg = BastionMessage::tell(msg);
@@ -592,9 +610,10 @@ impl BastionContext {
     /// [`Answer`]: /message/struct.Answer.html
     pub fn ask<M: Message>(&self, to: &RefAddr, msg: M) -> Result<Answer, M> {
         debug!(
-            "{:?}: Asking message: {:?} to: {:?}",
+            "{:?}: Asking message: {:?} (type: {}) to: {:?}",
             self.current().path(),
             msg,
+            std::any::type_name::<M>(),
             to
         );
         let (msg, answer) = BastionMessage::ask(msg);
@@ -631,6 +650,13 @@ impl BastionContext {
     ///
     /// [`BroadcastTarget`]: ../dispatcher/enum.DispatcherType.html
     pub fn broadcast_message<M: Message>(&self, target: BroadcastTarget, message: M) {
+        debug!(
+            "{:?}: Broadcasting message: {:?} (type: {})",
+            self.current().path(),
+            message,
+            std::any::type_name::<M>(),
+        );
+
         let msg = Arc::new(SignedMessage {
             msg: Msg::broadcast(message),
             sign: self.signature(),

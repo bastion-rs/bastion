@@ -15,6 +15,7 @@ use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 
+use async_mutex::Mutex;
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -23,6 +24,7 @@ use futures::stream::FuturesOrdered;
 use futures_timer::Delay;
 use fxhash::FxHashMap;
 use lightproc::prelude::*;
+use lightproc::proc_state::State;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
@@ -106,6 +108,9 @@ pub struct Children {
     // Children instance. For example for heartsbeat checks, collecting
     // stats, etc.
     helper_actors: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+    // Shared state between the children.
+    // can be retrieved from a bastioncontext.
+    state: Option<Arc<Mutex<Box<dyn State>>>>,
 }
 
 impl Children {
@@ -138,6 +143,7 @@ impl Children {
             resizer,
             hearbeat_tick,
             helper_actors,
+            state: None,
         }
     }
 
@@ -271,6 +277,12 @@ impl Children {
     {
         trace!("Children({}): Setting exec closure.", self.id());
         self.init = Init::new(init);
+        self
+    }
+
+    pub fn with_state(mut self, state: Arc<Mutex<Box<dyn State>>>) -> Self {
+        trace!("Children({}): Setting state.", self.id());
+        self.state = Some(state);
         self
     }
 
@@ -618,12 +630,14 @@ impl Children {
 
         let state = Arc::new(Box::pin(ContextState::new()));
 
-        let ctx = BastionContext::new(
+        let cloned = self.state.as_ref().map(|state| Arc::clone(&state));
+        let ctx = BastionContext::with_shared_state(
             id.clone(),
             child_ref.clone(),
             children,
             supervisor,
             state.clone(),
+            cloned,
         );
         let exec = (self.init.0)(ctx);
 
@@ -891,13 +905,15 @@ impl Children {
         self.init_data_for_scaling(&mut state);
 
         let state = Arc::new(Box::pin(state));
+        let cloned = self.state.as_ref().map(|state| Arc::clone(&state));
 
-        let ctx = BastionContext::new(
+        let ctx = BastionContext::with_shared_state(
             id.clone(),
             child_ref.clone(),
             children,
             supervisor,
             state.clone(),
+            cloned,
         );
         let exec = (self.init.0)(ctx);
 

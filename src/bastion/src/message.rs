@@ -291,7 +291,7 @@ impl Msg {
 
     #[doc(hidden)]
     pub fn take_sender(&mut self) -> Option<AnswerSender> {
-        debug!("{:?}: Taking sender.", self);
+        trace!("{:?}: Taking sender.", self);
         if let MsgInner::Ask { sender, .. } = &mut self.0 {
             sender.take()
         } else {
@@ -313,6 +313,7 @@ impl Msg {
         trace!("{:?}: Downcasting to {}.", self, type_name::<M>());
         match self.0 {
             MsgInner::Tell(msg) => {
+                // tracing::error!("{:?}",msg);
                 if msg.is::<M>() {
                     let msg: Box<dyn Any + 'static> = msg;
                     Ok(*msg.downcast().unwrap())
