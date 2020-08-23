@@ -382,20 +382,9 @@ impl GlobalDispatcher {
         target: BroadcastTarget,
         message: SignedMessage,
     ) -> Result<usize, ()> {
-        let target_dispatcher = if let BroadcastTarget::Group(name) = target {
-            self.dispatchers.get(&name.into())
-        } else {
-            self.dispatchers
-                .iter()
-                .map(|pair| pair.0.into())
-                .filter_map(|dispatcher_type: DispatcherType| {
-                    self.dispatchers.get(&dispatcher_type.name().into())
-                })
-                .collect::<Vec<_>>()
-                .first().map(|d| Arc::clone(&d))
-        };
+        let target_dispatchers = self.get_dispatchers(target);
 
-        if let Some(dispatcher) = target_dispatcher {
+        if let Some(dispatcher) = target_dispatchers.first() {
             (**dispatcher).notify_one(message);
             Ok(1)
         } else {
@@ -411,22 +400,7 @@ impl GlobalDispatcher {
         target: BroadcastTarget,
         message: Arc<SignedMessage>,
     ) -> Result<usize, ()> {
-        let target_dispatchers = if let BroadcastTarget::Group(name) = target {
-            self.dispatchers
-                .get(&name.into())
-                .as_ref()
-                .map(|dispatcher| vec![Arc::clone(&dispatcher)])
-                .or_else(|| Some(Vec::new()))
-                .unwrap()
-        } else {
-            self.dispatchers
-                .iter()
-                .map(|pair| pair.0.into())
-                .filter_map(|dispatcher_type: DispatcherType| {
-                    self.dispatchers.get(&dispatcher_type.name().into())
-                })
-                .collect::<Vec<_>>()
-        };
+        let target_dispatchers = self.get_dispatchers(target);
 
         if target_dispatchers.is_empty() {
             error!("The message can't be broadcasted.  No available dispatchers.");
@@ -441,6 +415,24 @@ impl GlobalDispatcher {
         }
     }
 
+    fn get_dispatchers(&self, target: BroadcastTarget) -> Vec<Arc<Box<Dispatcher>>> {
+        if let BroadcastTarget::Group(name) = target {
+            self.dispatchers
+                .get(&name.into())
+                .as_ref()
+                .map(|dispatcher| vec![Arc::clone(&dispatcher)])
+                .or_else(|| Some(Vec::new()))
+                .unwrap()
+        } else {
+            self.dispatchers
+                .iter()
+                .map(|pair| pair.0.into())
+                .filter_map(|dispatcher_type: DispatcherType| {
+                    self.dispatchers.get(&dispatcher_type.name().into())
+                })
+                .collect::<Vec<_>>()
+        }
+    }
     /// Asks the given message to the first recipient of the specified target.
     pub(crate) fn ask_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
         let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
