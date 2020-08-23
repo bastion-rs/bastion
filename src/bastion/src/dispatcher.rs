@@ -12,7 +12,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::{debug, trace, warn, error};
+use tracing::{debug, error, trace, warn};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -207,6 +207,18 @@ impl Dispatcher {
     pub fn broadcast_message(&self, message: &Arc<SignedMessage>) {
         self.handler.broadcast_message(&self.actors, &message);
     }
+
+    /// Gives the message to one of the dispatchers
+    /// according to the specified target.
+    pub fn notify_one(&self, message: SignedMessage) -> Result<usize, ()> {
+        todo!();
+    }
+
+    /// Gives the message to all of the dispatchers
+    /// according to the specified target.
+    pub fn notify_all(&self, message: Arc<SignedMessage>) -> Result<usize, ()> {
+        todo!();
+    }
 }
 
 impl Debug for Dispatcher {
@@ -373,16 +385,21 @@ impl GlobalDispatcher {
         let target_dispatcher = if let BroadcastTarget::Group(name) = target {
             self.dispatchers.get(&name.into())
         } else {
-            self.dispatchers.iter().map(|pair| pair.0.name().into()).collect::<Vec<_>>().first()
+            self.dispatchers
+                .iter()
+                .map(|pair| pair.0.into())
+                .filter_map(|dispatcher_type: DispatcherType| {
+                    self.dispatchers.get(&dispatcher_type.name().into())
+                })
+                .collect::<Vec<_>>()
+                .first().map(|d| Arc::clone(&d))
         };
 
         if let Some(dispatcher) = target_dispatcher {
-            dispatcher.notify_one(message);
+            (**dispatcher).notify_one(message);
             Ok(1)
         } else {
-            error!(
-                "The message can't be delivered. No available dispatcher."
-            );
+            error!("The message can't be delivered. No available dispatcher.");
             Err(())
         }
     }
@@ -395,25 +412,32 @@ impl GlobalDispatcher {
         message: Arc<SignedMessage>,
     ) -> Result<usize, ()> {
         let target_dispatchers = if let BroadcastTarget::Group(name) = target {
-            self.dispatchers.get(&name.into())
+            self.dispatchers
+                .get(&name.into())
+                .as_ref()
+                .map(|dispatcher| vec![Arc::clone(&dispatcher)])
+                .or_else(|| Some(Vec::new()))
+                .unwrap()
         } else {
-            self.dispatchers.iter().map(|pair| pair.0.name().into())
-        }
-        .filter(|dispatcher| self.dispatchers.get(dispatcher).is_some())
-        .collect::<Vec<_>>();
+            self.dispatchers
+                .iter()
+                .map(|pair| pair.0.into())
+                .filter_map(|dispatcher_type: DispatcherType| {
+                    self.dispatchers.get(&dispatcher_type.name().into())
+                })
+                .collect::<Vec<_>>()
+        };
 
         if target_dispatchers.is_empty() {
             error!("The message can't be broadcasted.  No available dispatchers.");
             Err(())
         } else {
             let mut recipients = 0;
-            target_dispatchers.for_each(|dispatcher| {
-                self.dispatchers.get(&target_dispatchers).map(|d| {
-                    d.broadcast_message(&message.clone());
-                    recipients += 1; // TODO: append result of new broadcast_message
-                });
+            target_dispatchers.iter().for_each(|dispatcher| {
+                dispatcher.broadcast_message(&message.clone());
+                recipients += 1; // TODO: append result of new broadcast_message
             });
-            Ok(recipients);
+            Ok(recipients)
         }
     }
 

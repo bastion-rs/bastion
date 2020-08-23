@@ -702,7 +702,7 @@ impl BastionContext {
         global_dispatcher.notify_all(target, msg);
     }
 
-    pub fn ask_one<M:Message>(&self, target: BroadcastTarget, message: M) {
+    pub fn ask_one<M: Message>(&self, target: BroadcastTarget, message: M) {
         debug!(
             "{:?}: asking one member of {:?} (message type: {})",
             self.current().path(),
@@ -719,7 +719,7 @@ impl BastionContext {
         global_dispatcher.notify_one(target, msg);
     }
 
-    pub fn ask_all<M:Message>(&self, target: BroadcastTarget, message: M) -> Result<usize, ()> {
+    pub fn ask_all<M: Message>(&self, target: BroadcastTarget, message: M) -> Result<usize, ()> {
         debug!(
             "{:?}: asking all members of {:?} (message type: {})",
             self.current().path(),
