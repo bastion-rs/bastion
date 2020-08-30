@@ -32,9 +32,9 @@ fn main() {
 
     Bastion::init();
 
-    Bastion::supervisor(input_supervisor)
+    Bastion::supervisor(response_supervisor)
         .and_then(|_| Bastion::supervisor(map_supervisor))
-        .and_then(|_| Bastion::supervisor(response_supervisor))
+        .and_then(|_| Bastion::supervisor(input_supervisor))
         .expect("Couldn't create supervisor chain.");
 
     Bastion::start();
@@ -59,7 +59,7 @@ fn response_supervisor(supervisor: Supervisor) -> Supervisor {
 fn input_group(children: Children) -> Children {
     children.with_name("input").with_redundancy(1).with_exec(
         move |ctx: BastionContext| async move {
-            println!("[Input] Worker started!");
+            tracing::info!("[Input] Worker started!");
 
             let data = vec!["A B C", "A C C", "B C C"];
             let group_name = "Processing".to_string();
@@ -87,7 +87,7 @@ fn process_group(children: Children) -> Children {
             Dispatcher::with_type(DispatcherType::Named("Processing".to_string())),
         )
         .with_exec(move |ctx: BastionContext| async move {
-            println!("[Processing] Worker started!");
+            tracing::info!("[Processing] Worker started!");
 
             msg! { ctx.recv().await?,
                 // We received the message from other actor wrapped in Arc<T>
@@ -135,7 +135,7 @@ fn response_group(children: Children) -> Children {
         )
         .with_exec(move |ctx: BastionContext| {
             async move {
-                println!("[Response] Worker started!");
+                tracing::info!("[Response] Worker started!");
 
                 let mut received_messages = 0;
                 let expected_messages = 3;
