@@ -110,7 +110,7 @@ pub struct Children {
     helper_actors: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
     // Shared state between the children.
     // can be retrieved from a bastioncontext.
-    state: Option<Arc<Mutex<Box<dyn State>>>>,
+    state: Option<ProcState>,
 }
 
 impl Children {
@@ -280,7 +280,7 @@ impl Children {
         self
     }
 
-    pub fn with_state(mut self, state: Arc<Mutex<Box<dyn State>>>) -> Self {
+    pub fn with_state(mut self, state: ProcState) -> Self {
         trace!("Children({}): Setting state.", self.id());
         self.state = Some(state);
         self

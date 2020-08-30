@@ -16,7 +16,7 @@ use futures::FutureExt;
 use futures_timer::Delay;
 #[cfg(feature = "scaling")]
 use lever::table::lotable::LOTable;
-use lightproc::proc_state::{EmptyState, State};
+use lightproc::proc_state::{EmptyState, ProcState, State};
 use std::fmt::{self, Display, Formatter};
 use std::pin::Pin;
 #[cfg(feature = "scaling")]
@@ -111,7 +111,7 @@ pub struct BastionContext {
     children: ChildrenRef,
     supervisor: Option<SupervisorRef>,
     state: Arc<Pin<Box<ContextState>>>,
-    shared_state: Option<Arc<Mutex<Box<dyn State>>>>,
+    shared_state: Option<ProcState>,
 }
 
 #[derive(Debug)]
@@ -138,7 +138,7 @@ impl BastionContext {
         children: ChildrenRef,
         supervisor: Option<SupervisorRef>,
         state: Arc<Pin<Box<ContextState>>>,
-        shared_state: Option<Arc<Mutex<Box<dyn State>>>>,
+        shared_state: Option<ProcState>,
     ) -> Self {
         debug!("BastionContext({}): Creating.", id);
         BastionContext {
@@ -147,7 +147,7 @@ impl BastionContext {
             children,
             supervisor,
             state,
-            shared_state: shared_state,
+            shared_state,
         }
     }
     pub(crate) fn new(
@@ -160,9 +160,34 @@ impl BastionContext {
         Self::with_shared_state(id, child, children, supervisor, state, None)
     }
 
-    pub fn state(&self) -> Option<&Arc<Mutex<Box<dyn State>>>> {
-        self.shared_state.as_ref()
+    pub async fn with_state<S>(&self, mut f: impl FnMut(&S)) -> Result<(), ()>
+    where
+        S: State,
+    {
+        let id = &self.id;
+        if let Some(state) = self.shared_state.as_ref() {
+            let mut locked = state.lock().unwrap();
+            let dyn_state = locked.as_any();
+            let state = dyn_state.downcast_ref::<S>().unwrap();
+
+            // .ok_or_else(|| {
+            //     error!(
+            //         "BastionContext({}):'Couldn't downcast state - type missmatch",
+            //         id
+            //     )
+            // });
+
+            f(state);
+            Ok(())
+        } else {
+            error!("BastionContext({}):'No state available", id);
+            Err(())
+        }
     }
+
+    // pub fn state(&self) -> Option<&Arc<Mutex<Box<dyn State>>>> {
+    //     self.shared_state.as_ref()
+    // }
 
     /// Returns a [`ChildRef`] referencing the children group's
     /// element that is linked to this `BastionContext`.
@@ -667,7 +692,7 @@ impl BastionContext {
     }
 
     /// Sends a message (unicast) to a recipient among the target.
-    pub fn notify_one<M: Message>(&self, target: BroadcastTarget, message: M) {
+    pub fn tell_one<M: Message>(&self, target: BroadcastTarget, message: M) {
         debug!(
             "{:?}: notifying one member of {:?} (message type: {})",
             self.current().path(),
@@ -681,7 +706,25 @@ impl BastionContext {
         };
 
         let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.notify_one(target, msg);
+        global_dispatcher.tell_one(target, msg);
+    }
+
+    /// Sends a message (unicast) to a recipient among the target.
+    pub fn tell_all<M: Message>(&self, target: BroadcastTarget, message: M) {
+        debug!(
+            "{:?}: notifying one member of {:?} (message type: {})",
+            self.current().path(),
+            target,
+            std::any::type_name::<M>(),
+        );
+
+        let msg = Arc::new(SignedMessage {
+            msg: Msg::tell(message),
+            sign: self.signature(),
+        });
+
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.tell_all(target, msg);
     }
 
     /// Sends a message (unicast) to a recipient among the target.
@@ -716,7 +759,7 @@ impl BastionContext {
         };
 
         let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.notify_one(target, msg);
+        global_dispatcher.tell_one(target, msg);
     }
 
     pub fn ask_all<M: Message>(&self, target: BroadcastTarget, message: M) -> Result<usize, ()> {

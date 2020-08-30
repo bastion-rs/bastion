@@ -102,7 +102,63 @@ impl DispatcherHandler for RoundRobinHandler {
             self.index.store(current_index + 1, Ordering::SeqCst);
         };
     }
+
+    fn tell_one(&self, entries: &DispatcherMap, message: SignedMessage) -> Result<usize, ()> {
+        let entries = entries
+            .iter()
+            .filter(|entry| entry.0.is_public())
+            .collect::<Vec<_>>();
+
+        if entries.is_empty() {
+            warn!("no public children to broadcast message to");
+            return Ok(0);
+        }
+        let current_index = self.index.load(Ordering::SeqCst) % entries.len();
+
+        if let Some(entry) = entries.get(current_index) {
+            trace!(
+                "sending message to child {}/{} - {}",
+                current_index + 1,
+                entries.len(),
+                entry.0.path()
+            );
+            if let Ok(_) = entry.0.tell_anonymously(message) {
+                self.index.store(current_index + 1, Ordering::SeqCst);
+                Ok(1)
+            } else {
+                trace!("couldn't send message to child");
+                Err(())
+            }
+        } else {
+            warn!(
+                "no public child with index {} to broadcast message to",
+                current_index
+            );
+            Ok(0)
+        }
+    }
+
+    fn tell_all(&self, entries: &DispatcherMap, message: Arc<SignedMessage>) -> Result<usize, ()> {
+        let entries = entries
+            .iter()
+            .filter(|entry| entry.0.is_public())
+            .collect::<Vec<_>>();
+
+        if entries.is_empty() {
+            debug!("no public children to broadcast message to");
+            return Ok(0);
+        }
+
+        trace!("broadcasting message to {} children", entries.len(),);
+
+        entries.iter().for_each(|entry| {
+            entry.0.tell_anonymously(message.clone()).unwrap();
+        });
+
+        Ok(entries.len())
+    }
 }
+
 /// Generic trait which any custom dispatcher handler must implement for
 /// the further usage by the `Dispatcher` instances.
 pub trait DispatcherHandler {
@@ -115,6 +171,10 @@ pub trait DispatcherHandler {
     );
     /// Broadcasts the message to actors in according to the implemented behaviour.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>);
+    /// Sends the message to one actor in a group.
+    fn tell_one(&self, entries: &DispatcherMap, message: SignedMessage) -> Result<usize, ()>;
+    /// Sends the message to all actors in a group.
+    fn tell_all(&self, entries: &DispatcherMap, message: impl SignedMessage + Clone) -> Result<usize, ()>;
 }
 
 /// A generic implementation of the Bastion dispatcher
@@ -210,14 +270,14 @@ impl Dispatcher {
 
     /// Gives the message to one of the dispatchers
     /// according to the specified target.
-    pub fn notify_one(&self, message: SignedMessage) -> Result<usize, ()> {
-        todo!();
+    pub fn tell_one(&self, message: SignedMessage) -> Result<usize, ()> {
+        self.handler.tell_one(&self.actors, message)
     }
 
     /// Gives the message to all of the dispatchers
     /// according to the specified target.
-    pub fn notify_all(&self, message: Arc<SignedMessage>) -> Result<usize, ()> {
-        todo!();
+    pub fn tell_all(&self, message: Arc<SignedMessage>) -> Result<usize, ()> {
+        self.handler.tell_all(&self.actors, message)
     }
 }
 
@@ -377,7 +437,7 @@ impl GlobalDispatcher {
 
     /// Gives the message to one of the dispatchers
     /// according to the specified target.
-    pub(crate) fn notify_one(
+    pub(crate) fn tell_one(
         &self,
         target: BroadcastTarget,
         message: SignedMessage,
@@ -385,12 +445,29 @@ impl GlobalDispatcher {
         let target_dispatchers = self.get_dispatchers(target);
 
         if let Some(dispatcher) = target_dispatchers.first() {
-            (**dispatcher).notify_one(message);
+            (**dispatcher).tell_one(message);
             Ok(1)
         } else {
             error!("The message can't be delivered. No available dispatcher.");
             Err(())
         }
+    }
+
+    /// Gives the message to one of the dispatchers
+    /// according to the specified target.
+    pub(crate) fn tell_all(
+        &self,
+        target: BroadcastTarget,
+        message: Arc<SignedMessage>,
+    ) -> Result<usize, ()> {
+        let target_dispatchers = self.get_dispatchers(target);
+
+        let mut recipients = 0;
+        for dispatcher in target_dispatchers {
+            recipients += (**dispatcher).tell_all(message.clone())?;
+        }
+
+        Ok(recipients)
     }
 
     /// Gives the message to all of the dispatchers
