@@ -1,9 +1,9 @@
 use super::mailbox::*;
+use crate::actor::state_codes::ActorState;
 use crate::message::*;
 use crate::routing::path::*;
-use std::sync::Arc;
 use lever::sync::atomics::AtomicBox;
-use crate::actor::state_codes::ActorState;
+use std::sync::Arc;
 
 pub struct ActorCell {}
 
@@ -17,7 +17,7 @@ where
     mailbox: MailboxTx<T>,
 
     /// State of the actor
-    state: Arc<AtomicBox<ActorState>>
+    state: Arc<AtomicBox<ActorState>>,
 }
 
 impl<T> ActorStateData<T>

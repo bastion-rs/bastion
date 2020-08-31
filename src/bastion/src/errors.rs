@@ -1,7 +1,7 @@
+
+
 use std::result;
 use std::time::Duration;
-use crate::envelope::Envelope;
-use crate::message::TypedMessage;
 
 pub type Result<T> = result::Result<T, BError>;
 
@@ -9,7 +9,7 @@ pub type Result<T> = result::Result<T, BError>;
 pub enum BError {
     Receive(ReceiveError),
     ChanSend(String),
-    ChanRecv(String)
+    ChanRecv(String),
 }
 
 #[derive(Debug)]

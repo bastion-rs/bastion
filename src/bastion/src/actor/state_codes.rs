@@ -5,7 +5,7 @@ pub(crate) enum MailboxState {
     /// Message has been sent to destination
     Sent,
     /// Ack has currently been awaited
-    Awaiting
+    Awaiting,
 }
 
 #[derive(PartialEq, PartialOrd)]
@@ -22,5 +22,5 @@ pub(crate) enum ActorState {
     /// Answer is awaited currently.
     Awaiting,
     /// State representing removing the actors from the cluster, unregistering from dispatchers, and started to hit their etc.
-    Deinit
+    Deinit,
 }

@@ -1,13 +1,13 @@
 use crate::actor::actor_ref::ActorRef;
-use crate::message::TypedMessage;
-use async_channel::{Receiver, Sender};
-use std::collections::VecDeque;
-use std::fmt::{self, Debug, Formatter};
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
-use std::sync::Arc;
-use lever::sync::atomics::AtomicBox;
 use crate::actor::state_codes::*;
 use crate::errors::*;
+use crate::message::TypedMessage;
+use async_channel::{Receiver, Sender};
+use lever::sync::atomics::AtomicBox;
+
+use std::fmt::{self, Debug, Formatter};
+use std::sync::atomic::{AtomicBool};
+use std::sync::Arc;
 
 pub struct MailboxInner<T>
 where
@@ -18,12 +18,12 @@ where
     /// System guardian receiver
     sys_rx: Receiver<Envelope<T>>,
     /// Mailbox state machine
-    state: Arc<AtomicBox<MailboxState>>
+    state: Arc<AtomicBox<MailboxState>>,
 }
 
 impl<T> MailboxInner<T>
 where
-    T: TypedMessage
+    T: TypedMessage,
 {
     /// User messages receiver channel
     fn user_rx(&self) -> &Receiver<Envelope<T>> {
@@ -56,10 +56,11 @@ unsafe impl<T> Sync for MailboxTx<T> where T: TypedMessage {}
 
 impl<T> MailboxTx<T>
 where
-    T: TypedMessage
+    T: TypedMessage,
 {
     pub fn try_send(&self, msg: Envelope<T>) -> Result<()> {
-        self.tx.try_send(msg)
+        self.tx
+            .try_send(msg)
             .map_err(|e| BError::ChanSend(e.to_string()))
     }
 }
@@ -69,7 +70,7 @@ pub struct Mailbox<T>
 where
     T: TypedMessage,
 {
-    inner: Arc<MailboxInner<T>>
+    inner: Arc<MailboxInner<T>>,
 }
 
 impl<T> Mailbox<T>
@@ -83,27 +84,37 @@ where
 
     /// Forced receive message from user queue
     pub async fn recv(&self) -> Envelope<T> {
-        self.inner.user_rx().recv().await
+        self.inner
+            .user_rx()
+            .recv()
+            .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
             .unwrap()
     }
 
     /// Try receiving message from user queue
     pub async fn try_recv(&self) -> Result<Envelope<T>> {
-        self.inner.user_rx().try_recv()
+        self.inner
+            .user_rx()
+            .try_recv()
             .map_err(|e| BError::ChanRecv(e.to_string()))
     }
 
     /// Forced receive message from user queue
     pub async fn sys_recv(&self) -> Envelope<T> {
-        self.inner.sys_rx().recv().await
+        self.inner
+            .sys_rx()
+            .recv()
+            .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
             .unwrap()
     }
 
     /// Try receiving message from user queue
     pub async fn try_sys_recv(&self) -> Result<Envelope<T>> {
-        self.inner.sys_rx().try_recv()
+        self.inner
+            .sys_rx()
+            .try_recv()
             .map_err(|e| BError::ChanRecv(e.to_string()))
     }
 
