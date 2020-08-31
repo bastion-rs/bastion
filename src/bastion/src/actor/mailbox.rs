@@ -6,7 +6,7 @@ use async_channel::{Receiver, Sender};
 use lever::sync::atomics::AtomicBox;
 
 use std::fmt::{self, Debug, Formatter};
-use std::sync::atomic::{AtomicBool};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub struct MailboxInner<T>
@@ -144,6 +144,14 @@ where
 
     pub(crate) fn is_awaiting(&self) -> bool {
         *self.inner.state().get() == MailboxState::Awaiting
+    }
+
+    pub(crate) fn set_retrieved(&self) {
+        self.inner.state().replace_with(|_| MailboxState::Retrieved);
+    }
+
+    pub(crate) fn is_retrieved(&self) -> bool {
+        *self.inner.state().get() == MailboxState::Retrieved
     }
 }
 
