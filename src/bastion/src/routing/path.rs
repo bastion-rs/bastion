@@ -10,14 +10,14 @@ use uuid::Uuid;
 /// message distribution.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ActorPath {
-    // Node name in the cluster.
+    /// Node name in the cluster.
     node_name: String,
-    // Defines actors in the local or the remote node.
+    /// Defines actors in the local or the remote node.
     node_type: ActorNodeType,
-    // Defines actors in the top-level namespace.
+    /// Defines actors in the top-level namespace.
     scope: ActorScope,
-    // A unique identifier of the actor.
-    id: String,
+    /// A unique name of the actor or namespace
+    name: String,
 }
 
 /// A part of path that defines remote or local machine
@@ -56,13 +56,13 @@ impl ActorPath {
         node_name: &str,
         node_type: ActorNodeType,
         scope: ActorScope,
-        id: &str,
+        name: &str,
     ) -> Self {
         ActorPath {
             node_name: node_name.to_string(),
             node_type,
             scope,
-            id: id.to_string(),
+            name: name.to_string(),
         }
     }
 
@@ -85,8 +85,8 @@ impl ActorPath {
     }
 
     /// Replaces the existing actor name onto the new one.
-    pub fn name(mut self, id: &str) -> Self {
-        self.id = id.to_string();
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = name.to_string();
         self
     }
 
@@ -114,7 +114,7 @@ impl ActorPath {
     }
 
     /// Method for checking that path is addressing to dead letter scope
-    pub fn is_deadletter_scope(&self) -> bool {
+    pub fn is_dead_letter_scope(&self) -> bool {
         self.scope == ActorScope::DeadLetter
     }
 
@@ -137,7 +137,7 @@ impl ToString for ActorPath {
         let scope = self.scope.as_str();
         format!(
             "bastion://{}{}/{}/{}",
-            self.node_name, node_type, scope, self.id
+            self.node_name, node_type, scope, self.name
         )
     }
 }
@@ -194,7 +194,7 @@ mod actor_path_tests {
     }
 
     #[test]
-    fn construct_local_deadletter_path_group() {
+    fn construct_local_dead_letter_path_group() {
         let instance = ActorPath::default()
             .node_name("test")
             .node_type(ActorNodeType::Local)
@@ -206,7 +206,7 @@ mod actor_path_tests {
             "bastion://test/dead_letter/processing/1"
         );
         assert_eq!(instance.is_local(), true);
-        assert_eq!(instance.is_deadletter_scope(), true);
+        assert_eq!(instance.is_dead_letter_scope(), true);
     }
 
     #[test]
@@ -260,7 +260,7 @@ mod actor_path_tests {
     }
 
     #[test]
-    fn construct_remote_deadletter_path_group() {
+    fn construct_remote_dead_letter_path_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_name("test")
@@ -273,7 +273,7 @@ mod actor_path_tests {
             "bastion://test@127.0.0.1:8080/dead_letter/processing/1"
         );
         assert_eq!(instance.is_remote(), true);
-        assert_eq!(instance.is_deadletter_scope(), true);
+        assert_eq!(instance.is_dead_letter_scope(), true);
     }
 
     #[test]
@@ -318,7 +318,7 @@ mod actor_path_tests {
     }
 
     #[test]
-    fn construct_local_deadletter_path_without_group() {
+    fn construct_local_dead_letter_path_without_group() {
         let instance = ActorPath::default()
             .node_type(ActorNodeType::Local)
             .scope(ActorScope::DeadLetter)
@@ -326,7 +326,7 @@ mod actor_path_tests {
 
         assert_eq!(instance.to_string(), "bastion://node/dead_letter/1");
         assert_eq!(instance.is_local(), true);
-        assert_eq!(instance.is_deadletter_scope(), true);
+        assert_eq!(instance.is_dead_letter_scope(), true);
     }
 
     #[test]
@@ -371,7 +371,7 @@ mod actor_path_tests {
     }
 
     #[test]
-    fn construct_remote_deadletter_path_without_group() {
+    fn construct_remote_dead_letter_path_without_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_type(ActorNodeType::Remote(address))
@@ -383,7 +383,7 @@ mod actor_path_tests {
             "bastion://node@127.0.0.1:8080/dead_letter/1"
         );
         assert_eq!(instance.is_remote(), true);
-        assert_eq!(instance.is_deadletter_scope(), true);
+        assert_eq!(instance.is_dead_letter_scope(), true);
     }
 
     #[test]

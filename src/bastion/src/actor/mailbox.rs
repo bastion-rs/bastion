@@ -145,14 +145,6 @@ where
     pub(crate) fn is_awaiting(&self) -> bool {
         *self.inner.state().get() == MailboxState::Awaiting
     }
-
-    pub(crate) fn set_retrieved(&self) {
-        self.inner.state().replace_with(|_| MailboxState::Retrieved);
-    }
-
-    pub(crate) fn is_retrieved(&self) -> bool {
-        *self.inner.state().get() == MailboxState::Retrieved
-    }
 }
 
 /// Struct that represents an incoming message in the actor's mailbox.
