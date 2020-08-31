@@ -108,7 +108,7 @@ where
     }
 
     //////////////////////
-    ///// State machine
+    ///// Mailbox state machine
     //////////////////////
 
     pub(crate) fn set_scheduled(&self) {
