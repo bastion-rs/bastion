@@ -2,13 +2,14 @@ use super::mailbox::*;
 use crate::message::*;
 use crate::routing::path::*;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU16, Ordering};
+use lever::sync::atomics::AtomicBox;
+use crate::actor::state_codes::ActorState;
 
 pub struct ActorCell {}
 
 ///
-/// State of the actor
-pub struct ActorState<T>
+/// State data of the actor
+pub struct ActorStateData<T>
 where
     T: TypedMessage,
 {
@@ -16,10 +17,10 @@ where
     mailbox: MailboxTx<T>,
 
     /// State of the actor
-    state: Arc<AtomicU16>
+    state: Arc<AtomicBox<ActorState>>
 }
 
-impl<T> ActorState<T>
+impl<T> ActorStateData<T>
 where
     T: TypedMessage,
 {
