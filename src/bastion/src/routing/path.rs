@@ -86,7 +86,7 @@ impl ActorPath {
 
     /// Replaces the existing actor name onto the new one.
     pub fn name(mut self, name: &str) -> Self {
-        self.name = name.to_string();
+        self.name = name.trim_start_matches("/").to_string();
         self
     }
 
@@ -127,7 +127,7 @@ impl ActorPath {
 impl Default for ActorPath {
     fn default() -> Self {
         let unique_id = Uuid::new_v4().to_string();
-        ActorPath::new("node", ActorNodeType::Local, ActorScope::System, &unique_id)
+        ActorPath::new("node", ActorNodeType::Local, ActorScope::User, &unique_id)
     }
 }
 
