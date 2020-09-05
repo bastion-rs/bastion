@@ -77,11 +77,43 @@ where
         *self.state.get() == ActorState::Awaiting
     }
 
+    pub(crate) fn set_stopped(&self) {
+        self.state.replace_with(|_| ActorState::Stopped);
+    }
+
+    pub(crate) fn is_stopped(&self) -> bool {
+        *self.state.get() == ActorState::Stopped
+    }
+
+    pub(crate) fn set_terminated(&self) {
+        self.state.replace_with(|_| ActorState::Terminated);
+    }
+
+    pub(crate) fn is_terminated(&self) -> bool {
+        *self.state.get() == ActorState::Terminated
+    }
+
+    pub(crate) fn set_failed(&self) {
+        self.state.replace_with(|_| ActorState::Failed);
+    }
+
+    pub(crate) fn is_failed(&self) -> bool {
+        *self.state.get() == ActorState::Failed
+    }
+
     pub(crate) fn set_deinit(&self) {
         self.state.replace_with(|_| ActorState::Deinit);
     }
 
     pub(crate) fn is_deinit(&self) -> bool {
         *self.state.get() == ActorState::Deinit
+    }
+
+    pub(crate) fn set_finished(&self) {
+        self.state.replace_with(|_| ActorState::Finished);
+    }
+
+    pub(crate) fn is_finished(&self) -> bool {
+        *self.state.get() == ActorState::Finished
     }
 }
