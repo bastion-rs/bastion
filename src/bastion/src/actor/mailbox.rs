@@ -14,7 +14,11 @@ pub struct MailboxTx<T>
 where
     T: TypedMessage,
 {
+    /// Indicated the transmitter part of the actor's channel
+    /// which is using for passing messages.
     tx: Sender<Envelope<T>>,
+    /// A field for checks that the message has been delivered to
+    /// the specific actor.
     scheduled: Arc<AtomicBool>,
 }
 
@@ -22,11 +26,13 @@ impl<T> MailboxTx<T>
 where
     T: TypedMessage,
 {
+    /// Return a new instance of MailboxTx that indicates sender.
     pub(crate) fn new(tx: Sender<Envelope<T>>) -> Self {
         let scheduled = Arc::new(AtomicBool::new(false));
         MailboxTx { tx, scheduled }
     }
 
+    /// Send the message to the actor by the channel.
     pub fn try_send(&self, msg: Envelope<T>) -> Result<()> {
         self.tx
             .try_send(msg)
@@ -34,6 +40,10 @@ where
     }
 }
 
+/// A struct that holds everything related to messages that can be
+/// retrieved from other actors. Each actor holds two queues: one for
+/// messages that come from user-defined actors, and another for
+/// internal messaging that must be handled separately.
 #[derive(Clone)]
 pub struct Mailbox<T>
 where
@@ -49,6 +59,8 @@ where
     state: Arc<AtomicBox<MailboxState>>,
 }
 
+// TODO: Add methods for acking messages
+// TODO: Always return a copy of the message. After being acked - remove from the queue
 impl<T> Mailbox<T>
 where
     T: TypedMessage,
@@ -203,3 +215,5 @@ where
             .finish()
     }
 }
+
+// TODO: Add tests
