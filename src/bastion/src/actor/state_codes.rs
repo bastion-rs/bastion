@@ -27,13 +27,16 @@ pub(crate) enum MailboxState {
 /// The whole state machine of the actor can be represented by
 /// the following schema:
 ///
-///                            +---> Stopped -----+
-///                            |                  |
-///                            |                  |
-/// Init -> Sync -> Scheduled -+---> Terminated --+---> Deinit -> Finished
-///                  ↑     |   |                  |
-///                  |     ↓   |                  |
-///                 Awaiting   +---> Finished ----+
+///                            +---> Stopped ----+
+///                            |                 |
+///                            |                 |
+/// Init -> Sync -> Scheduled -+---> Terminated -+---> Deinit -> Removed
+///                  ↑     |   |                 |
+///                  |     ↓   |                 |
+///                 Awaiting   +---> Failed -----+
+///                            |                 |
+///                            |                 |
+///                            +---> Finished ---+
 ///
 pub(crate) enum ActorState {
     /// The first state for actors. This state is the initial point
@@ -59,15 +62,17 @@ pub(crate) enum ActorState {
     Stopped,
     /// Actor has been terminated by the system or a user's call.
     Terminated,
-    /// Actor stopped doing any useful work because of raised a panic
-    /// during the execution.
+    /// Actor stopped doing any useful work because of a raised panic
+    /// or user's error during the execution.
     Failed,
+    /// Actor has completed an execution with the success.
+    Finished,
     /// The deinitialization state for the actor. During this stage the actor
     /// must unregister itself from the node, used dispatchers and any other
     /// parts where was initialized in the beginning. Can contain an additional
     /// user logic before being removed from the cluster.
     Deinit,
-    /// The final state of the actor. The finished actor can be removed
+    /// The final state of the actor. The actor can be removed
     /// gracefully from the node, because is not available anymore.
-    Finished,
+    Removed,
 }
