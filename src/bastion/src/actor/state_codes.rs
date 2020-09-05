@@ -62,7 +62,7 @@ pub(crate) enum ActorState {
     Stopped,
     /// Actor has been terminated by the system or a user's call.
     Terminated,
-    /// Actor stopped doing any useful work because of a raised panic
+    /// Actor has stopped doing any useful work because of a raised panic
     /// or user's error during the execution.
     Failed,
     /// Actor has completed an execution with the success.
