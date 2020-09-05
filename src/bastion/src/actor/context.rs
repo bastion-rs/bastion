@@ -5,32 +5,45 @@ use crate::routing::path::*;
 use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
 
-pub struct ActorCell {}
-
+/// A structure that defines actor's state, mailbox with  
+/// messages and a local storage for user's data.
 ///
-/// State data of the actor
-pub struct ActorStateData<T>
+/// Each actor in Bastion has an attached context which
+/// helps to understand what is the type of actor has been
+/// launched in the system, its path, current execution state
+/// and various data that can be attached to it.
+pub struct Context<T>
 where
     T: TypedMessage,
 {
+    /// Path to the actor in the system
+    path: ActorPath,
     /// Mailbox of the actor
     mailbox: MailboxTx<T>,
-
-    /// State of the actor
+    /// Current execution state of the actor
     state: Arc<AtomicBox<ActorState>>,
 }
 
-impl<T> ActorStateData<T>
+impl<T> Context<T>
 where
     T: TypedMessage,
 {
-    pub(crate) fn new(_path: ActorPath) -> Self {
-        todo!()
+    pub(crate) fn new(path: ActorPath) -> Self {
+        let mailbox = MailboxTx: new();
+        let state = Arc::new(AtomicBox::new(ActorState::Init));
+
+        Context {
+            path,
+            mailbox,
+            state,
+        }
     }
 
-    //////////////////////
-    ///// Actor state machine
-    //////////////////////
+    // Actor state machine.
+    //
+    // For more information about the actor's state machine
+    // see the actor/state_codes.rs module.
+    //
 
     pub(crate) fn set_init(&self) {
         self.state.replace_with(|_| ActorState::Init);
