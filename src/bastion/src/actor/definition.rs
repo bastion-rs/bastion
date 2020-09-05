@@ -1,12 +1,14 @@
 use crate::actor::traits::Actor;
 use crate::routing::path::ActorPath;
+use std::fmt::{self, Debug, Formatter};
+use std::sync::Arc;
 
 /// A structure that holds configuration of the Bastion actor.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Definition {
     /// The certain implementation of the Bastion actor that
     /// needs to be spawned.
-    implementation: Box<dyn Actor>,
+    implementation: Arc<Box<dyn Actor>>,
     /// Defines actors that must be spawned in the hierarchy
     /// in the beginning of the actor's lifetime. The further
     /// amount of children may vary in runtime a won't be
@@ -18,26 +20,20 @@ pub struct Definition {
 
 impl Definition {
     /// Returns a new Definition instance.
-    pub fn new(implementation: impl Actor) -> Self {
+    pub fn new(implementation: impl Actor + 'static) -> Self {
         let children = Vec::new();
         let path = ActorPath::default();
 
         Definition {
-            implementation: Box::new(implementation),
+            implementation: Arc::new(Box::new(implementation)),
             children,
             path,
         }
     }
 
-    /// Append a single actor definition to the children list.
-    pub fn with_actor(mut self, definition: Definition) -> self {
+    /// Adds a single definition to the children list.
+    pub fn with_parent_for(mut self, definition: Definition) -> Self {
         self.children.push(definition);
-        self
-    }
-
-    /// Adds a list of actors to the children list.
-    pub fn with_actors(mut self, actors: Vec<Definition>) -> self {
-        self.children.extend(actors);
         self
     }
 
@@ -47,3 +43,14 @@ impl Definition {
         self
     }
 }
+
+impl Debug for Definition {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        fmt.debug_struct("Definition")
+            .field("children", &self.children)
+            .field("path", &self.path)
+            .finish()
+    }
+}
+
+// TODO: Add tests

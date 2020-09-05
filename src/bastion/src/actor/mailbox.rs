@@ -2,44 +2,11 @@ use crate::actor::actor_ref::ActorRef;
 use crate::actor::state_codes::*;
 use crate::errors::*;
 use crate::message::TypedMessage;
-use async_channel::{Receiver, Sender};
+use async_channel::{unbounded, Receiver, Sender};
 use lever::sync::atomics::AtomicBox;
-
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-
-pub struct MailboxInner<T>
-where
-    T: TypedMessage,
-{
-    /// User guardian receiver
-    user_rx: Receiver<Envelope<T>>,
-    /// System guardian receiver
-    sys_rx: Receiver<Envelope<T>>,
-    /// Mailbox state machine
-    state: Arc<AtomicBox<MailboxState>>,
-}
-
-impl<T> MailboxInner<T>
-where
-    T: TypedMessage,
-{
-    /// User messages receiver channel
-    fn user_rx(&self) -> &Receiver<Envelope<T>> {
-        &self.user_rx
-    }
-
-    /// System messages receiver channel
-    fn sys_rx(&self) -> &Receiver<Envelope<T>> {
-        &self.sys_rx
-    }
-
-    /// Mailbox state
-    fn state(&self) -> &Arc<AtomicBox<MailboxState>> {
-        &self.state
-    }
-}
 
 /// Struct that represents a message sender.
 #[derive(Clone)]
@@ -51,13 +18,15 @@ where
     scheduled: Arc<AtomicBool>,
 }
 
-unsafe impl<T> Send for MailboxTx<T> where T: TypedMessage {}
-unsafe impl<T> Sync for MailboxTx<T> where T: TypedMessage {}
-
 impl<T> MailboxTx<T>
 where
     T: TypedMessage,
 {
+    pub(crate) fn new(tx: Sender<Envelope<T>>) -> Self {
+        let scheduled = Arc::new(AtomicBool::new(false));
+        MailboxTx { tx, scheduled }
+    }
+
     pub fn try_send(&self, msg: Envelope<T>) -> Result<()> {
         self.tx
             .try_send(msg)
@@ -70,7 +39,14 @@ pub struct Mailbox<T>
 where
     T: TypedMessage,
 {
-    inner: Arc<MailboxInner<T>>,
+    /// User guardian sender
+    user_tx: MailboxTx<T>,
+    /// User guardian receiver
+    user_rx: Receiver<Envelope<T>>,
+    /// System guardian receiver
+    system_rx: Receiver<Envelope<T>>,
+    /// Mailbox state machine
+    state: Arc<AtomicBox<MailboxState>>,
 }
 
 impl<T> Mailbox<T>
@@ -78,14 +54,22 @@ where
     T: TypedMessage,
 {
     /// Creates a new mailbox for the actor.
-    pub fn new(inner: Arc<MailboxInner<T>>) -> Self {
-        Mailbox { inner }
+    pub(crate) fn new(system_rx: Receiver<Envelope<T>>) -> Self {
+        let (tx, user_rx) = unbounded();
+        let user_tx = MailboxTx::new(tx);
+        let state = Arc::new(AtomicBox::new(MailboxState::Scheduled));
+
+        Mailbox {
+            user_tx,
+            user_rx,
+            system_rx,
+            state,
+        }
     }
 
     /// Forced receive message from user queue
     pub async fn recv(&self) -> Envelope<T> {
-        self.inner
-            .user_rx()
+        self.user_rx
             .recv()
             .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
@@ -94,56 +78,56 @@ where
 
     /// Try receiving message from user queue
     pub async fn try_recv(&self) -> Result<Envelope<T>> {
-        self.inner
-            .user_rx()
+        self.user_rx
             .try_recv()
             .map_err(|e| BError::ChanRecv(e.to_string()))
     }
 
-    /// Forced receive message from user queue
+    /// Forced receive message from system queue
     pub async fn sys_recv(&self) -> Envelope<T> {
-        self.inner
-            .sys_rx()
+        self.system_rx
             .recv()
             .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
             .unwrap()
     }
 
-    /// Try receiving message from user queue
+    /// Try receiving message from system queue
     pub async fn try_sys_recv(&self) -> Result<Envelope<T>> {
-        self.inner
-            .sys_rx()
+        self.system_rx
             .try_recv()
             .map_err(|e| BError::ChanRecv(e.to_string()))
     }
 
-    //////////////////////
-    ///// Mailbox state machine
-    //////////////////////
+    //
+    // Mailbox state machine
+    //
+    // For more information about the actor's state machine
+    // see the actor/state_codes.rs module.
+    //
 
     pub(crate) fn set_scheduled(&self) {
-        self.inner.state().replace_with(|_| MailboxState::Scheduled);
+        self.state.replace_with(|_| MailboxState::Scheduled);
     }
 
     pub(crate) fn is_scheduled(&self) -> bool {
-        *self.inner.state().get() == MailboxState::Scheduled
+        *self.state.get() == MailboxState::Scheduled
     }
 
     pub(crate) fn set_sent(&self) {
-        self.inner.state().replace_with(|_| MailboxState::Sent);
+        self.state.replace_with(|_| MailboxState::Sent);
     }
 
     pub(crate) fn is_sent(&self) -> bool {
-        *self.inner.state().get() == MailboxState::Sent
+        *self.state.get() == MailboxState::Sent
     }
 
     pub(crate) fn set_awaiting(&self) {
-        self.inner.state().replace_with(|_| MailboxState::Awaiting);
+        self.state.replace_with(|_| MailboxState::Awaiting);
     }
 
     pub(crate) fn is_awaiting(&self) -> bool {
-        *self.inner.state().get() == MailboxState::Awaiting
+        *self.state.get() == MailboxState::Awaiting
     }
 }
 

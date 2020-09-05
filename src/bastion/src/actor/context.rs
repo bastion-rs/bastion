@@ -1,7 +1,8 @@
-use super::mailbox::*;
+use crate::actor::mailbox::Mailbox;
 use crate::actor::state_codes::ActorState;
 use crate::message::*;
 use crate::routing::path::*;
+use async_channel::unbounded;
 use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
 
@@ -19,7 +20,7 @@ where
     /// Path to the actor in the system
     path: ActorPath,
     /// Mailbox of the actor
-    mailbox: MailboxTx<T>,
+    mailbox: Mailbox<T>,
     /// Current execution state of the actor
     state: Arc<AtomicBox<ActorState>>,
 }
@@ -28,8 +29,11 @@ impl<T> Context<T>
 where
     T: TypedMessage,
 {
+    // FIXME: Pass the correct system_rx instead of the fake one
     pub(crate) fn new(path: ActorPath) -> Self {
-        let mailbox = MailboxTx: new();
+        let (_system_tx, system_rx) = unbounded();
+
+        let mailbox = Mailbox::new(system_rx);
         let state = Arc::new(AtomicBox::new(ActorState::Init));
 
         Context {
