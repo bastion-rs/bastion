@@ -5,7 +5,7 @@
 /// The whole lifecycle of the message can be described by the
 /// next schema:
 ///
-///    +------ Message processed -----+
+///    +------ Message processed ----+
 ///    ↓                             |
 /// Scheduled -> Sent -> Awaiting ---+
 ///               ↑           |   
@@ -27,23 +27,47 @@ pub(crate) enum MailboxState {
 /// The whole state machine of the actor can be represented by
 /// the following schema:
 ///
-/// Init -> Sync -> Scheduled -> Awaiting -> Deinit
-///                    ↑            |   
-///                    +------------+
+///                            +---> Stopped -----+
+///                            |                  |
+///                            |                  |
+/// Init -> Sync -> Scheduled -+---> Terminated --+---> Deinit -> Finished
+///                  ↑     |   |                  |
+///                  |     ↓   |                  |
+///                 Awaiting   +---> Finished ----+
 ///
 pub(crate) enum ActorState {
-    /// This is the first state for the actors,
-    /// right after the creation, but the actors wasn't started retrieving
-    /// messages and doing work (e.g. registering themselves in dispatchers)
+    /// The first state for actors. This state is the initial point
+    /// after being created or added to the Bastion node in runtime.
+    /// At this stage, actor isn't doing any useful job and retrieving
+    /// any messages from other parts of the cluster yet.
+    /// However, it can do some initialization steps (e.g. register itself
+    /// in dispatchers or adding the initial data to the local state),
+    /// before being available to the rest of the cluster.
     Init,
-    /// Remote or local state synchronization, this behaves like a half state
+    /// Remote or local state synchronization. this behaves like a half state
     /// to converging consensus between multiple actor states.
     Sync,
-    /// Currently scheduler is processing this actor's mailbox.
+    /// The main state in which actor can stay for indefinite amount of time.
+    /// During this state, actor doing useful work (e.g. processing the incoming
+    /// message from other actors) that doesn't require any asynchronous calls.
     Scheduled,
-    /// Answer is awaited currently.
+    /// Special kind of the scheduled state which help to understand that
+    /// actor is awaiting for other futures or response messages from other
+    /// actors in the Bastion cluster.
     Awaiting,
-    /// State representing removing the actors from the cluster, unregistering
-    /// from dispatchers, and started to hit their etc.
+    /// Actor has been stopped by the system or a user's call.
+    Stopped,
+    /// Actor has been terminated by the system or a user's call.
+    Terminated,
+    /// Actor stopped doing any useful work because of raised a panic
+    /// during the execution.
+    Failed,
+    /// The deinitialization state for the actor. During this stage the actor
+    /// must unregister itself from the node, used dispatchers and any other
+    /// parts where was initialized in the beginning. Can contain an additional
+    /// user logic before being removed from the cluster.
     Deinit,
+    /// The final state of the actor. The finished actor can be removed
+    /// gracefully from the node, because is not available anymore.
+    Finished,
 }
