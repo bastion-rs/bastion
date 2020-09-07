@@ -32,7 +32,7 @@ impl Definition {
     }
 
     /// Adds a single definition to the children list.
-    pub fn with_parent_for(mut self, definition: Definition) -> Self {
+    pub fn with_child(mut self, definition: Definition) -> Self {
         self.children.push(definition);
         self
     }
@@ -53,4 +53,41 @@ impl Debug for Definition {
     }
 }
 
-// TODO: Add tests
+#[cfg(test)]
+mod actor_path_tests {
+    use crate::actor::definition::Definition;
+    use crate::actor::traits::Actor;
+    use crate::message::Deployment::Children;
+    use crate::routing::path::ActorPath;
+
+    struct FakeParentActor;
+    impl Actor for FakeParentActor {}
+
+    struct FakeChildActor;
+    impl Actor for FakeChildActor {}
+
+    #[test]
+    fn test_default_definition_has_no_children() {
+        let definition = Definition::new(FakeChildActor);
+
+        assert_eq!(definition.children.is_empty(), true);
+    }
+
+    #[test]
+    fn test_set_custom_actor_path() {
+        let path = ActorPath::default().name("custom");
+        let definition = Definition::new(FakeChildActor).with_path(path.clone());
+
+        assert_eq!(definition.children.is_empty(), true);
+        assert_eq!(definition.path, path);
+    }
+
+    #[test]
+    fn test_add_relation_to_parent() {
+        let child_definition = Definition::new(FakeChildActor);
+        let definition = Definition::new(FakeParentActor).with_child(child_definition.clone());
+
+        assert_eq!(definition.children.is_empty(), false);
+        assert_eq!(definition.children.len(), 1);
+    }
+}
