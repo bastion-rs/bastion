@@ -44,6 +44,10 @@ where
 /// retrieved from other actors. Each actor holds two queues: one for
 /// messages that come from user-defined actors, and another for
 /// internal messaging that must be handled separately.
+///
+/// For each used queue, mailbox always holds the latest requested message
+/// by a user, to guarantee that the message won't be lost if something
+/// happens wrong.
 #[derive(Clone)]
 pub struct Mailbox<T>
 where
@@ -55,12 +59,17 @@ where
     user_rx: Receiver<Envelope<T>>,
     /// System guardian receiver
     system_rx: Receiver<Envelope<T>>,
+    /// The current processing message, received from the
+    /// latest call to the user's queue
+    latest_user_message: Option<Envelope<T>>,
+    /// The current processing message, received from the
+    /// latest call to the system's queue
+    latest_system_message: Option<Envelope<T>>,
     /// Mailbox state machine
     state: Arc<AtomicBox<MailboxState>>,
 }
 
-// TODO: Add methods for acking messages
-// TODO: Always return a copy of the message. After being acked - remove from the queue
+// TODO: Add calls with recv with timeout
 impl<T> Mailbox<T>
 where
     T: TypedMessage,
@@ -70,45 +79,81 @@ where
         let (tx, user_rx) = unbounded();
         let user_tx = MailboxTx::new(tx);
         let state = Arc::new(AtomicBox::new(MailboxState::Scheduled));
+        let latest_user_message = None;
+        let latest_system_message = None;
 
         Mailbox {
             user_tx,
             user_rx,
             system_rx,
+            latest_user_message,
+            latest_system_message,
             state,
         }
     }
 
     /// Forced receive message from user queue
-    pub async fn recv(&self) -> Envelope<T> {
-        self.user_rx
+    pub async fn recv(&mut self) -> &Envelope<T> {
+        if let Some(old_message) = &self.latest_user_message {
+            old_message.ack().await;
+        }
+
+        let message = self
+            .user_rx
             .recv()
             .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
-            .unwrap()
+            .unwrap();
+
+        self.latest_user_message = Some(message);
+        self.latest_user_message.as_ref().unwrap()
     }
 
     /// Try receiving message from user queue
-    pub async fn try_recv(&self) -> Result<Envelope<T>> {
-        self.user_rx
-            .try_recv()
-            .map_err(|e| BError::ChanRecv(e.to_string()))
+    pub async fn try_recv(&mut self) -> Result<&Envelope<T>> {
+        if self.latest_user_message.is_some() {
+            return Err(BError::UnackedMessage);
+        }
+
+        match self.user_rx.try_recv() {
+            Ok(message) => {
+                self.latest_user_message = Some(message);
+                Ok(self.latest_user_message.as_ref().unwrap())
+            }
+            Err(e) => Err(BError::ChanRecv(e.to_string())),
+        }
     }
 
     /// Forced receive message from system queue
-    pub async fn sys_recv(&self) -> Envelope<T> {
-        self.system_rx
+    pub async fn sys_recv(&mut self) -> &Envelope<T> {
+        if let Some(old_message) = &self.latest_system_message {
+            old_message.ack().await;
+        }
+
+        let message = self
+            .system_rx
             .recv()
             .await
             .map_err(|e| BError::ChanRecv(e.to_string()))
-            .unwrap()
+            .unwrap();
+
+        self.latest_system_message = Some(message);
+        self.latest_system_message.as_ref().unwrap()
     }
 
     /// Try receiving message from system queue
-    pub async fn try_sys_recv(&self) -> Result<Envelope<T>> {
-        self.system_rx
-            .try_recv()
-            .map_err(|e| BError::ChanRecv(e.to_string()))
+    pub async fn try_sys_recv(&mut self) -> Result<&Envelope<T>> {
+        if self.latest_system_message.is_some() {
+            return Err(BError::UnackedMessage);
+        }
+
+        match self.system_rx.try_recv() {
+            Ok(message) => {
+                self.latest_system_message = Some(message);
+                Ok(self.latest_system_message.as_ref().unwrap())
+            }
+            Err(e) => Err(BError::ChanRecv(e.to_string())),
+        }
     }
 
     //
