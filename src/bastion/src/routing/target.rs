@@ -1,6 +1,6 @@
 use crate::routing::ActorPath;
 use lazy_static::lazy_static;
-use regex::{escape, CaptureMatches, Captures, Regex};
+use regex::Regex;
 
 lazy_static! {
     static ref WILDCARD_REGEX: Regex = Regex::new(r"(\*/)").unwrap();
