@@ -156,6 +156,16 @@ where
         }
     }
 
+    /// Returns latest system message
+    pub async fn get_latest_user_message(&self) -> Option<&Envelope<T>> {
+        self.latest_user_message.as_ref()
+    }
+
+    /// Returns latest system message
+    pub async fn get_latest_system_message(&self) -> Option<&Envelope<T>> {
+        self.latest_system_message.as_ref()
+    }
+
     //
     // Mailbox state machine
     //
