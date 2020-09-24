@@ -1,16 +1,23 @@
 //!
 //! Pool of threads to run lightweight processes
 //!
-//! Pool management and tracking belongs here.
 //! We spawn futures onto the pool with [spawn] method of global run queue or
 //! with corresponding [Worker]'s spawn method.
-use crate::distributor::Distributor;
-use crate::run_queue::{Injector, Stealer};
-use crate::sleepers::Sleepers;
+
+use crate::thread_manager::{DynamicPoolManager, DynamicRunner};
 use crate::worker;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
-use lightproc::prelude::*;
+use lightproc::lightproc::LightProc;
+use lightproc::proc_stack::ProcStack;
+use lightproc::recoverable_handle::RecoverableHandle;
+use once_cell::sync::{Lazy, OnceCell};
 use std::future::Future;
+use std::iter::Iterator;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{env, thread};
+use tracing::trace;
 
 ///
 /// Spawn a process (which contains future + process stack) onto the executor from the global level.
@@ -42,22 +49,29 @@ where
     F: Future<Output = T> + Send + 'static,
     T: Send + 'static,
 {
-    self::get().spawn(future, stack)
+    let (task, handle) = LightProc::recoverable(future, worker::schedule, stack);
+    task.schedule();
+    handle
+}
+
+/// Spawns a blocking task.
+///
+/// The task will be spawned onto a thread pool specifically dedicated to blocking tasks.
+pub fn spawn_blocking<F, R>(future: F, stack: ProcStack) -> RecoverableHandle<R>
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+{
+    let (task, handle) = LightProc::recoverable(future, schedule, stack);
+    task.schedule();
+    handle
 }
 
 ///
-/// Pool that global run queue, stealers of the workers, and parked threads.
-#[derive(Debug)]
-pub struct Pool {
-    ///
-    /// Global run queue implementation
-    pub(crate) injector: Injector<LightProc>,
-    ///
-    /// Stealers of the workers
-    pub(crate) stealers: Vec<Stealer<LightProc>>,
-    ///
-    /// Container of parked threads
-    pub(crate) sleepers: Sleepers,
+/// Acquire the static Pool reference
+#[inline]
+pub fn get() -> &'static Pool {
+    &*POOL
 }
 
 impl Pool {
@@ -78,21 +92,96 @@ impl Pool {
     }
 }
 
-///
-/// Acquire the static Pool reference
-#[inline]
-pub fn get() -> &'static Pool {
-    lazy_static! {
-        static ref POOL: Pool = {
-            let distributor = Distributor::new();
-            let stealers = distributor.assign();
+/// Enqueues work, attempting to send to the thread pool in a
+/// nonblocking way and spinning up needed amount of threads
+/// based on the previous statistics without relying on
+/// if there is not a thread ready to accept the work or not.
+pub(crate) fn schedule(t: LightProc) {
+    if let Err(err) = POOL.sender.try_send(t) {
+        // We were not able to send to the channel without
+        // blocking.
+        POOL.sender.send(err.into_inner()).unwrap();
+    }
+    // Add up for every incoming scheduled task
+    DYNAMIC_POOL_MANAGER.get().unwrap().increment_frequency();
+}
 
-            Pool {
-                injector: Injector::new(),
-                stealers,
-                sleepers: Sleepers::new(),
-            }
+///
+/// Low watermark value, defines the bare minimum of the pool.
+/// Spawns initial thread set.
+/// Can be configurable with env var `BASTION_BLOCKING_THREADS` at runtime.
+#[inline]
+fn low_watermark() -> &'static u64 {
+    lazy_static! {
+        static ref LOW_WATERMARK: u64 = {
+            env::var_os("BASTION_BLOCKING_THREADS")
+                .map(|x| x.to_str().unwrap().parse::<u64>().unwrap())
+                .unwrap_or(DEFAULT_LOW_WATERMARK)
         };
     }
-    &*POOL
+
+    &*LOW_WATERMARK
 }
+
+/// If low watermark isn't configured this is the default scaler value.
+/// This value is used for the heuristics of the scaler
+const DEFAULT_LOW_WATERMARK: u64 = 2;
+
+/// Pool interface between the scheduler and thread pool
+#[derive(Debug)]
+pub struct Pool {
+    sender: Sender<LightProc>,
+    receiver: Receiver<LightProc>,
+}
+
+struct AsyncRunner {}
+
+impl DynamicRunner for AsyncRunner {
+    fn run_static(&self, park_timeout: Duration) -> ! {
+        loop {
+            for task in &POOL.receiver {
+                trace!("static: running task");
+                task.run();
+            }
+
+            trace!("static: empty queue, parking with timeout");
+            thread::park_timeout(park_timeout);
+        }
+    }
+    fn run_dynamic(&self, parker: &dyn Fn()) -> ! {
+        loop {
+            while let Ok(task) = POOL.receiver.try_recv() {
+                trace!("dynamic thread: running task");
+                task.run();
+            }
+            trace!(
+                "dynamic thread: parking - {:?}",
+                std::thread::current().id()
+            );
+            parker();
+        }
+    }
+    fn run_standalone(&self) {
+        while let Ok(task) = POOL.receiver.try_recv() {
+            task.run();
+        }
+        trace!("standalone thread: quitting.");
+    }
+}
+
+static DYNAMIC_POOL_MANAGER: OnceCell<DynamicPoolManager> = OnceCell::new();
+
+static POOL: Lazy<Pool> = Lazy::new(|| {
+    let runner = Arc::new(AsyncRunner {});
+
+    DYNAMIC_POOL_MANAGER
+        .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
+        .expect("couldn't create dynamic pool manager");
+    DYNAMIC_POOL_MANAGER
+        .get()
+        .expect("couldn't get static pool manager")
+        .initialize();
+
+    let (sender, receiver) = unbounded();
+    Pool { sender, receiver }
+});

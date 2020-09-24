@@ -10,9 +10,15 @@ pub fn get_core_ids() -> Option<Vec<CoreId>> {
     get_core_ids_helper()
 }
 
+/// This function tries to retrieve
+/// the number of active "cores" on the system.
+pub fn get_num_cores() -> Option<usize> {
+    get_core_ids().map(|ids| ids.len())
+}
 ///
 /// Sets the current threads affinity
 pub fn set_for_current(core_id: CoreId) {
+    tracing::info!("Executor: placement: set affinity on core {}", core_id.id);
     set_for_current_helper(core_id);
 }
 

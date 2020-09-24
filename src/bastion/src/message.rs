@@ -11,7 +11,7 @@ use crate::children::Children;
 use crate::context::{BastionId, ContextState};
 use crate::envelope::{RefAddr, SignedMessage};
 use crate::supervisor::{SupervisionStrategy, Supervisor};
-use async_mutex::Mutex;
+
 use futures::channel::oneshot::{self, Receiver};
 use std::any::{type_name, Any};
 use std::fmt::Debug;
@@ -200,7 +200,7 @@ pub(crate) enum BastionMessage {
     InstantiatedChild {
         parent_id: BastionId,
         child_id: BastionId,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
     },
     Message(Msg),
     RestartRequired {
@@ -214,13 +214,13 @@ pub(crate) enum BastionMessage {
     RestartSubtree,
     RestoreChild {
         id: BastionId,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
     },
     DropChild {
         id: BastionId,
     },
     SetState {
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
     },
     Stopped {
         id: BastionId,
@@ -418,7 +418,7 @@ impl BastionMessage {
     pub(crate) fn instantiated_child(
         parent_id: BastionId,
         child_id: BastionId,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
     ) -> Self {
         BastionMessage::InstantiatedChild {
             parent_id,
@@ -454,7 +454,7 @@ impl BastionMessage {
         BastionMessage::RestartSubtree
     }
 
-    pub(crate) fn restore_child(id: BastionId, state: Arc<Mutex<Pin<Box<ContextState>>>>) -> Self {
+    pub(crate) fn restore_child(id: BastionId, state: Arc<Pin<Box<ContextState>>>) -> Self {
         BastionMessage::RestoreChild { id, state }
     }
 
@@ -462,7 +462,7 @@ impl BastionMessage {
         BastionMessage::DropChild { id }
     }
 
-    pub(crate) fn set_state(state: Arc<Mutex<Pin<Box<ContextState>>>>) -> Self {
+    pub(crate) fn set_state(state: Arc<Pin<Box<ContextState>>>) -> Self {
         BastionMessage::SetState { state }
     }
 

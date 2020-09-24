@@ -9,7 +9,7 @@ use crate::context::{BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Deployment, Message};
 use crate::path::{BastionPath, BastionPathElement};
-use async_mutex::Mutex;
+
 use bastion_executor::pool;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
@@ -106,7 +106,7 @@ pub struct Supervisor {
 #[derive(Debug, Clone)]
 struct TrackedChildState {
     id: BastionId,
-    state: Arc<Mutex<Pin<Box<ContextState>>>>,
+    state: Arc<Pin<Box<ContextState>>>,
     restarts_counts: usize,
 }
 
@@ -1750,7 +1750,7 @@ impl SupervisorRef {
 }
 
 impl TrackedChildState {
-    fn new(id: BastionId, state: Arc<Mutex<Pin<Box<ContextState>>>>) -> Self {
+    fn new(id: BastionId, state: Arc<Pin<Box<ContextState>>>) -> Self {
         TrackedChildState {
             id,
             state,
@@ -1762,7 +1762,7 @@ impl TrackedChildState {
         self.id.clone()
     }
 
-    fn state(&self) -> Arc<Mutex<Pin<Box<ContextState>>>> {
+    fn state(&self) -> Arc<Pin<Box<ContextState>>> {
         self.state.clone()
     }
 

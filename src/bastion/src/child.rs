@@ -10,7 +10,7 @@ use crate::message::BastionMessage;
 use crate::resizer::ActorGroupStats;
 use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
-use async_mutex::Mutex;
+
 use bastion_executor::pool;
 use futures::pending;
 use futures::poll;
@@ -35,11 +35,11 @@ pub(crate) struct Child {
     callbacks: Callbacks,
     // The future that this child is executing.
     exec: Exec,
-    // A lock behind which is the child's context state.
+    // The child's context state.
     // This is used to store the messages that were received
     // for the child's associated future to be able to
     // retrieve them.
-    state: Arc<Mutex<Pin<Box<ContextState>>>>,
+    state: Arc<Pin<Box<ContextState>>>,
     // Messages that were received before the child was
     // started. Those will be "replayed" once a start message
     // is received.
@@ -71,7 +71,7 @@ impl Child {
         exec: Exec,
         callbacks: Callbacks,
         bcast: Broadcast,
-        state: Arc<Mutex<Pin<Box<ContextState>>>>,
+        state: Arc<Pin<Box<ContextState>>>,
         child_ref: ChildRef,
     ) -> Self {
         debug!("Child({}): Initializing.", bcast.id());
@@ -200,9 +200,7 @@ impl Child {
                 sign,
             } => {
                 debug!("Child({}): Received a message: {:?}", self.id(), msg);
-                let state = self.state.clone();
-                let mut guard = state.lock().await;
-                guard.push_message(msg, sign);
+                self.state.push_message(msg, sign);
             }
             Envelope {
                 msg: BastionMessage::RestartRequired { .. },
@@ -288,17 +286,16 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn update_stats(&mut self) {
-        let guard = self.state.lock().await;
-        let context_state = guard.as_ref();
-        let storage = guard.stats();
+        let mailbox_size = self.state.mailbox_size();
+        let storage = self.state.stats();
 
         let mut stats = ActorGroupStats::load(storage.clone());
-        stats.update_average_mailbox_size(context_state.mailbox_size());
+        stats.update_average_mailbox_size(mailbox_size);
         stats.store(storage);
 
-        let actor_stats_table = guard.actor_stats();
+        let actor_stats_table = self.state.actor_stats();
         actor_stats_table
-            .insert(self.bcast.id().clone(), context_state.mailbox_size())
+            .insert(self.bcast.id().clone(), mailbox_size)
             .ok();
     }
 
@@ -416,9 +413,10 @@ impl Child {
 
     #[cfg(feature = "scaling")]
     async fn cleanup_actors_stats(&mut self) {
-        let guard = self.state.lock().await;
-        let actor_stats_table = guard.actor_stats();
-        actor_stats_table.remove(&self.bcast.id().clone()).ok();
+        self.state
+            .actor_stats()
+            .remove(&self.bcast.id().clone())
+            .ok();
     }
 }
 

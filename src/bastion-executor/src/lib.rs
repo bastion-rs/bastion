@@ -28,26 +28,15 @@
 // Force missing implementations
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
-#![cfg_attr(
-    any(feature = "numanji", feature = "allocator-suite"),
-    feature(allocator_api)
-)]
-#![cfg_attr(
-    any(feature = "numanji", feature = "allocator-suite"),
-    feature(nonnull_slice_from_raw_parts)
-)]
-#[macro_use]
-mod macros;
 
-pub mod allocator;
 pub mod blocking;
-pub mod distributor;
 pub mod load_balancer;
 pub mod placement;
 pub mod pool;
 pub mod run;
 pub mod run_queue;
 pub mod sleepers;
+mod thread_manager;
 pub mod worker;
 
 ///

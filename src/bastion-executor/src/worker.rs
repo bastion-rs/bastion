@@ -3,13 +3,17 @@
 //!
 //! This worker implementation relies on worker run queue statistics which are hold in the pinned global memory
 //! where workload distribution calculated and amended to their own local queues.
-use crate::load_balancer;
-use crate::pool::{self, Pool};
-use crate::run_queue::{Steal, Worker};
+
+use crate::pool;
+
 use lightproc::prelude::*;
-use load_balancer::SmpStats;
-use std::cell::{Cell, UnsafeCell};
-use std::{iter, ptr};
+use std::cell::Cell;
+use std::ptr;
+use std::time::Duration;
+
+/// The timeout we'll use when parking before an other Steal attempt
+pub const THREAD_PARK_TIMEOUT: Duration = Duration::from_millis(1);
+
 ///
 /// Get the current process's stack
 pub fn current() -> ProcStack {
@@ -55,97 +59,6 @@ where
     }
 }
 
-thread_local! {
-    static QUEUE: UnsafeCell<Option<Worker<LightProc>>> = UnsafeCell::new(None);
-}
-
 pub(crate) fn schedule(proc: LightProc) {
-    QUEUE.with(|queue| {
-        let local = unsafe { (*queue.get()).as_ref() };
-
-        match local {
-            None => pool::get().injector.push(proc),
-            Some(q) => q.push(proc),
-        }
-    });
-
-    pool::get().sleepers.notify_one();
-}
-
-///
-/// Fetch the process from the run queue.
-/// Does the work of work-stealing if process doesn't exist in the local run queue.
-pub fn fetch_proc(affinity: usize) -> Option<LightProc> {
-    let pool = pool::get();
-
-    QUEUE.with(|queue| {
-        let local = unsafe { (*queue.get()).as_ref().unwrap() };
-        local.pop().or_else(|| affine_steal(pool, local, affinity))
-    })
-}
-
-fn affine_steal(pool: &Pool, local: &Worker<LightProc>, affinity: usize) -> Option<LightProc> {
-    let load_mean = load_balancer::stats().mean();
-    // Pop a task from the local queue, if not empty.
-    local.pop().or_else(|| {
-        // Otherwise, we need to look for a task elsewhere.
-        iter::repeat_with(|| {
-            let core_vec = load_balancer::stats().get_sorted_load();
-
-            // First try to get procs from global queue
-            pool.injector.steal_batch_and_pop(&local).or_else(|| {
-                match core_vec.get(0) {
-                    Some((core, _)) => {
-                        // If affinity is the one with the highest let other's do the stealing
-                        if *core == affinity {
-                            Steal::Retry
-                        } else {
-                            // Try iterating through biggest to smallest
-                            core_vec
-                                .iter()
-                                .map(|s| {
-                                    // Steal the mean amount to balance all queues considering incoming workloads
-                                    // Otherwise do an ignorant steal (which is going to be useless)
-                                    if load_mean > 0 {
-                                        pool.stealers
-                                            .get(s.0)
-                                            .unwrap()
-                                            .steal_batch_and_pop_with_amount(&local, load_mean)
-                                    } else {
-                                        pool.stealers.get(s.0).unwrap().steal_batch_and_pop(&local)
-                                        // TODO: Set evacuation flag in thread_local
-                                    }
-                                })
-                                .collect()
-                        }
-                    }
-                    _ => Steal::Retry,
-                }
-            })
-        })
-        // Loop while no task was stolen and any steal operation needs to be retried.
-        .find(|s| !s.is_retry())
-        // Extract the stolen task, if there is one.
-        .and_then(|s| s.success())
-    })
-}
-
-pub(crate) fn stats_generator(affinity: usize, local: &Worker<LightProc>) {
-    load_balancer::stats().store_load(affinity, local.worker_run_queue_size());
-}
-
-pub(crate) fn main_loop(affinity: usize, local: Worker<LightProc>) {
-    QUEUE.with(|queue| unsafe { *queue.get() = Some(local) });
-
-    loop {
-        QUEUE.with(|queue| {
-            let local = unsafe { (*queue.get()).as_ref().unwrap() };
-            stats_generator(affinity, local);
-        });
-
-        match fetch_proc(affinity) {
-            Some(proc) => set_stack(proc.stack(), || proc.run()),
-            None => pool::get().sleepers.wait(),
-        }
-    }
+    pool::schedule(proc)
 }
