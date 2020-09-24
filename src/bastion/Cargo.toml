@@ -50,7 +50,7 @@ features = ["docs"]
 rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
-bastion-executor = "0.3.6"
+bastion-executor = "0.4.0"
 lightproc = "0.3.5"
 # bastion-executor = { version = "= 0.3.7-alpha.0", path = "../bastion-executor" }
 # lightproc = { version = "= 0.3.6-alpha.0", path = "../lightproc" }
