@@ -14,12 +14,12 @@ use tracing::Level;
 /// broadcasting messages features.
 ///
 /// The pipeline in this example can be described in the following way:
-/// 1. The Input group contains the only one actor that stars the processing with
+/// 1. The Input group contains the only one actor that starts the processing with
 ///    sending messages through a dispatcher to actors in the Map group.
 /// 2. Each actor of the Process group does some useful work and passes a result
 ///    to the next stage with the similar call to the Reduce group.
 /// 3. The actor from the Response group retrieves the data from the actors of the
-///    Reduce group, combines the results and prints its when everything is done.
+///    Reduce group, combines the results and prints them when everything is done.
 ///
 fn main() {
     let subscriber = tracing_subscriber::fmt()
@@ -41,7 +41,7 @@ fn main() {
     Bastion::block_until_stopped();
 }
 
-// Supervisor that tracking only the single actor with input data
+// Supervisor which tracks only the single actor with input data
 fn input_supervisor(supervisor: Supervisor) -> Supervisor {
     supervisor.children(input_group)
 }
@@ -83,7 +83,7 @@ fn process_group(children: Children) -> Children {
             // the namespace with the "Map" name and removed after being stopped or killed
             // automatically.
             //
-            // If needed to use more than one groups, then do more `with_dispatcher` calls
+            // If needed to use more than one group, then do more `with_dispatcher` calls
             Dispatcher::with_type(DispatcherType::Named("Processing".to_string())),
         )
         .with_exec(move |ctx: BastionContext| async move {
@@ -128,9 +128,9 @@ fn response_group(children: Children) -> Children {
         .with_redundancy(1)
         .with_dispatcher(
             // We will re-use the dispatcher to make the example easier to understand
-            // and flexibility in code.
+            // and increase flexibility in code.
             //
-            // The single difference is only the name for Dispatcher for our actor's group.
+            // The single difference is only the name for Dispatcher for our actors group.
             Dispatcher::with_type(DispatcherType::Named("Response".to_string())),
         )
         .with_exec(move |ctx: BastionContext| {
