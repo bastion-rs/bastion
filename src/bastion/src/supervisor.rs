@@ -1485,7 +1485,7 @@ impl SupervisorRef {
     /// `SupervisorRef` is referencing to supervise it.
     ///
     /// This methods returns a [`ChildrenRef`] referencing the newly
-    /// created children group it it succeeded, or `Err(())`
+    /// created children group if it succeeded, or `Err(())`
     /// otherwise.
     ///
     /// # Arguments
