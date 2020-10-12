@@ -35,7 +35,7 @@ bastion-utils = "0.3.2"
 
 crossbeam-utils = "0.7"
 crossbeam-channel = "0.4"
-crossbeam-epoch = "0.8"
+crossbeam-epoch = "0.9"
 lazy_static = "1.4"
 libc = "0.2"
 num_cpus = "1.13"
