@@ -33,7 +33,7 @@ bastion-utils = "0.3.2"
 # lightproc = { path = "../lightproc" }
 # bastion-utils = { path = "../bastion-utils" }
 
-crossbeam-utils = "0.7"
+crossbeam-utils = "0.8"
 crossbeam-channel = "0.4"
 crossbeam-epoch = "0.8"
 lazy_static = "1.4"
