@@ -74,7 +74,7 @@ artillery-core = { version = "0.1.2-alpha.3", optional = true }
 tracing-subscriber = "0.2.6"
 tracing = "0.1.15"
 anyhow = "1.0.31"
-crossbeam-queue = "0.2.3"
+crossbeam-queue = "0.3.0"
 
 [target.'cfg(not(windows))'.dependencies]
 nuclei = "0.1.2-alpha.1"
