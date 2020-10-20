@@ -93,7 +93,7 @@ where
     }
 
     /// Forced receive message from user queue
-    pub async fn recv(&mut self) -> &Envelope<T> {
+    pub async fn recv(&mut self) -> Envelope<T> {
         if let Some(old_message) = &self.latest_user_message {
             old_message.ack().await;
         }
@@ -106,11 +106,11 @@ where
             .unwrap();
 
         self.latest_user_message = Some(message);
-        self.latest_user_message.as_ref().unwrap()
+        self.latest_user_message.clone().unwrap()
     }
 
     /// Try receiving message from user queue
-    pub async fn try_recv(&mut self) -> Result<&Envelope<T>> {
+    pub async fn try_recv(&mut self) -> Result<Envelope<T>> {
         if self.latest_user_message.is_some() {
             return Err(BError::UnackedMessage);
         }
@@ -118,14 +118,14 @@ where
         match self.user_rx.try_recv() {
             Ok(message) => {
                 self.latest_user_message = Some(message);
-                Ok(self.latest_user_message.as_ref().unwrap())
+                Ok(self.latest_user_message.clone().unwrap())
             }
             Err(e) => Err(BError::ChanRecv(e.to_string())),
         }
     }
 
     /// Forced receive message from system queue
-    pub async fn sys_recv(&mut self) -> &Envelope<T> {
+    pub async fn sys_recv(&mut self) -> Envelope<T> {
         if let Some(old_message) = &self.latest_system_message {
             old_message.ack().await;
         }
@@ -138,11 +138,11 @@ where
             .unwrap();
 
         self.latest_system_message = Some(message);
-        self.latest_system_message.as_ref().unwrap()
+        self.latest_system_message.clone().unwrap()
     }
 
     /// Try receiving message from system queue
-    pub async fn try_sys_recv(&mut self) -> Result<&Envelope<T>> {
+    pub async fn try_sys_recv(&mut self) -> Result<Envelope<T>> {
         if self.latest_system_message.is_some() {
             return Err(BError::UnackedMessage);
         }
@@ -150,20 +150,20 @@ where
         match self.system_rx.try_recv() {
             Ok(message) => {
                 self.latest_system_message = Some(message);
-                Ok(self.latest_system_message.as_ref().unwrap())
+                Ok(self.latest_system_message.clone().unwrap())
             }
             Err(e) => Err(BError::ChanRecv(e.to_string())),
         }
     }
 
     /// Returns latest system message
-    pub async fn get_latest_user_message(&self) -> Option<&Envelope<T>> {
-        self.latest_user_message.as_ref()
+    pub async fn get_latest_user_message(&self) -> Option<Envelope<T>> {
+        self.latest_user_message.clone()
     }
 
     /// Returns latest system message
-    pub async fn get_latest_system_message(&self) -> Option<&Envelope<T>> {
-        self.latest_system_message.as_ref()
+    pub async fn get_latest_system_message(&self) -> Option<Envelope<T>> {
+        self.latest_system_message.clone()
     }
 
     //
