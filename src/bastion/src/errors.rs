@@ -1,5 +1,3 @@
-
-
 use std::result;
 use std::time::Duration;
 
@@ -10,6 +8,7 @@ pub enum BError {
     Receive(ReceiveError),
     ChanSend(String),
     ChanRecv(String),
+    UnackedMessage,
 }
 
 #[derive(Debug)]
