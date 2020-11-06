@@ -677,7 +677,7 @@ impl ContextState {
     }
 
     pub(crate) fn pop_message(&self) -> Option<SignedMessage> {
-        self.messages.pop().ok()
+        self.messages.pop()
     }
 
     #[cfg(feature = "scaling")]
