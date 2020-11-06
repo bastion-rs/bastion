@@ -274,33 +274,21 @@ impl DynamicPoolManager {
                 trace!("parking thread {:?}", std::thread::current().id());
                 std::thread::park();
             })
-            .map_err(|e| {
-                debug!(
-                    "couldn't park thread {:?} - {}",
-                    std::thread::current().id(),
-                    e
-                );
+            .map_err(|t| {
+                debug!("couldn't park thread {:?}", t.id(),);
             });
     }
 
     /// Pops a thread from the parked_threads queue and unparks it.
     /// returns true on success.
     fn unpark_thread(&self) -> bool {
-        if self.parked_threads.is_empty() {
-            trace!("no parked threads");
-            false
+        trace!("parked_threads: len is {}", self.parked_threads.len());
+        if let Some(thread) = self.parked_threads.pop() {
+            debug!("Executor: unpark_thread: unparking {:?}", thread.id());
+            thread.unpark();
+            true
         } else {
-            trace!("parked_threads: len is {}", self.parked_threads.len());
-            self.parked_threads
-                .pop()
-                .map(|thread| {
-                    debug!("Executor: unpark_thread: unparking {:?}", thread.id());
-                    thread.unpark();
-                })
-                .map_err(|e| {
-                    debug!("Executor: unpark_thread: couldn't unpark thread - {}", e);
-                })
-                .is_ok()
+            false
         }
     }
 
