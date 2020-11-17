@@ -15,5 +15,5 @@
 
 mod actor;
 mod error;
-mod message;
+mod mailbox;
 mod routing;

@@ -1,8 +1,9 @@
-use crate::actor::mailbox::Mailbox;
-use crate::actor::state::ActorState;
-use crate::message::*;
-use crate::routing::path::*;
 use async_channel::unbounded;
+
+use crate::actor::state::ActorState;
+use crate::mailbox::traits::TypedMessage;
+use crate::mailbox::Mailbox;
+use crate::routing::path::ActorPath;
 
 /// A structure that defines actor's state, mailbox with  
 /// messages and a local storage for user's data.

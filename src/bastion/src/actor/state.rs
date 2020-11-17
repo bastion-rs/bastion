@@ -4,7 +4,7 @@
 ///
 /// The whole state machine of the actor can be represented by the
 /// following schema:
-///
+/// ```ignore
 ///                            +---> Stopped ----+
 ///                            |                 |
 ///                            |                 |
@@ -16,15 +16,11 @@
 ///                            |                 |
 ///                            +---> Finished ---+
 ///
-///
+/// ```
 /// The transitions between the states is called by the actor's context
 /// internally and aren't available to use and override by crate users.
 ///
-use std::sync::Arc;
-
 use crossbeam::atomic::AtomicCell;
-
-use crate::actor::state::InnerState::Init;
 
 // Actor state holder
 #[derive(Debug)]
