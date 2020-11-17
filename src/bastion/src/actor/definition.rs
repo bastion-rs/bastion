@@ -57,7 +57,6 @@ impl Debug for Definition {
 mod actor_path_tests {
     use crate::actor::definition::Definition;
     use crate::actor::traits::Actor;
-    use crate::message::Deployment::Children;
     use crate::routing::path::ActorPath;
 
     struct FakeParentActor;

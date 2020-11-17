@@ -38,41 +38,20 @@ maintenance = { status = "actively-developed" }
 [features]
 default = []
 unstable = ["bastion-executor/unstable"]
-distributed = [
-  "artillery-core"
-]
-scaling = []
-docs = ["distributed", "scaling", "default"]
-
+docs = ["default"]
 
 [package.metadata.docs.rs]
 features = ["docs"]
 rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
-bastion-executor = "0.3.6"
-lightproc = "0.3.5"
-
-lever = "0.1.1-alpha.11"
-futures = "0.3.5"
-futures-timer = "3.0.2"
-fxhash = "0.2"
-lazy_static = "1.4"
-regex = "1.3.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-pin-utils = "0.1"
-
 async-channel = "1.4.0"
-async-mutex = "1.1"
+bastion-executor = "0.3.6"
+crossbeam = "0.8.0"
+lazy_static = "1.4"
+lever = "0.1.1-alpha.11"
+lightproc = "0.3.5"
+regex = "1.3.9"
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
-env_logger = "0.7"
-proptest = "0.10"
-snap = "1.0"
-# prime_numbers example
-bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
-rand = "0.7.3"
-rayon = "1.3.1"
-num_cpus = "1.13.0"

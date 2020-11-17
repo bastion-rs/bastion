@@ -14,4 +14,6 @@
 #![cfg_attr(feature = "docs", feature(doc_cfg))]
 
 mod actor;
+mod error;
+mod message;
 mod routing;

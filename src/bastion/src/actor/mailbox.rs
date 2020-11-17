@@ -1,12 +1,38 @@
-use crate::actor::actor_ref::ActorRef;
-use crate::actor::state_codes::*;
-use crate::errors::*;
-use crate::message::TypedMessage;
-use async_channel::{unbounded, Receiver, Sender};
-use lever::sync::atomics::AtomicBox;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+
+use async_channel::{unbounded, Receiver, Sender};
+use lever::sync::atomics::AtomicBox;
+
+use crate::actor::actor_ref::ActorRef;
+use crate::actor::state::*;
+use crate::error::{BastionError, Result};
+use crate::message::TypedMessage;
+
+#[derive(PartialEq, PartialOrd)]
+/// An enum that specifies a lifecycle of the message that has
+/// been sent by the actor in the system.
+///
+/// The whole lifecycle of the message can be described by the
+/// next schema:
+///
+///    +------ Message processed ----+
+///    ↓                             |
+/// Scheduled -> Sent -> Awaiting ---+
+///               ↑           |
+///               +-- Retry --+
+///
+pub(crate) enum MailboxState {
+    /// Message has been scheduled to deliver
+    Scheduled,
+    /// Message has been sent to destination
+    Sent,
+    /// Ack has currently been awaited
+    Awaiting,
+    /// Message has been sucessfully delivered
+    Delivered,
+}
 
 /// Struct that represents a message sender.
 #[derive(Clone)]
@@ -36,7 +62,7 @@ where
     pub fn try_send(&self, msg: Envelope<T>) -> Result<()> {
         self.tx
             .try_send(msg)
-            .map_err(|e| BError::ChanSend(e.to_string()))
+            .map_err(|e| BastionError::ChanSend(e.to_string()))
     }
 }
 
@@ -98,7 +124,7 @@ where
             .user_rx
             .recv()
             .await
-            .map_err(|e| BError::ChanRecv(e.to_string()))
+            .map_err(|e| BastionError::ChanRecv(e.to_string()))
             .unwrap();
 
         self.last_user_message = Some(message);
@@ -108,7 +134,7 @@ where
     /// Try receiving message from user queue
     pub async fn try_recv(&mut self) -> Result<Envelope<T>> {
         if self.last_user_message.is_some() {
-            return Err(BError::UnackedMessage);
+            return Err(BastionError::UnackedMessage);
         }
 
         match self.user_rx.try_recv() {
@@ -116,7 +142,7 @@ where
                 self.last_user_message = Some(message);
                 Ok(self.last_user_message.clone().unwrap())
             }
-            Err(e) => Err(BError::ChanRecv(e.to_string())),
+            Err(e) => Err(BastionError::ChanRecv(e.to_string())),
         }
     }
 
@@ -126,7 +152,7 @@ where
             .system_rx
             .recv()
             .await
-            .map_err(|e| BError::ChanRecv(e.to_string()))
+            .map_err(|e| BastionError::ChanRecv(e.to_string()))
             .unwrap();
 
         self.last_system_message = Some(message);
@@ -136,7 +162,7 @@ where
     /// Try receiving message from system queue
     pub async fn try_sys_recv(&mut self) -> Result<Envelope<T>> {
         if self.last_system_message.is_some() {
-            return Err(BError::UnackedMessage);
+            return Err(BastionError::UnackedMessage);
         }
 
         match self.system_rx.try_recv() {
@@ -144,7 +170,7 @@ where
                 self.last_system_message = Some(message);
                 Ok(self.last_system_message.clone().unwrap())
             }
-            Err(e) => Err(BError::ChanRecv(e.to_string())),
+            Err(e) => Err(BastionError::ChanRecv(e.to_string())),
         }
     }
 
@@ -162,7 +188,7 @@ where
     // Mailbox state machine
     //
     // For more information about the actor's state machine
-    // see the actor/state_codes.rs module.
+    // see the actor/state module.
     //
 
     pub(crate) fn set_scheduled(&self) {
