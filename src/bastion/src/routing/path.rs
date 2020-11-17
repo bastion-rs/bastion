@@ -158,7 +158,7 @@ impl Scope {
 }
 
 #[cfg(test)]
-mod actor_path_tests {
+mod tests {
     use crate::routing::path::{ActorPath, NodeType, Scope};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

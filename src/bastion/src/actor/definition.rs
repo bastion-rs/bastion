@@ -1,92 +1,152 @@
-use crate::actor::traits::Actor;
-use crate::routing::path::ActorPath;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
+use crate::actor::callbacks::Callbacks;
+use crate::mailbox::traits::TypedMessage;
+use crate::routing::path::{ActorPath, NodeType, Scope};
+
+type CustomActorNameFn = dyn Fn() -> String + Send + 'static;
+
 /// A structure that holds configuration of the Bastion actor.
-#[derive(Clone)]
 pub struct Definition {
-    /// The certain implementation of the Bastion actor that
-    /// needs to be spawned.
-    implementation: Arc<Box<dyn Actor>>,
-    /// Defines actors that must be spawned in the hierarchy
-    /// in the beginning of the actor's lifetime. The further
-    /// amount of children may vary in runtime a won't be
-    /// adjusted to the initial definition.
-    children: Vec<Definition>,
-    /// The path to the actor in the node.
-    path: ActorPath,
+    /// Defines a used scope for instantiating actors.
+    scope: Scope,
+    /// Defines a function used for generating unique actor names.
+    actor_name_fn: Option<Arc<CustomActorNameFn>>,
+    /// Defines how much actors must be instantiated in the beginning.
+    redundancy: usize,
+    /// User-defined callbacks that can be called in runtime
+    callbacks: Callbacks,
 }
 
 impl Definition {
-    /// Returns a new Definition instance.
-    pub fn new(implementation: impl Actor + 'static) -> Self {
-        let children = Vec::new();
-        let path = ActorPath::default();
+    /// Returns a new instance of the actor's definition.
+    pub fn new() -> Self {
+        let scope = Scope::User;
+        let actor_name_fn = None;
+        let redundancy = 1;
+        let callbacks = Callbacks::new();
 
         Definition {
-            implementation: Arc::new(Box::new(implementation)),
-            children,
-            path,
+            scope,
+            actor_name_fn,
+            callbacks,
+            redundancy,
         }
     }
 
-    /// Adds a single definition to the children list.
-    pub fn with_child(mut self, definition: Definition) -> Self {
-        self.children.push(definition);
+    /// Overrides the default scope in which actors must be spawned
+    pub fn scope(mut self, scope: Scope) -> Self {
+        self.scope = scope;
         self
     }
 
-    /// Overrides the path on the user defined.
-    pub fn with_path(mut self, path: ActorPath) -> Self {
-        self.path = path;
+    /// Overrides the default behaviour for generating actor names
+    pub fn custom_actor_name<F>(mut self, func: F) -> Self
+    where
+        F: Fn() -> String + Send + 'static,
+    {
+        self.actor_name_fn = Some(Arc::new(func));
         self
+    }
+
+    /// Overrides the default values for redundancy
+    pub fn redundancy(mut self, redundancy: usize) -> Self {
+        self.redundancy = match redundancy == std::usize::MIN {
+            true => redundancy.saturating_add(1),
+            false => redundancy,
+        };
+
+        self
+    }
+
+    pub(crate) fn generate_actor_path(&self) -> ActorPath {
+        match &self.actor_name_fn {
+            Some(func) => {
+                let custom_name = func();
+                ActorPath::default()
+                    .scope(self.scope.clone())
+                    .name(&custom_name)
+            }
+            None => ActorPath::default().scope(self.scope.clone()),
+        }
     }
 }
 
 impl Debug for Definition {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         fmt.debug_struct("Definition")
-            .field("children", &self.children)
-            .field("path", &self.path)
+            .field("scope", &self.scope)
             .finish()
     }
 }
 
 #[cfg(test)]
-mod actor_path_tests {
+mod tests {
     use crate::actor::definition::Definition;
-    use crate::actor::traits::Actor;
-    use crate::routing::path::ActorPath;
+    use crate::routing::path::Scope;
 
-    struct FakeParentActor;
-    impl Actor for FakeParentActor {}
-
-    struct FakeChildActor;
-    impl Actor for FakeChildActor {}
-
-    #[test]
-    fn test_default_definition_has_no_children() {
-        let definition = Definition::new(FakeChildActor);
-
-        assert_eq!(definition.children.is_empty(), true);
+    fn fake_actor_name() -> String {
+        let index = 1;
+        format!("Actor_{}", index)
     }
 
     #[test]
-    fn test_set_custom_actor_path() {
-        let path = ActorPath::default().name("custom");
-        let definition = Definition::new(FakeChildActor).with_path(path.clone());
+    fn test_default_definition() {
+        let instance = Definition::new();
 
-        assert_eq!(definition.children.is_empty(), true);
-        assert_eq!(definition.path, path);
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_none(), true);
+        assert_eq!(instance.redundancy, 1);
     }
 
     #[test]
-    fn test_add_relation_to_parent() {
-        let child_definition = Definition::new(FakeChildActor);
-        let definition = Definition::new(FakeParentActor).with_child(child_definition.clone());
+    fn test_definition_with_custom_actor_name() {
+        let instance = Definition::new().custom_actor_name(fake_actor_name);
 
-        assert_eq!(definition.children.is_empty(), false);
-        assert_eq!(definition.children.len(), 1);
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_some(), true);
+        assert_eq!(instance.redundancy, 1);
+
+        let actor_path = instance.generate_actor_path();
+        assert_eq!(actor_path.to_string(), "bastion://node/user/Actor_1");
+        assert_eq!(actor_path.is_local(), true);
+        assert_eq!(actor_path.is_user_scope(), true);
+    }
+
+    #[test]
+    fn test_definition_with_custom_actor_name_closure() {
+        let instance = Definition::new().custom_actor_name(move || -> String {
+            let index = 1;
+            format!("Actor_{}", index)
+        });
+
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_some(), true);
+        assert_eq!(instance.redundancy, 1);
+
+        let actor_path = instance.generate_actor_path();
+        assert_eq!(actor_path.to_string(), "bastion://node/user/Actor_1");
+        assert_eq!(actor_path.is_local(), true);
+        assert_eq!(actor_path.is_user_scope(), true);
+    }
+
+    #[test]
+    fn test_definition_with_custom_scope_and_actor_name_closure() {
+        let instance =
+            Definition::new()
+                .scope(Scope::Temporary)
+                .custom_actor_name(move || -> String {
+                    let index = 1;
+                    format!("Actor_{}", index)
+                });
+
+        assert_eq!(instance.scope, Scope::Temporary);
+        assert_eq!(instance.actor_name_fn.is_some(), true);
+        assert_eq!(instance.redundancy, 1);
+
+        let actor_path = instance.generate_actor_path();
+        assert_eq!(actor_path.to_string(), "bastion://node/temporary/Actor_1");
+        assert_eq!(actor_path.is_temporary_scope(), true);
     }
 }
