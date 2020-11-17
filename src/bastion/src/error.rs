@@ -1,18 +1,15 @@
 use std::result;
-use std::time::Duration;
+
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, BastionError>;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum BastionError {
-    Receive(ReceiveError),
+    #[error("The message cannot be sent via the channel. Reason: {0}")]
     ChanSend(String),
+    #[error("The message cannot be received from the channel. Reason: {0}")]
     ChanRecv(String),
+    #[error("Before requesting a next message the previous message must be acked.")]
     UnackedMessage,
-}
-
-#[derive(Debug)]
-pub enum ReceiveError {
-    Timeout(Duration),
-    Other,
 }
