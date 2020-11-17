@@ -13,9 +13,9 @@ pub struct ActorPath {
     /// Node name in the cluster.
     node_name: String,
     /// Defines actors in the local or the remote node.
-    node_type: ActorNodeType,
+    node_type: NodeType,
     /// Defines actors in the top-level namespace.
-    scope: ActorScope,
+    scope: Scope,
     /// A unique name of the actor or namespace
     name: String,
 }
@@ -23,7 +23,7 @@ pub struct ActorPath {
 /// A part of path that defines remote or local machine
 /// with running supervisors and actors.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ActorNodeType {
+pub enum NodeType {
     /// The message must be delivered in terms of
     /// the local node.
     Local,
@@ -35,7 +35,7 @@ pub enum ActorNodeType {
 /// A part of path that defines to what part of the node
 /// the message must be delivered.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ActorScope {
+pub enum Scope {
     /// Broadcast the message to user-defined actors, defined
     /// before starting an application.
     User,
@@ -52,12 +52,7 @@ pub enum ActorScope {
 
 impl ActorPath {
     /// Returns a ActorPath instance, constructed from parts.
-    pub(crate) fn new(
-        node_name: &str,
-        node_type: ActorNodeType,
-        scope: ActorScope,
-        name: &str,
-    ) -> Self {
+    pub(crate) fn new(node_name: &str, node_type: NodeType, scope: Scope, name: &str) -> Self {
         ActorPath {
             node_name: node_name.to_string(),
             node_type,
@@ -73,13 +68,13 @@ impl ActorPath {
     }
 
     /// Replaces the existing node type onto the new one.
-    pub fn node_type(mut self, node_type: ActorNodeType) -> Self {
+    pub fn node_type(mut self, node_type: NodeType) -> Self {
         self.node_type = node_type;
         self
     }
 
     /// Replaces the existing scope onto the new one.
-    pub fn scope(mut self, scope: ActorScope) -> Self {
+    pub fn scope(mut self, scope: Scope) -> Self {
         self.scope = scope;
         self
     }
@@ -92,42 +87,42 @@ impl ActorPath {
 
     /// Method for checking that the path is related to the local node
     pub fn is_local(&self) -> bool {
-        self.node_type == ActorNodeType::Local
+        self.node_type == NodeType::Local
     }
 
     /// Method for checking that the path is related to the remote node
     pub fn is_remote(&self) -> bool {
         match self.node_type {
-            ActorNodeType::Remote(_) => true,
+            NodeType::Remote(_) => true,
             _ => false,
         }
     }
 
     /// Method for checking that path is addressing to user-defined actors
     pub fn is_user_scope(&self) -> bool {
-        self.scope == ActorScope::User
+        self.scope == Scope::User
     }
 
     /// Method for checking that path is addressing to system actors
     pub fn is_system_scope(&self) -> bool {
-        self.scope == ActorScope::System
+        self.scope == Scope::System
     }
 
     /// Method for checking that path is addressing to dead letter scope
     pub fn is_dead_letter_scope(&self) -> bool {
-        self.scope == ActorScope::DeadLetter
+        self.scope == Scope::DeadLetter
     }
 
     /// Method for checking that path is addressing to temporary actors
     pub fn is_temporary_scope(&self) -> bool {
-        self.scope == ActorScope::Temporary
+        self.scope == Scope::Temporary
     }
 }
 
 impl Default for ActorPath {
     fn default() -> Self {
         let unique_id = Uuid::new_v4().to_string();
-        ActorPath::new("node", ActorNodeType::Local, ActorScope::User, &unique_id)
+        ActorPath::new("node", NodeType::Local, Scope::User, &unique_id)
     }
 }
 
@@ -142,37 +137,37 @@ impl ToString for ActorPath {
     }
 }
 
-impl ToString for ActorNodeType {
+impl ToString for NodeType {
     fn to_string(&self) -> String {
         match self {
-            ActorNodeType::Local => String::new(),
-            ActorNodeType::Remote(address) => format!("@{}", address.to_string()),
+            NodeType::Local => String::new(),
+            NodeType::Remote(address) => format!("@{}", address.to_string()),
         }
     }
 }
 
-impl ActorScope {
+impl Scope {
     fn as_str(&self) -> &str {
         match self {
-            ActorScope::User => "user",
-            ActorScope::System => "system",
-            ActorScope::DeadLetter => "dead_letter",
-            ActorScope::Temporary => "temporary",
+            Scope::User => "user",
+            Scope::System => "system",
+            Scope::DeadLetter => "dead_letter",
+            Scope::Temporary => "temporary",
         }
     }
 }
 
 #[cfg(test)]
 mod actor_path_tests {
-    use crate::routing::path::{ActorNodeType, ActorPath, ActorScope};
+    use crate::routing::path::{ActorPath, NodeType, Scope};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[test]
     fn construct_local_user_path_group() {
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::User)
+            .node_type(NodeType::Local)
+            .scope(Scope::User)
             .name("processing/1");
 
         assert_eq!(instance.to_string(), "bastion://test/user/processing/1");
@@ -184,8 +179,8 @@ mod actor_path_tests {
     fn construct_local_system_path_group() {
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::System)
+            .node_type(NodeType::Local)
+            .scope(Scope::System)
             .name("processing/1");
 
         assert_eq!(instance.to_string(), "bastion://test/system/processing/1");
@@ -197,8 +192,8 @@ mod actor_path_tests {
     fn construct_local_dead_letter_path_group() {
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::DeadLetter)
+            .node_type(NodeType::Local)
+            .scope(Scope::DeadLetter)
             .name("processing/1");
 
         assert_eq!(
@@ -213,8 +208,8 @@ mod actor_path_tests {
     fn construct_local_temporary_path_group() {
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::Temporary)
+            .node_type(NodeType::Local)
+            .scope(Scope::Temporary)
             .name("processing/1");
 
         assert_eq!(
@@ -230,8 +225,8 @@ mod actor_path_tests {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::User)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::User)
             .name("processing/1");
 
         assert_eq!(
@@ -247,8 +242,8 @@ mod actor_path_tests {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::System)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::System)
             .name("processing/1");
 
         assert_eq!(
@@ -264,8 +259,8 @@ mod actor_path_tests {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::DeadLetter)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::DeadLetter)
             .name("processing/1");
 
         assert_eq!(
@@ -281,8 +276,8 @@ mod actor_path_tests {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
             .node_name("test")
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::Temporary)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::Temporary)
             .name("processing/1");
 
         assert_eq!(
@@ -296,8 +291,8 @@ mod actor_path_tests {
     #[test]
     fn construct_local_user_path_without_group() {
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::User)
+            .node_type(NodeType::Local)
+            .scope(Scope::User)
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/user/1");
@@ -308,8 +303,8 @@ mod actor_path_tests {
     #[test]
     fn construct_local_system_path_without_group() {
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::System)
+            .node_type(NodeType::Local)
+            .scope(Scope::System)
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/system/1");
@@ -320,8 +315,8 @@ mod actor_path_tests {
     #[test]
     fn construct_local_dead_letter_path_without_group() {
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::DeadLetter)
+            .node_type(NodeType::Local)
+            .scope(Scope::DeadLetter)
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/dead_letter/1");
@@ -332,8 +327,8 @@ mod actor_path_tests {
     #[test]
     fn construct_local_temporary_path_without_group() {
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Local)
-            .scope(ActorScope::Temporary)
+            .node_type(NodeType::Local)
+            .scope(Scope::Temporary)
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node/temporary/1");
@@ -345,8 +340,8 @@ mod actor_path_tests {
     fn construct_remote_user_path_without_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::User)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::User)
             .name("1");
 
         assert_eq!(instance.to_string(), "bastion://node@127.0.0.1:8080/user/1");
@@ -358,8 +353,8 @@ mod actor_path_tests {
     fn construct_remote_system_path_without_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::System)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::System)
             .name("1");
 
         assert_eq!(
@@ -374,8 +369,8 @@ mod actor_path_tests {
     fn construct_remote_dead_letter_path_without_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::DeadLetter)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::DeadLetter)
             .name("1");
 
         assert_eq!(
@@ -390,8 +385,8 @@ mod actor_path_tests {
     fn construct_remote_temporary_path_without_group() {
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let instance = ActorPath::default()
-            .node_type(ActorNodeType::Remote(address))
-            .scope(ActorScope::Temporary)
+            .node_type(NodeType::Remote(address))
+            .scope(Scope::Temporary)
             .name("1");
 
         assert_eq!(
