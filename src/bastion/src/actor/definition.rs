@@ -1,22 +1,21 @@
 use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
-use crate::actor::callbacks::Callbacks;
-use crate::mailbox::traits::TypedMessage;
-use crate::routing::path::{ActorPath, NodeType, Scope};
+use crate::actor::traits::Actor;
+use crate::routing::path::{ActorPath, Scope};
 
 type CustomActorNameFn = dyn Fn() -> String + Send + 'static;
 
 /// A structure that holds configuration of the Bastion actor.
 pub struct Definition {
+    /// A struct that implements actor's behaviour
+    actor: Option<Arc<Box<dyn Actor>>>,
     /// Defines a used scope for instantiating actors.
     scope: Scope,
     /// Defines a function used for generating unique actor names.
     actor_name_fn: Option<Arc<CustomActorNameFn>>,
     /// Defines how much actors must be instantiated in the beginning.
     redundancy: usize,
-    /// User-defined callbacks that can be called in runtime
-    callbacks: Callbacks,
 }
 
 impl Definition {
@@ -25,14 +24,20 @@ impl Definition {
         let scope = Scope::User;
         let actor_name_fn = None;
         let redundancy = 1;
-        let callbacks = Callbacks::new();
+        let actor = None;
 
         Definition {
+            actor,
             scope,
             actor_name_fn,
-            callbacks,
             redundancy,
         }
+    }
+
+    /// Sets the actor to schedule.
+    pub fn actor(mut self, actor: impl Actor) -> Self {
+        self.actor = Some(Arc::new(Box::new(actor)));
+        self
     }
 
     /// Overrides the default scope in which actors must be spawned

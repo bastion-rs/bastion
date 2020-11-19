@@ -46,6 +46,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
 async-channel = "1.4.0"
+async-trait = "0.1.41"
 bastion-executor = "0.3.6"
 crossbeam = "0.8.0"
 thiserror = "1.0.22"
