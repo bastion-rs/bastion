@@ -9,7 +9,7 @@ type CustomActorNameFn = dyn Fn() -> String + Send + 'static;
 /// A structure that holds configuration of the Bastion actor.
 pub struct Definition {
     /// A struct that implements actor's behaviour
-    actor: Option<Arc<Box<dyn Actor>>>,
+    actor: Option<Arc<dyn Actor>>,
     /// Defines a used scope for instantiating actors.
     scope: Scope,
     /// Defines a function used for generating unique actor names.
@@ -36,7 +36,7 @@ impl Definition {
 
     /// Sets the actor to schedule.
     pub fn actor(mut self, actor: impl Actor) -> Self {
-        self.actor = Some(Arc::new(Box::new(actor)));
+        self.actor = Some(Arc::new(actor));
         self
     }
 
