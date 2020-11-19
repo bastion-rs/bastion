@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use async_channel::unbounded;
 
+use crate::actor::local_state::LocalState;
 use crate::actor::state::ActorState;
 use crate::mailbox::traits::TypedMessage;
 use crate::mailbox::Mailbox;
@@ -12,33 +15,32 @@ use crate::routing::path::ActorPath;
 /// helps to understand what is the type of actor has been
 /// launched in the system, its path, current execution state
 /// and various data that can be attached to it.
-pub struct Context<T>
-where
-    T: TypedMessage,
-{
+pub struct Context {
     /// Path to the actor in the system
-    path: ActorPath,
+    path: Arc<ActorPath>,
     /// Mailbox of the actor
-    mailbox: Mailbox<T>,
+    //mailbox: Mailbox<TypedMessage>,
+    /// Local storage for actor's data
+    local_state: LocalState,
     /// Current execution state of the actor
-    state: ActorState,
+    internal_state: ActorState,
 }
 
-impl<T> Context<T>
-where
-    T: TypedMessage,
-{
+impl Context {
     // FIXME: Pass the correct system_rx instead of the fake one
     pub(crate) fn new(path: ActorPath) -> Self {
-        let (_system_tx, system_rx) = unbounded();
+        //let (_system_tx, system_rx) = unbounded();
+        // let mailbox = Mailbox::new(system_rx);
 
-        let mailbox = Mailbox::new(system_rx);
-        let state = ActorState::new();
+        let path = Arc::new(path);
+        let local_state = LocalState::new();
+        let internal_state = ActorState::new();
 
         Context {
             path,
-            mailbox,
-            state,
+            //mailbox,
+            local_state,
+            internal_state,
         }
     }
 }

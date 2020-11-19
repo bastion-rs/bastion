@@ -64,7 +64,7 @@ impl<'a> From<Target<'a>> for EnvelopeTarget<'a> {
                     // Exists at least one wildcard that needs to be replaced
                     // onto the regular expression.
                     true => {
-                        let mut raw_regex = match stringified_path.ends_with("/*") {
+                        let raw_regex = match stringified_path.ends_with("/*") {
                             // Necessary to replace the ending, so that any path with
                             // any nested level can be considered as a correct one.
                             true => {

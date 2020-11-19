@@ -35,7 +35,10 @@ impl Definition {
     }
 
     /// Sets the actor to schedule.
-    pub fn actor(mut self, actor: impl Actor) -> Self {
+    pub fn actor<T: 'static>(mut self, actor: T) -> Self
+    where
+        T: Actor,
+    {
         self.actor = Some(Arc::new(actor));
         self
     }

@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 
 use crate::actor::context::Context;
+use crate::error::Result;
 
 #[async_trait]
-pub trait Actor {
+pub trait Actor: Sync {
     async fn on_init(&self, _ctx: &mut Context) {}
     async fn on_sync(&self, _ctx: &mut Context) {}
     async fn on_stopped(&self, _ctx: &mut Context) {}
@@ -11,5 +12,5 @@ pub trait Actor {
     async fn on_failed(&self, _ctx: &mut Context) {}
     async fn on_finished(&self, _ctx: &mut Context) {}
     async fn on_deinit(&self, _ctx: &mut Context) {}
-    async fn handler(&self, ctx: &mut Context);
+    async fn handler(&self, ctx: &mut Context) -> Result<()>;
 }
