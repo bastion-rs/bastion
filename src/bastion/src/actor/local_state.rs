@@ -68,10 +68,11 @@ impl LocalDataContainer {
         self.0.downcast_ref()
     }
 
-    /// Returns mutable data to the caller.
-    pub fn get_mut<'a, T: Send + Sync + 'static>(&'a mut self) -> Option<&'a mut T> {
-        Arc::get_mut(&mut self.0).and_then(|data| data.downcast_mut())
-    }
+    // FIXME: Find a way to return mutable reference instead of usage the insert() call
+    // /// Returns mutable data to the caller.
+    // pub fn get_mut<'a, T: Send + Sync + 'static>(&'a mut self) -> Option<&'a mut T> {
+    //     Arc::get_mut(&mut self.0).and_then(|data| data.downcast_mut())
+    // }
 }
 
 #[cfg(test)]
@@ -136,18 +137,24 @@ mod tests {
         instance.insert(expected.clone());
         assert_eq!(instance.contains::<Data>(), true);
 
+        // Get the current snapshot of data
         let result_get = instance.get_container::<Data>();
         assert_eq!(result_get.is_some(), true);
 
         let mut container = result_get.unwrap();
-        let result_mut_data = container.get_mut::<Data>();
-        assert_eq!(result_mut_data.is_some(), true);
+        let data = container.get::<Data>();
+        assert_eq!(data.is_some(), true);
+        assert_eq!(data.unwrap(), &expected);
 
-        let mut_data = result_mut_data.unwrap();
-        mut_data.counter += 1;
-
+        // Replace the data onto new one
         let expected_update = Data { counter: 2 };
-        let result_updated_data = container.get::<Data>();
+        instance.insert(expected_update.clone());
+
+        // Check the data was updated
+        let updated_result_get = instance.get_container::<Data>();
+        assert_eq!(updated_result_get.is_some(), true);
+        let mut updated_container = updated_result_get.unwrap();
+        let result_updated_data = updated_container.get::<Data>();
         assert_eq!(result_updated_data.is_some(), true);
         assert_eq!(result_updated_data.unwrap(), &expected_update);
     }
