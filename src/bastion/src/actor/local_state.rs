@@ -44,13 +44,24 @@ impl LocalState {
         self.table.contains_key(&TypeId::of::<T>())
     }
 
-    /// Runs given closure on the state
-    pub fn with_state<F, R, T: Send + Sync + 'static>(&self, f: F) -> Option<R>
+    /// Runs given closure on the immutable state
+    pub fn with_state<T, F, R>(&self, f: F) -> Option<R>
     where
+        T: Send + Sync + 'static,
         F: FnOnce(Option<&T>) -> Option<R>
     {
         self.table.get(&TypeId::of::<T>())
             .and_then(|e| f(e.get()))
+    }
+
+    /// Runs given closure on the mutable state
+    pub fn with_state_mut<T, F, R>(&mut self, mut f: F) -> Option<R>
+    where
+        T: Send + Sync + 'static,
+        F: FnMut(Option<&mut T>) -> Option<R>
+    {
+        self.table.get_mut(&TypeId::of::<T>())
+            .and_then(|e| f(e.get_mut()))
     }
 
     /// Deletes the entry from the table.
@@ -176,6 +187,53 @@ mod tests {
         let result_updated_data = instance.get::<Data>();
         assert_eq!(result_updated_data.is_some(), true);
         assert_eq!(result_updated_data.unwrap(), &expected_update);
+    }
+
+    #[test]
+    fn test_immutable_run_on_state() {
+        let mut instance = LocalState::new();
+
+        let mut expected = Data { counter: 1 };
+
+        instance.insert(expected.clone());
+        assert_eq!(instance.contains::<Data>(), true);
+
+        // Get the current snapshot of data
+        let mut data: Option<Data> = instance.with_state::<Data, _, _>(|e| {
+            let mut k = e.cloned();
+            k.map(|mut e| {
+                e.counter += 1;
+                e
+            })
+        });
+        assert_eq!(data.is_some(), true);
+
+        // Expected data update
+        let expected_update = Data { counter: 2 };
+        assert_eq!(data, Some(expected_update));
+    }
+
+    #[test]
+    fn test_mutable_run_on_state() {
+        let mut instance = LocalState::new();
+
+        let mut expected = Data { counter: 1 };
+
+        instance.insert(expected.clone());
+        assert_eq!(instance.contains::<Data>(), true);
+
+        // Get the current snapshot of data
+        let mut data: Option<Data> = instance.with_state_mut::<Data, _, _>(|mut e| {
+            e.map(|mut d| {
+                d.counter += 1;
+                d
+            }).cloned()
+        });
+        assert_eq!(data.is_some(), true);
+
+        // Expected data update
+        let expected_update = Data { counter: 2 };
+        assert_eq!(data, Some(expected_update));
     }
 
     #[test]
