@@ -3,12 +3,6 @@
 /// it to others, so that it will be possible to do updates in runtime
 /// without being affected by other actors or potential data races.
 use std::any::{Any, TypeId};
-use std::sync::Arc;
-
-use lever::table::lotable::LOTable;
-use std::borrow::BorrowMut;
-use std::borrow::Borrow;
-use std::convert::identity;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -48,20 +42,18 @@ impl LocalState {
     pub fn with_state<T, F, R>(&self, f: F) -> Option<R>
     where
         T: Send + Sync + 'static,
-        F: FnOnce(Option<&T>) -> Option<R>
+        F: FnOnce(Option<&T>) -> Option<R>,
     {
-        self.get_container::<T>()
-            .and_then(|e| f(e.get()))
+        self.get_container::<T>().and_then(|e| f(e.get()))
     }
 
     /// Runs given closure on the mutable state
     pub fn with_state_mut<T, F, R>(&mut self, mut f: F) -> Option<R>
     where
         T: Send + Sync + 'static,
-        F: FnMut(Option<&mut T>) -> Option<R>
+        F: FnMut(Option<&mut T>) -> Option<R>,
     {
-        self.get_container_mut::<T>()
-            .and_then(|e| f(e.get_mut()))
+        self.get_container_mut::<T>().and_then(|e| f(e.get_mut()))
     }
 
     /// Deletes the entry from the table.
@@ -72,7 +64,7 @@ impl LocalState {
     /// Returns immutable data to the caller.
     pub fn get<T>(&self) -> Option<&T>
     where
-        T : Send + Sync + 'static
+        T: Send + Sync + 'static,
     {
         self.get_container::<T>().and_then(|e| e.0.downcast_ref())
     }
@@ -80,23 +72,22 @@ impl LocalState {
     /// Returns mutable data to the caller.
     pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
-        T : Send + Sync + 'static
+        T: Send + Sync + 'static,
     {
-        self.get_container_mut::<T>().and_then(|e| e.0.downcast_mut())
+        self.get_container_mut::<T>()
+            .and_then(|e| e.0.downcast_mut())
     }
 
     /// Returns local data container to the caller if it exists.
     #[inline]
     fn get_container<T: Send + Sync + 'static>(&self) -> Option<&LocalDataContainer> {
-        self.table
-            .get(&TypeId::of::<T>())
+        self.table.get(&TypeId::of::<T>())
     }
 
     /// Returns local data container to the caller if it exists.
     #[inline]
     fn get_container_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut LocalDataContainer> {
-        self.table
-            .get_mut(&TypeId::of::<T>())
+        self.table.get_mut(&TypeId::of::<T>())
     }
 }
 
@@ -235,7 +226,8 @@ mod tests {
             e.map(|mut d| {
                 d.counter += 1;
                 d
-            }).cloned()
+            })
+            .cloned()
         });
         assert_eq!(data.is_some(), true);
 
