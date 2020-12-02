@@ -87,12 +87,12 @@ impl LocalDataContainer {
     }
 
     /// Returns immutable data to the caller.
-    fn get<'a, T: Send + Sync + 'static>(&'a self) -> Option<&'a T> {
+    fn get<T: Send + Sync + 'static>(&self) -> Option<&T> {
         self.0.downcast_ref()
     }
 
     /// Returns mutable data to the caller.
-    fn get_mut<'a, T: Send + Sync + 'static>(&'a mut self) -> Option<&'a mut T> {
+    fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut T> {
         self.0.downcast_mut()
     }
 }
