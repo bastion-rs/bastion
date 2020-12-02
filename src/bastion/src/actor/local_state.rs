@@ -50,7 +50,7 @@ impl LocalState {
         T: Send + Sync + 'static,
         F: FnOnce(Option<&T>) -> Option<R>
     {
-        self.table.get(&TypeId::of::<T>())
+        self.get_container::<T>()
             .and_then(|e| f(e.get()))
     }
 
@@ -60,7 +60,7 @@ impl LocalState {
         T: Send + Sync + 'static,
         F: FnMut(Option<&mut T>) -> Option<R>
     {
-        self.table.get_mut(&TypeId::of::<T>())
+        self.get_container_mut::<T>()
             .and_then(|e| f(e.get_mut()))
     }
 
@@ -86,12 +86,14 @@ impl LocalState {
     }
 
     /// Returns local data container to the caller if it exists.
+    #[inline]
     fn get_container<T: Send + Sync + 'static>(&self) -> Option<&LocalDataContainer> {
         self.table
             .get(&TypeId::of::<T>())
     }
 
     /// Returns local data container to the caller if it exists.
+    #[inline]
     fn get_container_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut LocalDataContainer> {
         self.table
             .get_mut(&TypeId::of::<T>())
