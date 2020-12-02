@@ -78,13 +78,13 @@ impl LocalState {
             .and_then(|e| e.0.downcast_mut())
     }
 
-    /// Returns local data container to the caller if it exists.
+    /// Returns immutable local data container to the caller if it exists.
     #[inline]
     fn get_container<T: Send + Sync + 'static>(&self) -> Option<&LocalDataContainer> {
         self.table.get(&TypeId::of::<T>())
     }
 
-    /// Returns local data container to the caller if it exists.
+    /// Returns mutable local data container to the caller if it exists.
     #[inline]
     fn get_container_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut LocalDataContainer> {
         self.table.get_mut(&TypeId::of::<T>())
