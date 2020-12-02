@@ -70,12 +70,18 @@ impl LocalState {
     }
 
     /// Returns immutable data to the caller.
-    pub fn get<'a, T: Send + Sync + 'static>(&'a self) -> Option<&'a T> {
+    pub fn get<T>(&self) -> Option<&T>
+    where
+        T : Send + Sync + 'static
+    {
         self.get_container::<T>().and_then(|e| e.0.downcast_ref())
     }
 
     /// Returns mutable data to the caller.
-    pub fn get_mut<'a, T: Send + Sync + 'static>(&'a mut self) -> Option<&'a mut T> {
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T : Send + Sync + 'static
+    {
         self.get_container_mut::<T>().and_then(|e| e.0.downcast_mut())
     }
 
