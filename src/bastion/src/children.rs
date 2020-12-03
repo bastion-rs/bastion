@@ -616,14 +616,12 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Arc::new(Box::pin(ContextState::new()));
-
         let ctx = BastionContext::new(
             id.clone(),
             child_ref.clone(),
             children,
             supervisor,
-            state.clone(),
+            old_state.clone(),
         );
         let exec = (self.init.0)(ctx);
 
@@ -643,6 +641,7 @@ impl Children {
 
         debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
         let callbacks = self.callbacks.clone();
+        let state = Arc::new(Box::pin(ContextState::new()));
         let child = Child::new(exec, callbacks, bcast, state, child_ref);
         debug!(
             "Children({}): Launching faulted Child({}).",
