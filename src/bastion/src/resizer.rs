@@ -112,9 +112,23 @@ impl OptimalSizeExploringResizer {
         self.actor_stats.clone()
     }
 
+    /// Returns lower bound of the number of actors in the scaling group.
+    pub(crate) fn lower_bound(&self) -> u64 {
+        self.lower_bound
+    }
+
+    /// Set lower bound of the autoscaling group.
+    pub(crate) fn set_lower_bound(&mut self, lower_bound: u64) {
+        self.lower_bound = lower_bound;
+    }
+
     /// Overrides the minimal amount of actors available to use.
     pub fn with_lower_bound(mut self, lower_bound: u64) -> Self {
-        self.lower_bound = lower_bound;
+        if lower_bound == u64::MIN {
+            self.lower_bound = lower_bound.saturating_add(1);
+        } else {
+            self.lower_bound = lower_bound;
+        }
         self
     }
 

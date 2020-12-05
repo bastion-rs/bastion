@@ -314,6 +314,10 @@ impl Children {
         } else {
             self.redundancy = redundancy;
         }
+        #[cfg(feature = "scaling")]
+        {
+            self.resizer.set_lower_bound(self.redundancy as u64);
+        }
 
         self
     }
@@ -383,7 +387,8 @@ impl Children {
     /// # }
     /// ```
     /// [`Resizer`]: ../resizer/struct.Resizer.html
-    pub fn with_resizer(mut self, resizer: OptimalSizeExploringResizer) -> Self {
+    pub fn with_resizer(mut self, mut resizer: OptimalSizeExploringResizer) -> Self {
+        self.redundancy = resizer.lower_bound() as usize;
         self.resizer = Box::new(resizer);
         self
     }
