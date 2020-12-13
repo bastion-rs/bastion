@@ -80,7 +80,7 @@ fn auto_resize_group(children: Children) -> Children {
         children = children.with_resizer(
             OptimalSizeExploringResizer::default()
                 .with_lower_bound(1) // A minimal acceptable size of group
-                .with_upper_bound(UpperBound::Limit(10)) // Max 10 actors in runtime
+                .with_upper_bound(UpperBound::Limit(2)) // Max 10 actors in runtime
                 .with_upscale_strategy(UpscaleStrategy::MailboxSizeThreshold(3)) // Scale up when a half of actors have more than 3 messages
                 .with_upscale_rate(0.1) // Increase the size of group on 10%, if necessary to scale up
                 .with_downscale_rate(0.2), // Decrease the size of group on 20%, if too many free actors
@@ -107,7 +107,7 @@ fn auto_resize_group(children: Children) -> Children {
                             ref number: &'static u64 => {
                                 // Emulate some processing. The received number is a delay.
                                 println!("[Processing] Worker #{:?} received `{}`", ctx.current().id(), number);
-                                Delay::new(Duration::from_millis(**number * 500)).await;
+                                Delay::new(Duration::from_millis(**number * 5000)).await;
                             };
                             _: _ => ();
                         }
@@ -117,9 +117,10 @@ fn auto_resize_group(children: Children) -> Children {
 
                 messages_received += 1;
                 println!(
-                    "[Processing] Worker #{:?} processed {} message(s)",
+                    "[Processing] Worker #{:?} processed {} message(s) Total workers:{}",
                     ctx.current().id(),
-                    messages_received
+                    messages_received,
+                    ctx.parent().elems().len()
                 );
             }
 
