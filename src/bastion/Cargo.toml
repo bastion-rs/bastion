@@ -85,6 +85,6 @@ proptest = "0.10"
 snap = "1.0"
 # prime_numbers example
 bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
-rand = "0.7.3"
+rand = "0.8.1"
 rayon = "1.3.1"
 num_cpus = "1.13.0"
