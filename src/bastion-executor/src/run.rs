@@ -7,11 +7,11 @@ use crossbeam_utils::sync::Parker;
 use lightproc::proc_stack::ProcStack;
 use std::cell::{Cell, UnsafeCell};
 use std::future::Future;
+use std::mem;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-use std::{mem, panic};
 
 ///
 /// This method blocks the current thread until passed future is resolved with an output (including the panic).

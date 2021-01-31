@@ -17,6 +17,8 @@ use std::iter::Iterator;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, thread};
+#[cfg(feature = "runtime-tokio")]
+use tokio::runtime;
 use tracing::trace;
 
 ///
@@ -138,6 +140,52 @@ struct AsyncRunner {}
 
 impl DynamicRunner for AsyncRunner {
     fn run_static(&self, park_timeout: Duration) -> ! {
+        #[cfg(feature = "runtime-tokio")]
+        {
+            let thread_runtime = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("static thread: couldn't spawn tokio runtime");
+            thread_runtime.block_on(async move { self._static_loop(park_timeout) })
+        }
+        #[cfg(not(feature = "runtime-tokio"))]
+        {
+            self._static_loop(park_timeout)
+        }
+    }
+    fn run_dynamic(&self, parker: &dyn Fn()) -> ! {
+        #[cfg(feature = "runtime-tokio")]
+        {
+            let thread_runtime = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("dynamic thread: couldn't spawn tokio runtime");
+            thread_runtime.block_on(async move { self._dynamic_loop(parker) })
+        }
+        #[cfg(not(feature = "runtime-tokio"))]
+        {
+            self._dynamic_loop(parker)
+        }
+    }
+    fn run_standalone(&self) {
+        #[cfg(feature = "runtime-tokio")]
+        {
+            let thread_runtime = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("standalone thread: couldn't spawn tokio runtime");
+            thread_runtime.block_on(async move { self._standalone() })
+        }
+        #[cfg(not(feature = "runtime-tokio"))]
+        {
+            self._standalone()
+        }
+        self._standalone()
+    }
+}
+
+impl AsyncRunner {
+    fn _static_loop(&self, park_timeout: Duration) -> ! {
         loop {
             for task in &POOL.receiver {
                 trace!("static: running task");
@@ -148,7 +196,7 @@ impl DynamicRunner for AsyncRunner {
             thread::park_timeout(park_timeout);
         }
     }
-    fn run_dynamic(&self, parker: &dyn Fn()) -> ! {
+    fn _dynamic_loop(&self, parker: &dyn Fn()) -> ! {
         loop {
             while let Ok(task) = POOL.receiver.try_recv() {
                 trace!("dynamic thread: running task");
@@ -161,7 +209,7 @@ impl DynamicRunner for AsyncRunner {
             parker();
         }
     }
-    fn run_standalone(&self) {
+    fn _standalone(&self) {
         while let Ok(task) = POOL.receiver.try_recv() {
             task.run();
         }
