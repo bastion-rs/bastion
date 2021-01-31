@@ -90,7 +90,6 @@ async fn main() -> AnyResult<()> {
 
     warn!("we're done, asking bastion to stop!");
     // We are done, stopping the bastion!
-    Bastion::kill();
     Bastion::stop();
     warn!("bastion stopped!");
     Ok(())

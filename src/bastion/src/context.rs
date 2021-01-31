@@ -699,7 +699,22 @@ mod context_tests {
     use crate::Bastion;
     use std::panic;
 
-    #[test]
+    #[cfg(feature = "runtime-tokio")]
+    mod tokio_tests {
+        #[tokio::test]
+        async fn test_context() {
+            super::test_context()
+        }
+    }
+
+    #[cfg(not(feature = "runtime-tokio"))]
+    mod no_tokio_tests {
+        #[test]
+        fn test_context() {
+            super::test_context()
+        }
+    }
+
     fn test_context() {
         Bastion::init();
         Bastion::start();

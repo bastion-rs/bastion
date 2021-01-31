@@ -191,17 +191,28 @@ impl AsyncRunner {
 static DYNAMIC_POOL_MANAGER: OnceCell<DynamicPoolManager> = OnceCell::new();
 
 static POOL: Lazy<Pool> = Lazy::new(|| {
-    let runner = Arc::new(AsyncRunner {
-        // We use current() here instead of try_current()
-        // because we want bastion to crash as soon as possible
-        // if there is no available runtime.
-        #[cfg(feature = "runtime-tokio")]
-        runtime_handle: tokio::runtime::Handle::current(),
-    });
+    #[cfg(feature = "runtime-tokio")]
+    {
+        let runner = Arc::new(AsyncRunner {
+            // We use current() here instead of try_current()
+            // because we want bastion to crash as soon as possible
+            // if there is no available runtime.
+            runtime_handle: tokio::runtime::Handle::current(),
+        });
 
-    DYNAMIC_POOL_MANAGER
-        .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
-        .expect("couldn't create dynamic pool manager");
+        DYNAMIC_POOL_MANAGER
+            .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
+            .expect("couldn't create dynamic pool manager");
+    }
+    #[cfg(not(feature = "runtime-tokio"))]
+    {
+        let runner = Arc::new(AsyncRunner {});
+
+        DYNAMIC_POOL_MANAGER
+            .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
+            .expect("couldn't create dynamic pool manager");
+    }
+
     DYNAMIC_POOL_MANAGER
         .get()
         .expect("couldn't get static pool manager")
