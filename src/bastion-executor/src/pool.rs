@@ -17,8 +17,6 @@ use std::iter::Iterator;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, thread};
-#[cfg(feature = "runtime-tokio")]
-use tokio::runtime;
 use tracing::trace;
 
 ///
@@ -136,71 +134,31 @@ pub struct Pool {
     receiver: Receiver<LightProc>,
 }
 
-struct AsyncRunner {}
+struct AsyncRunner {
+    // We keep a handle to the tokio runtime here to make sure
+    // it will never be dropped while the DynamicPoolManager is alive,
+    // In case we need to spin up some threads.
+    #[cfg(feature = "runtime-tokio")]
+    runtime_handle: tokio::runtime::Handle,
+}
 
 impl DynamicRunner for AsyncRunner {
     fn run_static(&self, park_timeout: Duration) -> ! {
-        #[cfg(feature = "runtime-tokio")]
-        {
-            let thread_runtime = runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("static thread: couldn't spawn tokio runtime");
-            thread_runtime.block_on(async move { self._static_loop(park_timeout) })
-        }
-        #[cfg(not(feature = "runtime-tokio"))]
-        {
-            self._static_loop(park_timeout)
-        }
-    }
-    fn run_dynamic(&self, parker: &dyn Fn()) -> ! {
-        #[cfg(feature = "runtime-tokio")]
-        {
-            let thread_runtime = runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("dynamic thread: couldn't spawn tokio runtime");
-            thread_runtime.block_on(async move { self._dynamic_loop(parker) })
-        }
-        #[cfg(not(feature = "runtime-tokio"))]
-        {
-            self._dynamic_loop(parker)
-        }
-    }
-    fn run_standalone(&self) {
-        #[cfg(feature = "runtime-tokio")]
-        {
-            let thread_runtime = runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("standalone thread: couldn't spawn tokio runtime");
-            thread_runtime.block_on(async move { self._standalone() })
-        }
-        #[cfg(not(feature = "runtime-tokio"))]
-        {
-            self._standalone()
-        }
-        self._standalone()
-    }
-}
-
-impl AsyncRunner {
-    fn _static_loop(&self, park_timeout: Duration) -> ! {
         loop {
             for task in &POOL.receiver {
                 trace!("static: running task");
-                task.run();
+                self.run(task);
             }
 
             trace!("static: empty queue, parking with timeout");
             thread::park_timeout(park_timeout);
         }
     }
-    fn _dynamic_loop(&self, parker: &dyn Fn()) -> ! {
+    fn run_dynamic(&self, parker: &dyn Fn()) -> ! {
         loop {
             while let Ok(task) = POOL.receiver.try_recv() {
                 trace!("dynamic thread: running task");
-                task.run();
+                self.run(task);
             }
             trace!(
                 "dynamic thread: parking - {:?}",
@@ -209,18 +167,37 @@ impl AsyncRunner {
             parker();
         }
     }
-    fn _standalone(&self) {
+    fn run_standalone(&self) {
         while let Ok(task) = POOL.receiver.try_recv() {
-            task.run();
+            self.run(task);
         }
         trace!("standalone thread: quitting.");
+    }
+}
+
+impl AsyncRunner {
+    fn run(&self, task: LightProc) {
+        #[cfg(feature = "runtime-tokio")]
+        {
+            self.runtime_handle.spawn_blocking(|| task.run());
+        }
+        #[cfg(not(feature = "runtime-tokio"))]
+        {
+            task.run();
+        }
     }
 }
 
 static DYNAMIC_POOL_MANAGER: OnceCell<DynamicPoolManager> = OnceCell::new();
 
 static POOL: Lazy<Pool> = Lazy::new(|| {
-    let runner = Arc::new(AsyncRunner {});
+    let runner = Arc::new(AsyncRunner {
+        // We use current() here instead of try_current()
+        // because we want bastion to crash as soon as possible
+        // if there is no available runtime.
+        #[cfg(feature = "runtime-tokio")]
+        runtime_handle: tokio::runtime::Handle::current(),
+    });
 
     DYNAMIC_POOL_MANAGER
         .set(DynamicPoolManager::new(*low_watermark() as usize, runner))

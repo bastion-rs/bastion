@@ -29,7 +29,6 @@ fn test_run_blocking() {
                         _: _ => panic!();
                     }
                 }
-                Ok(())
             }
         })
     })

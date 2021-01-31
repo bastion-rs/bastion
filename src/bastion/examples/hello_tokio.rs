@@ -2,7 +2,7 @@ use anyhow::Result as AnyResult;
 use bastion::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 use tokio;
-use tracing::{error, info, warn, Level};
+use tracing::{error, warn, Level};
 
 /// `cargo run --features=runtime-tokio --example hello_tokio`
 ///
@@ -88,10 +88,11 @@ async fn main() -> AnyResult<()> {
         std::thread::sleep(std::time::Duration::from_secs(20))
     }));
 
-    warn!("we're done, stopping the bastion!");
-
+    warn!("we're done, asking bastion to stop!");
     // We are done, stopping the bastion!
+    Bastion::kill();
     Bastion::stop();
+    warn!("bastion stopped!");
     Ok(())
 }
 

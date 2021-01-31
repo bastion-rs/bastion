@@ -21,7 +21,6 @@ async fn run(addr: impl ToSocketAddrs) -> io::Result<()> {
         // Spawn a task that echoes messages from the client back to it.
         spawn(echo(stream));
     }
-    Ok(())
 }
 
 #[cfg(target_os = "windows")]
