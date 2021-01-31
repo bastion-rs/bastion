@@ -22,6 +22,18 @@ pub(crate) struct Envelope {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -37,6 +49,7 @@ pub(crate) struct Envelope {
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub struct SignedMessage {
     pub(crate) msg: Msg,
@@ -60,6 +73,18 @@ impl SignedMessage {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -75,6 +100,7 @@ impl SignedMessage {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn signature(&self) -> &RefAddr {
         &self.sign
@@ -89,6 +115,18 @@ impl SignedMessage {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -106,6 +144,7 @@ impl SignedMessage {
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub struct RefAddr {
     path: Arc<BastionPath>,
@@ -134,7 +173,18 @@ impl RefAddr {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -174,7 +224,18 @@ impl RefAddr {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();

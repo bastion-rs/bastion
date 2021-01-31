@@ -8,7 +8,18 @@
 ///
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let children = children! {
 ///     // the default redundancy is 1
 ///     redundancy: 100,
@@ -133,7 +144,18 @@ macro_rules! children {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let sp = supervisor! {
 ///     callbacks: Callbacks::default(),
 ///     strategy: SupervisionStrategy::OneForAll,
@@ -189,7 +211,18 @@ macro_rules! supervisor {
 /// # use std::{thread, time};
 /// # use lightproc::proc_stack::ProcStack;
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let task = blocking! {
 ///     thread::sleep(time::Duration::from_millis(3000));
 /// };
@@ -211,7 +244,18 @@ macro_rules! blocking {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let future1 = async move {
 ///     123
 /// };
@@ -245,7 +289,18 @@ macro_rules! run {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let handle = spawn! {
 ///     panic!("test");
 /// };

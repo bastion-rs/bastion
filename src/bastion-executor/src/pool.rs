@@ -27,6 +27,18 @@ use tracing::trace;
 /// use bastion_executor::prelude::*;
 /// use lightproc::prelude::*;
 ///
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    start();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # fn main() {
+/// #    start();    
+/// # }
+/// #
+/// # fn start() {
 /// let pid = 1;
 /// let stack = ProcStack::default().with_pid(pid);
 ///
@@ -43,6 +55,7 @@ use tracing::trace;
 ///     },
 ///     stack.clone(),
 /// );
+/// # }
 /// ```
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
 where

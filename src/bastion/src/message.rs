@@ -49,7 +49,18 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// // The message that will be "asked"...
 /// const ASK_MSG: &'static str = "A message containing data (ask).";
@@ -125,7 +136,18 @@ pub struct Answer(Receiver<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
@@ -572,7 +594,18 @@ impl Future for Answer {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// // The message that will be broadcasted...
 /// const BCAST_MSG: &'static str = "A message containing data (broadcast).";
@@ -776,7 +809,18 @@ macro_rules! msg {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 ///     # let children_ref =
 /// // Create a new child...
