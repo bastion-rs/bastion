@@ -42,6 +42,18 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -57,6 +69,7 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub struct BastionId(pub(crate) Uuid);
 
@@ -71,6 +84,18 @@ pub struct BastionId(pub(crate) Uuid);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "runtime-tokio")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -103,6 +128,7 @@ pub struct BastionId(pub(crate) Uuid);
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub struct BastionContext {
     id: BastionId,
@@ -155,6 +181,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -172,6 +210,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -187,6 +226,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -204,6 +255,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`ChildrenRef`]: children/struct.ChildrenRef.html
@@ -222,6 +274,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// // When calling the method from a children group supervised
@@ -258,6 +322,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
@@ -283,6 +348,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -300,6 +377,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`recv`]: #method.recv
@@ -339,6 +417,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -355,6 +445,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`try_recv`]: #method.try_recv
@@ -390,6 +481,18 @@ impl BastionContext {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -411,6 +514,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`recv`]: #method.recv
@@ -439,6 +543,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     ///
@@ -455,6 +571,7 @@ impl BastionContext {
     /// #
     /// # Bastion::start();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`RefAddr`]: /prelude/struct.Answer.html
@@ -477,6 +594,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -496,6 +625,7 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`RefAddr`]: ../prelude/struct.RefAddr.html
@@ -529,7 +659,18 @@ impl BastionContext {
     /// ```
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     /// // The message that will be "asked"...
     /// const ASK_MSG: &'static str = "A message containing data (ask).";

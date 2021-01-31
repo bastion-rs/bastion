@@ -52,6 +52,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// let children_ref = Bastion::children(|children| {
@@ -64,6 +76,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -77,6 +90,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -85,6 +110,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -100,6 +126,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -108,6 +146,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`ChildRef`]: children/struct.ChildRef.html
@@ -135,7 +174,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -191,6 +241,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -199,6 +261,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Stopping.", self.id());
@@ -219,6 +282,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -227,6 +302,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Killing.", self.id());
