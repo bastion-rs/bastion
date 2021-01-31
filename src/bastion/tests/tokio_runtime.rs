@@ -9,10 +9,19 @@ mod tokio_tests {
     }
 
     #[tokio::test]
-    async fn test_within_children() {
+    async fn test_within_bastion() {
         Bastion::init();
         Bastion::start();
 
+        test_within_children().await;
+        test_within_message_receive().await;
+        test_within_message_receive_blocking().await;
+        test_within_message_receive_spawn().await;
+
+        Bastion::stop();
+    }
+
+    async fn test_within_children() {
         Bastion::children(|children| {
             children.with_exec(|_| async move {
                 tokio::time::sleep(std::time::Duration::from_nanos(1)).await;
@@ -20,15 +29,9 @@ mod tokio_tests {
             })
         })
         .expect("Couldn't create the children group.");
-
-        Bastion::stop();
     }
 
-    #[tokio::test]
     async fn test_within_message_receive() {
-        Bastion::init();
-        Bastion::start();
-
         let workers = Bastion::children(|children| {
             children.with_exec(|ctx| async move {
                 msg! {
@@ -61,14 +64,9 @@ mod tokio_tests {
             };
             _: _ => { panic!("didn't receive &str"); };
         }
-        Bastion::stop();
     }
 
-    #[tokio::test]
     async fn test_within_message_receive_blocking() {
-        Bastion::init();
-        Bastion::start();
-
         let workers = Bastion::children(|children| {
             children.with_exec(|ctx| async move {
                 msg! {
@@ -104,14 +102,9 @@ mod tokio_tests {
             };
             _: _ => { panic!("didn't receive &str"); };
         }
-        Bastion::stop();
     }
 
-    #[tokio::test]
     async fn test_within_message_receive_spawn() {
-        Bastion::init();
-        Bastion::start();
-
         let workers = Bastion::children(|children| {
             children.with_exec(|ctx| async move {
                 msg! {
@@ -147,6 +140,5 @@ mod tokio_tests {
             };
             _: _ => { panic!("didn't receive &str"); };
         }
-        Bastion::stop();
     }
 }

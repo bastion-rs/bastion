@@ -8,8 +8,19 @@ mod tests {
         dbg!(core_ids);
     }
 
-    #[test]
-    fn pool_check() {
-        pool::get();
+    #[cfg(feature = "runtime-tokio")]
+    mod tokio_tests {
+        #[tokio::test]
+        async fn pool_check() {
+            super::pool::get();
+        }
+    }
+
+    #[cfg(not(feature = "runtime-tokio"))]
+    mod no_tokio_tests {
+        #[test]
+        fn pool_check() {
+            super::pool::get();
+        }
     }
 }

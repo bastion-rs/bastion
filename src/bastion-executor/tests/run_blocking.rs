@@ -4,8 +4,23 @@ use lightproc::proc_stack::ProcStack;
 use std::thread;
 use std::time::Duration;
 
-#[test]
-fn test_run_blocking() {
+#[cfg(feature = "runtime-tokio")]
+mod tokio_tests {
+    #[tokio::test]
+    async fn test_run_blocking() {
+        super::run_test()
+    }
+}
+
+#[cfg(not(feature = "runtime-tokio"))]
+mod no_tokio_tests {
+    #[test]
+    fn test_run_blocking() {
+        super::run_test()
+    }
+}
+
+fn run_test() {
     let output = run(
         blocking::spawn_blocking(
             async {
