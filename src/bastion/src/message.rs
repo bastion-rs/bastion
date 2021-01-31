@@ -49,13 +49,13 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -136,13 +136,13 @@ pub struct Answer(Receiver<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -594,13 +594,13 @@ impl Future for Answer {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -809,13 +809,13 @@ macro_rules! msg {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }

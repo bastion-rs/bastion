@@ -4,7 +4,7 @@ use std::sync::Once;
 
 static START: Once = Once::new();
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 mod tokio_proptests {
     use super::*;
     proptest! {
@@ -18,7 +18,7 @@ mod tokio_proptests {
         }
     }
 }
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(feature = "tokio-runtime"))]
 mod not_tokio_proptests {
     use super::*;
 

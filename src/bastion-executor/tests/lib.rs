@@ -8,7 +8,7 @@ mod tests {
         dbg!(core_ids);
     }
 
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "tokio-runtime")]
     mod tokio_tests {
         #[tokio::test]
         async fn pool_check() {
@@ -16,7 +16,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(feature = "runtime-tokio"))]
+    #[cfg(not(feature = "tokio-runtime"))]
     mod no_tokio_tests {
         #[test]
         fn pool_check() {

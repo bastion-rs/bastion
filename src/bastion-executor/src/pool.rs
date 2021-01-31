@@ -27,13 +27,13 @@ use tracing::trace;
 /// use bastion_executor::prelude::*;
 /// use lightproc::prelude::*;
 ///
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    start();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    start();    
 /// # }
@@ -151,7 +151,7 @@ struct AsyncRunner {
     // We keep a handle to the tokio runtime here to make sure
     // it will never be dropped while the DynamicPoolManager is alive,
     // In case we need to spin up some threads.
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "tokio-runtime")]
     runtime_handle: tokio::runtime::Handle,
 }
 
@@ -190,11 +190,11 @@ impl DynamicRunner for AsyncRunner {
 
 impl AsyncRunner {
     fn run(&self, task: LightProc) {
-        #[cfg(feature = "runtime-tokio")]
+        #[cfg(feature = "tokio-runtime")]
         {
             self.runtime_handle.spawn_blocking(|| task.run());
         }
-        #[cfg(not(feature = "runtime-tokio"))]
+        #[cfg(not(feature = "tokio-runtime"))]
         {
             task.run();
         }
@@ -204,7 +204,7 @@ impl AsyncRunner {
 static DYNAMIC_POOL_MANAGER: OnceCell<DynamicPoolManager> = OnceCell::new();
 
 static POOL: Lazy<Pool> = Lazy::new(|| {
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "tokio-runtime")]
     {
         let runner = Arc::new(AsyncRunner {
             // We use current() here instead of try_current()
@@ -217,7 +217,7 @@ static POOL: Lazy<Pool> = Lazy::new(|| {
             .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
             .expect("couldn't create dynamic pool manager");
     }
-    #[cfg(not(feature = "runtime-tokio"))]
+    #[cfg(not(feature = "tokio-runtime"))]
     {
         let runner = Arc::new(AsyncRunner {});
 

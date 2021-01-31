@@ -43,7 +43,7 @@ distributed = [
 ]
 scaling = []
 docs = ["distributed", "scaling", "default"]
-runtime-tokio = ["bastion-executor/runtime-tokio"]
+tokio-runtime = ["bastion-executor/tokio-runtime"]
 
 [package.metadata.docs.rs]
 features = ["docs"]

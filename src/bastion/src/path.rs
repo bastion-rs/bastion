@@ -17,13 +17,13 @@ use std::result::Result;
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -83,13 +83,13 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -135,13 +135,13 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -187,13 +187,13 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -307,13 +307,13 @@ impl fmt::Debug for BastionPath {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -390,13 +390,13 @@ impl BastionPathElement {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }

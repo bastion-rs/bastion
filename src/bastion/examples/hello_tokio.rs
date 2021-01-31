@@ -1,10 +1,10 @@
 use anyhow::Result as AnyResult;
 use bastion::prelude::*;
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 use tokio;
 use tracing::{error, warn, Level};
 
-/// `cargo run --features=runtime-tokio --example hello_tokio`
+/// `cargo run --features=tokio-runtime --example hello_tokio`
 ///
 /// We are focusing on the contents of the msg! macro here.
 /// If you would like to understand how the rest works,
@@ -24,7 +24,7 @@ use tracing::{error, warn, Level};
 /// Jan 31 14:56:03.683  WARN hello_tokio: let's sleep for 10 seconds within a spawn block
 /// Jan 31 14:56:13.683  WARN hello_tokio: the spawn! is complete
 /// Jan 31 14:56:15.679  WARN hello_tokio: we're done, stopping the bastion!
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 #[tokio::main]
 async fn main() -> AnyResult<()> {
     // Initialize tracing logger
@@ -95,7 +95,7 @@ async fn main() -> AnyResult<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(feature = "tokio-runtime"))]
 fn main() {
-    panic!("this example requires the runtime-tokio feature: `cargo run --features=runtime-tokio --example hello_tokio`")
+    panic!("this example requires the tokio-runtime feature: `cargo run --features=tokio-runtime --example hello_tokio`")
 }

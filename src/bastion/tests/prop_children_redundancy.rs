@@ -5,8 +5,8 @@ use std::sync::Once;
 
 static START: Once = Once::new();
 
-// TODO [igni]: Figure out how to make it work with feature = "runtime-tokio"
-#[cfg(not(feature = "runtime-tokio"))]
+// TODO [igni]: Figure out how to make it work with feature = "tokio-runtime"
+#[cfg(not(feature = "tokio-runtime"))]
 mod not_tokio_proptests {
     use super::*;
 

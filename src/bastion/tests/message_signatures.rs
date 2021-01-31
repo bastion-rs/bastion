@@ -42,7 +42,7 @@ fn spawn_responders() -> ChildrenRef {
     .expect("Couldn't create the children group.")
 }
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 mod tokio_tests {
     use super::*;
 
@@ -54,7 +54,7 @@ mod tokio_tests {
     }
 }
 
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(feature = "tokio-runtime"))]
 mod no_tokio_tests {
     use super::*;
 

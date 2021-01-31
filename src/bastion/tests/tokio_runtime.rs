@@ -1,4 +1,4 @@
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 mod tokio_tests {
 
     use bastion::prelude::*;

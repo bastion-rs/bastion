@@ -8,13 +8,13 @@
 ///
 /// ```
 /// # use bastion::prelude::*;
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -144,13 +144,13 @@ macro_rules! children {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -211,13 +211,13 @@ macro_rules! supervisor {
 /// # use std::{thread, time};
 /// # use lightproc::proc_stack::ProcStack;
 /// # use bastion::prelude::*;
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -244,13 +244,13 @@ macro_rules! blocking {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -289,13 +289,13 @@ macro_rules! run {
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }

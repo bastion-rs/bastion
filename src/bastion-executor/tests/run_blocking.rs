@@ -4,7 +4,7 @@ use lightproc::proc_stack::ProcStack;
 use std::thread;
 use std::time::Duration;
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 mod tokio_tests {
     #[tokio::test]
     async fn test_run_blocking() {
@@ -12,7 +12,7 @@ mod tokio_tests {
     }
 }
 
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(feature = "tokio-runtime"))]
 mod no_tokio_tests {
     #[test]
     fn test_run_blocking() {

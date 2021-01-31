@@ -6,7 +6,7 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-#[cfg(feature = "runtime-tokio")]
+#[cfg(feature = "tokio-runtime")]
 mod tokio_tests {
     #[tokio::test]
     async fn test_run_blocking() {
@@ -14,7 +14,7 @@ mod tokio_tests {
     }
 }
 
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(feature = "tokio-runtime"))]
 mod not_tokio_tests {
     #[test]
     fn test_run_blocking() {

@@ -42,13 +42,13 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -84,13 +84,13 @@ pub struct BastionId(pub(crate) Uuid);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
-/// # #[cfg(feature = "runtime-tokio")]
+/// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
 /// #    run();    
 /// # }
 /// #
-/// # #[cfg(not(feature = "runtime-tokio"))]
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
 /// #    run();    
 /// # }
@@ -181,13 +181,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -226,13 +226,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -274,13 +274,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -348,13 +348,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -417,13 +417,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -481,13 +481,13 @@ impl BastionContext {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -543,13 +543,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -594,13 +594,13 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -659,13 +659,13 @@ impl BastionContext {
     /// ```
     /// # use bastion::prelude::*;
     /// #
-    /// # #[cfg(feature = "runtime-tokio")]
+    /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
     /// #    run();    
     /// # }
     /// #
-    /// # #[cfg(not(feature = "runtime-tokio"))]
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
     /// #    run();    
     /// # }
@@ -840,7 +840,7 @@ mod context_tests {
     use crate::Bastion;
     use std::panic;
 
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "tokio-runtime")]
     mod tokio_tests {
         #[tokio::test]
         async fn test_context() {
@@ -848,7 +848,7 @@ mod context_tests {
         }
     }
 
-    #[cfg(not(feature = "runtime-tokio"))]
+    #[cfg(not(feature = "tokio-runtime"))]
     mod no_tokio_tests {
         #[test]
         fn test_context() {
