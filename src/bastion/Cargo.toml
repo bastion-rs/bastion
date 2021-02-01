@@ -5,7 +5,7 @@ name = "bastion"
 # - Update CHANGELOG.md.
 #   - npm install -g auto-changelog && auto-changelog at the root
 # - Create "v0.x.y" git tag at the root of the project.
-version = "0.4.4"
+version = "0.4.5-alpha.0"
 description = "Fault-tolerant Runtime for Rust applications"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
