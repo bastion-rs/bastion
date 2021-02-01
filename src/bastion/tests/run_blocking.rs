@@ -6,8 +6,23 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-#[test]
-fn test_run_blocking() {
+#[cfg(feature = "tokio-runtime")]
+mod tokio_tests {
+    #[tokio::test]
+    async fn test_run_blocking() {
+        super::run()
+    }
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+mod not_tokio_tests {
+    #[test]
+    fn test_run_blocking() {
+        super::run()
+    }
+}
+
+fn run() {
     Bastion::init();
     Bastion::start();
 
@@ -29,7 +44,6 @@ fn test_run_blocking() {
                         _: _ => panic!();
                     }
                 }
-                Ok(())
             }
         })
     })

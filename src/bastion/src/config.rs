@@ -10,6 +10,18 @@
 /// ```rust
 /// use bastion::prelude::*;
 ///
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let config = Config::new().show_backtraces();
 ///
 /// Bastion::init_with(config);
@@ -19,6 +31,7 @@
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 ///
 /// [`Bastion::init_with`]: struct.Bastion.html#method.init_with
@@ -57,6 +70,18 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// let config = Config::new().show_backtraces();
     ///
     /// Bastion::init_with(config);
@@ -67,6 +92,7 @@ impl Config {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn show_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::show();
@@ -83,6 +109,18 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// let config = Config::new().hide_backtraces();
     ///
     /// Bastion::init_with(config);
@@ -93,6 +131,7 @@ impl Config {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
     /// [`Config::show_backtraces`]: #method.show_backtraces

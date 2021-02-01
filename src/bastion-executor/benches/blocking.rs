@@ -8,9 +8,36 @@ use std::thread;
 use std::time::Duration;
 use test::Bencher;
 
+#[cfg(feature = "tokio-runtime")]
+mod tokio_benchs {
+    use super::*;
+    #[bench]
+    fn blocking(b: &mut Bencher) {
+        tokio_test::block_on(async { _blocking(b) });
+    }
+    #[bench]
+    fn blocking_single(b: &mut Bencher) {
+        tokio_test::block_on(async {
+            _blocking_single(b);
+        });
+    }
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+mod no_tokio_benchs {
+    use super::*;
+    #[bench]
+    fn blocking(b: &mut Bencher) {
+        _blocking(b);
+    }
+    #[bench]
+    fn blocking_single(b: &mut Bencher) {
+        _blocking_single(b);
+    }
+}
+
 // Benchmark for a 10K burst task spawn
-#[bench]
-fn blocking(b: &mut Bencher) {
+fn _blocking(b: &mut Bencher) {
     b.iter(|| {
         (0..10_000)
             .map(|_| {
@@ -27,8 +54,7 @@ fn blocking(b: &mut Bencher) {
 }
 
 // Benchmark for a single blocking task spawn
-#[bench]
-fn blocking_single(b: &mut Bencher) {
+fn _blocking_single(b: &mut Bencher) {
     b.iter(|| {
         blocking::spawn_blocking(
             async {

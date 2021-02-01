@@ -17,7 +17,18 @@ use std::result::Result;
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 ///
 ///     # Bastion::children(|children| {
@@ -72,7 +83,18 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -113,7 +135,18 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -154,7 +187,18 @@ impl BastionPath {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -263,6 +307,18 @@ impl fmt::Debug for BastionPath {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 ///
@@ -284,6 +340,7 @@ impl fmt::Debug for BastionPath {
 /// #
 /// # Bastion::start();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub enum BastionPathElement {
     #[doc(hidden)]
@@ -333,6 +390,18 @@ impl BastionPathElement {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     ///
     /// Bastion::children(|children| {
@@ -353,6 +422,7 @@ impl BastionPathElement {
     /// #
     /// # Bastion::start();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn is_child(&self) -> bool {
         matches!(self, BastionPathElement::Child(_))

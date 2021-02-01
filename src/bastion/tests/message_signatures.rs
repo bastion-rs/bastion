@@ -42,11 +42,28 @@ fn spawn_responders() -> ChildrenRef {
     .expect("Couldn't create the children group.")
 }
 
-#[test]
-fn answer_and_tell_signatures() {
-    setup();
-    Bastion::spawn(run).unwrap();
-    teardown();
+#[cfg(feature = "tokio-runtime")]
+mod tokio_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn answer_and_tell_signatures() {
+        setup();
+        Bastion::spawn(run).unwrap();
+        teardown();
+    }
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+mod no_tokio_tests {
+    use super::*;
+
+    #[test]
+    fn answer_and_tell_signatures() {
+        setup();
+        Bastion::spawn(run).unwrap();
+        teardown();
+    }
 }
 
 async fn run(ctx: BastionContext) -> Result<(), ()> {
