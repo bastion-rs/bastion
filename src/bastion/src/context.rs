@@ -426,7 +426,7 @@ impl BastionContext {
             message = self.recv().fuse() => {
                 message.map_err(|_| ReceiveError::Other)
             },
-            duration = Delay::new(timeout).fuse() => {
+            _duration = Delay::new(timeout).fuse() => {
                 Err(ReceiveError::Timeout(timeout))
             }
         }
