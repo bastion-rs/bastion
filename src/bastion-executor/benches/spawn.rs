@@ -29,11 +29,11 @@ mod no_tokio_benchs {
     use super::*;
     #[bench]
     fn spawn_lot(b: &mut Bencher) {
-        _spawn_lot(&mut b);
+        _spawn_lot(b);
     }
     #[bench]
     fn spawn_single(b: &mut Bencher) {
-        _spawn_single(&mut b);
+        _spawn_single(b);
     }
 }
 

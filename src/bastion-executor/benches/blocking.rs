@@ -28,11 +28,11 @@ mod no_tokio_benchs {
     use super::*;
     #[bench]
     fn blocking(b: &mut Bencher) {
-        _blocking(&mut b);
+        _blocking(b);
     }
     #[bench]
     fn blocking_single(b: &mut Bencher) {
-        _blocking_single(&mut b);
+        _blocking_single(b);
     }
 }
 
