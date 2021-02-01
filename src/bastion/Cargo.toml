@@ -55,7 +55,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 bastion-executor = { path = "../bastion-executor" }
 lightproc = { path = "../lightproc" }
 
-lever = "0.1.1-alpha.11"
+lever = "0.1"
 futures = "0.3.5"
 futures-timer = "3.0.2"
 fxhash = "0.2"
@@ -78,7 +78,7 @@ crossbeam-queue = "0.3.0"
 log = "0.4.14"
 
 [target.'cfg(not(windows))'.dependencies]
-nuclei = "0.1.2-alpha.1"
+nuclei = "0.1"
 
 [dev-dependencies]
 env_logger = "0.8"
