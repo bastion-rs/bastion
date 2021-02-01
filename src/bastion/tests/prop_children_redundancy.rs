@@ -1,11 +1,24 @@
 use bastion::prelude::*;
 use proptest::prelude::*;
-use std::sync::Arc;
 use std::sync::Once;
 
 static START: Once = Once::new();
 
-// TODO [igni]: Figure out how to make it work with feature = "tokio-runtime"
+#[cfg(feature = "tokio-runtime")]
+mod tokio_proptests {
+    use super::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1_000))]
+        #[test]
+        fn proptest_redundancy(r in std::usize::MIN..32) {
+            let _ = tokio_test::task::spawn(async {
+                super::test_with_usize(r);
+            });
+        }
+    }
+}
+
 #[cfg(not(feature = "tokio-runtime"))]
 mod not_tokio_proptests {
     use super::*;

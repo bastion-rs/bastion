@@ -9,9 +9,36 @@ use lightproc::proc_stack::ProcStack;
 use std::time::Duration;
 use test::Bencher;
 
+#[cfg(feature = "tokio-runtime")]
+mod tokio_benchs {
+    use super::*;
+    #[bench]
+    fn spawn_lot(b: &mut Bencher) {
+        tokio_test::block_on(async { _spawn_lot(b) });
+    }
+    #[bench]
+    fn spawn_single(b: &mut Bencher) {
+        tokio_test::block_on(async {
+            _spawn_single(b);
+        });
+    }
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+mod no_tokio_benchs {
+    use super::*;
+    #[bench]
+    fn spawn_lot(b: &mut Bencher) {
+        _spawn_lot(&mut b);
+    }
+    #[bench]
+    fn spawn_single(b: &mut Bencher) {
+        _spawn_single(&mut b);
+    }
+}
+
 // Benchmark for a 10K burst task spawn
-#[bench]
-fn spawn_lot(b: &mut Bencher) {
+fn _spawn_lot(b: &mut Bencher) {
     let proc_stack = ProcStack::default();
     b.iter(|| {
         let _ = (0..10_000)
@@ -29,8 +56,7 @@ fn spawn_lot(b: &mut Bencher) {
 }
 
 // Benchmark for a single task spawn
-#[bench]
-fn spawn_single(b: &mut Bencher) {
+fn _spawn_single(b: &mut Bencher) {
     let proc_stack = ProcStack::default();
     b.iter(|| {
         spawn(

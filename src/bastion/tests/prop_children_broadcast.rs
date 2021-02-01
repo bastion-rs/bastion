@@ -11,9 +11,8 @@ mod tokio_proptests {
         #![proptest_config(ProptestConfig::with_cases(1_000))]
         #[test]
         fn proptest_bcast_message(message in "\\PC*") {
-            tokio::runtime::Runtime::new().unwrap().block_on(async {
+            tokio_test::block_on(async {
                 super::test_with_message(message);
-
             });
         }
     }
