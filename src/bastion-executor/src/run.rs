@@ -11,7 +11,7 @@ use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-use std::{mem, panic};
+use std::mem;
 
 ///
 /// This method blocks the current thread until passed future is resolved with an output (including the panic).
