@@ -1,6 +1,3 @@
-use bastion::prelude::*;
-#[cfg(not(target_os = "windows"))]
-use futures::*;
 #[cfg(not(target_os = "windows"))]
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -8,6 +5,11 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+#[cfg(not(target_os = "windows"))]
+use futures::*;
+
+use bastion::prelude::*;
 
 ///
 /// Parallel (MapReduce) job which async writes results to a single output file
@@ -51,7 +53,6 @@ fn main() {
     // Get a shadowed sharable reference of workers.
     let workers = Arc::new(workers);
 
-    //
     // Mapper that generates work.
     Bastion::children(|children: Children| {
         children.with_exec(move |ctx: BastionContext| {
@@ -62,6 +63,11 @@ fn main() {
                 let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
                 path.push("data");
                 path.push("distwrite");
+
+                if !path.exists() || !path.is_file() {
+                    Bastion::stop();
+                    panic!("The file could not be opened.");
+                }
 
                 let fo = OpenOptions::new()
                     .read(true)
