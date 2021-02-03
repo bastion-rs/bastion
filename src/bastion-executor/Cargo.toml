@@ -29,9 +29,8 @@ unstable = []
 tokio-runtime = ["tokio"]
 
 [dependencies]
-# lightproc = "0.3.5"
 bastion-utils = "0.3.2"
-lightproc = "0.3.5"
+lightproc = "0.3"
 # bastion-utils = { path = "../bastion-utils" }
 
 crossbeam-utils = "0.8"
