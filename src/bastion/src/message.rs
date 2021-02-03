@@ -865,3 +865,76 @@ macro_rules! answer {
         sender.send($answer, sign)
     }};
 }
+
+#[derive(Debug)]
+pub struct MessageHandler {
+    msg: Option<SignedMessage>,
+}
+
+impl MessageHandler {
+    pub fn new(msg: SignedMessage) -> MessageHandler {
+        let msg = Some(msg);
+        MessageHandler { msg }
+    }
+
+    pub fn on_question<T, F>(self, f: F) -> MessageHandler
+    where
+        T: 'static,
+        F: FnOnce(T, AnswerSender),
+    {
+        match self.try_into_question::<T>() {
+            Ok((arg, sender)) => {
+                f(arg, sender);
+                MessageHandler::empty()
+            }
+            Err(this) => this,
+        }
+    }
+
+    pub fn on_fallback(mut self, f: impl FnOnce(&dyn Any)) {
+        if let Some(msg) = self.fallback_arg() {
+            f(msg);
+            self.msg.take();
+        }
+    }
+
+    fn empty() -> MessageHandler {
+        MessageHandler { msg: None }
+    }
+
+    fn try_into_question<T: 'static>(mut self) -> Result<(T, AnswerSender), MessageHandler> {
+        match self.msg.take() {
+            Some(SignedMessage {
+                msg:
+                    Msg(MsgInner::Ask {
+                        msg,
+                        sender: Some(sender),
+                    }),
+                ..
+            }) if msg.is::<T>() => {
+                let msg: Box<dyn Any> = msg;
+                Ok((*msg.downcast::<T>().unwrap(), sender))
+            }
+
+            _ => Err(self),
+        }
+    }
+
+    fn fallback_arg(&self) -> Option<&dyn Any> {
+        let msg = match self.msg.as_ref()?.msg.0 {
+            MsgInner::Broadcast(ref msg) => msg.as_ref(),
+            MsgInner::Tell(ref msg) => msg.as_ref(),
+            MsgInner::Ask { ref msg, .. } => msg.as_ref(),
+        };
+
+        Some(msg)
+    }
+}
+
+impl Drop for MessageHandler {
+    fn drop(&mut self) {
+        if let Some(msg) = self.fallback_arg() {
+            panic!("Unhandled message: {:#?}", msg);
+        }
+    }
+}
