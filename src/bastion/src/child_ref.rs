@@ -306,7 +306,7 @@ impl ChildRef {
     /// [`Answer`]: message/struct.Answer.html
     pub fn ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
-        let (msg, answer) = BastionMessage::ask(msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.addr());
         let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
         self.send(env).map_err(|env| env.into_msg().unwrap())?;

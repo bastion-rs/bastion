@@ -33,9 +33,12 @@ use tracing::{debug, trace};
 pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
+/// Allows to respond to questions.
+///
+/// This type features the [`respond`] method, that allows to respond to a
+/// question.
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct AnswerSender(oneshot::Sender<SignedMessage>);
+pub struct AnswerSender(oneshot::Sender<SignedMessage>, RefAddr);
 
 #[derive(Debug)]
 /// A [`Future`] returned when successfully "asking" a
@@ -260,14 +263,17 @@ pub(crate) enum Deployment {
 }
 
 impl AnswerSender {
-    // FIXME: we can't let manipulating Signature in a public API
-    // but now it's being called only by a macro so we are trusting it
-    #[doc(hidden)]
-    pub fn send<M: Message>(self, msg: M, sign: RefAddr) -> Result<(), M> {
+    /// Sends data back to the original sender.
+    ///
+    /// Returns  `Ok` if the data was sent successfully, otherwise returns the
+    /// original data.
+    pub fn reply<M: Message>(self, msg: M) -> Result<(), M> {
         debug!("{:?}: Sending answer: {:?}", self, msg);
         let msg = Msg::tell(msg);
         trace!("{:?}: Sending message: {:?}", self, msg);
-        self.0
+
+        let AnswerSender(sender, sign) = self;
+        sender
             .send(SignedMessage::new(msg, sign))
             .map_err(|smsg| smsg.msg.try_unwrap().unwrap())
     }
@@ -284,10 +290,10 @@ impl Msg {
         Msg(inner)
     }
 
-    pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
+    pub(crate) fn ask<M: Message>(msg: M, sign: RefAddr) -> (Self, Answer) {
         let msg = Box::new(msg);
         let (sender, recver) = oneshot::channel();
-        let sender = AnswerSender(sender);
+        let sender = AnswerSender(sender, sign);
         let answer = Answer(recver);
 
         let sender = Some(sender);
@@ -459,8 +465,8 @@ impl BastionMessage {
         BastionMessage::Message(msg)
     }
 
-    pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
-        let (msg, answer) = Msg::ask(msg);
+    pub(crate) fn ask<M: Message>(msg: M, sign: RefAddr) -> (Self, Answer) {
+        let (msg, answer) = Msg::ask(msg, sign);
         (BastionMessage::Message(msg), answer)
     }
 
@@ -767,7 +773,7 @@ macro_rules! msg {
                 ($ctx:expr, $answer:expr) => {
                     {
                         let sign = $ctx.signature();
-                        sender.send($answer, sign)
+                        sender.reply($answer)
                     }
                 };
             }
@@ -862,7 +868,7 @@ macro_rules! answer {
     ($msg:expr, $answer:expr) => {{
         let (mut msg, sign) = $msg.extract();
         let sender = msg.take_sender().expect("failed to take render");
-        sender.send($answer, sign)
+        sender.reply($answer)
     }};
 }
 
