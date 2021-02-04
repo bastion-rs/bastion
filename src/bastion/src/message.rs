@@ -413,6 +413,16 @@ impl Msg {
     }
 }
 
+impl AsRef<dyn Any> for Msg {
+    fn as_ref(&self) -> &dyn Any {
+        match &self.0 {
+            MsgInner::Broadcast(msg) => msg.as_ref(),
+            MsgInner::Tell(msg) => msg.as_ref(),
+            MsgInner::Ask { msg, .. } => msg.as_ref(),
+        }
+    }
+}
+
 impl BastionMessage {
     pub(crate) fn start() -> Self {
         BastionMessage::Start
@@ -879,6 +889,28 @@ macro_rules! answer {
     }};
 }
 
+#[derive(Debug)]
+enum MessageHandlerState<O> {
+    Matched(O),
+    Unmatched(SignedMessage),
+}
+
+impl<O> MessageHandlerState<O> {
+    fn take_message(self) -> Result<SignedMessage, O> {
+        match self {
+            MessageHandlerState::Unmatched(msg) => Ok(msg),
+            MessageHandlerState::Matched(output) => Err(output),
+        }
+    }
+
+    fn output_or_else(self, f: impl FnOnce(SignedMessage) -> O) -> O {
+        match self {
+            MessageHandlerState::Matched(output) => output,
+            MessageHandlerState::Unmatched(msg) => f(msg),
+        }
+    }
+}
+
 /// Matches a [`Msg`] (as returned by [`BastionContext::recv`]
 /// or [`BastionContext::try_recv`]) with different types.
 ///
@@ -979,30 +1011,30 @@ macro_rules! answer {
 /// [`on_fallback`]: Self::on_fallback
 /// [`reply`]: AnswerSender::reply
 #[derive(Debug)]
-pub struct MessageHandler {
-    msg: Option<SignedMessage>,
+pub struct MessageHandler<O> {
+    state: MessageHandlerState<O>,
 }
 
-impl MessageHandler {
+impl<O> MessageHandler<O> {
     /// Creates a new [`MessageHandler`] with an incoming message.
-    pub fn new(msg: SignedMessage) -> MessageHandler {
-        let msg = Some(msg);
-        MessageHandler { msg }
+    pub fn new(msg: SignedMessage) -> MessageHandler<O> {
+        let state = MessageHandlerState::Unmatched(msg);
+        MessageHandler { state }
     }
 
     /// Matches on a question of a specific type.
     ///
     /// This will consume the inner data and call `f` if the contained message
     /// can be replied to.
-    pub fn on_question<T, F>(self, f: F) -> MessageHandler
+    pub fn on_question<T, F>(self, f: F) -> MessageHandler<O>
     where
         T: 'static,
-        F: FnOnce(T, AnswerSender),
+        F: FnOnce(T, AnswerSender) -> O,
     {
         match self.try_into_question::<T>() {
             Ok((arg, sender)) => {
-                f(arg, sender);
-                MessageHandler::empty()
+                let val = f(arg, sender);
+                MessageHandler::matched(val)
             }
             Err(this) => this,
         }
@@ -1012,27 +1044,25 @@ impl MessageHandler {
     ///
     /// This consumes the [`MessageHandler`], so that no matching can be
     /// performed anymore.
-    pub fn on_fallback<F>(mut self, f: F)
+    pub fn on_fallback<F>(self, f: F) -> O
     where
-        F: FnOnce(&dyn Any, RefAddr),
+        F: FnOnce(&dyn Any, RefAddr) -> O,
     {
-        if let Some((msg, addr)) = self.fallback_arg() {
-            f(msg, addr.clone());
-            self.msg.take();
-        }
+        self.state
+            .output_or_else(|msg| f(msg.msg.as_ref(), msg.signature().clone()))
     }
 
     /// Calls a function if the incoming message is a broadcast and has a
     /// specific type.
-    pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler
+    pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler<O>
     where
         T: 'static + Send + Sync,
-        F: FnOnce(&T, RefAddr),
+        F: FnOnce(&T, RefAddr) -> O,
     {
         match self.try_into_broadcast::<T>() {
             Ok((arg, addr)) => {
-                f(arg.as_ref(), addr);
-                MessageHandler::empty()
+                let val = f(arg.as_ref(), addr);
+                MessageHandler::matched(val)
             }
             Err(this) => this,
         }
@@ -1040,27 +1070,28 @@ impl MessageHandler {
 
     /// Calls a function if the incoming message can't be replied to and has a
     /// specific type.
-    pub fn on_tell<T, F>(self, f: F) -> MessageHandler
+    pub fn on_tell<T, F>(self, f: F) -> MessageHandler<O>
     where
         T: 'static,
-        F: FnOnce(T, RefAddr),
+        F: FnOnce(T, RefAddr) -> O,
     {
         match self.try_into_tell::<T>() {
             Ok((msg, addr)) => {
-                f(msg, addr);
-                MessageHandler::empty()
+                let val = f(msg, addr);
+                MessageHandler::matched(val)
             }
             Err(this) => this,
         }
     }
 
-    fn empty() -> MessageHandler {
-        MessageHandler { msg: None }
+    fn matched(output: O) -> MessageHandler<O> {
+        let state = MessageHandlerState::Matched(output);
+        MessageHandler { state }
     }
 
-    fn try_into_question<T: 'static>(mut self) -> Result<(T, AnswerSender), MessageHandler> {
-        match self.msg.take() {
-            Some(SignedMessage {
+    fn try_into_question<T: 'static>(self) -> Result<(T, AnswerSender), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
                 msg:
                     Msg(MsgInner::Ask {
                         msg,
@@ -1072,15 +1103,16 @@ impl MessageHandler {
                 Ok((*msg.downcast::<T>().unwrap(), sender))
             }
 
-            _ => Err(self),
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
         }
     }
 
     fn try_into_broadcast<T: Send + Sync + 'static>(
-        mut self,
-    ) -> Result<(Arc<T>, RefAddr), MessageHandler> {
-        match self.msg.take() {
-            Some(SignedMessage {
+        self,
+    ) -> Result<(Arc<T>, RefAddr), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
                 msg: Msg(MsgInner::Broadcast(msg)),
                 sign,
             }) if msg.is::<T>() => {
@@ -1088,13 +1120,14 @@ impl MessageHandler {
                 Ok((msg.downcast::<T>().unwrap(), sign))
             }
 
-            _ => Err(self),
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
         }
     }
 
-    fn try_into_tell<T: 'static>(mut self) -> Result<(T, RefAddr), MessageHandler> {
-        match self.msg.take() {
-            Some(SignedMessage {
+    fn try_into_tell<T: 'static>(self) -> Result<(T, RefAddr), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
                 msg: Msg(MsgInner::Tell(msg)),
                 sign,
             }) if msg.is::<T>() => {
@@ -1102,28 +1135,8 @@ impl MessageHandler {
                 Ok((*msg.downcast::<T>().unwrap(), sign))
             }
 
-            _ => Err(self),
-        }
-    }
-
-    fn fallback_arg(&self) -> Option<(&dyn Any, &RefAddr)> {
-        let inner_message = self.msg.as_ref()?;
-        let addr = inner_message.signature();
-
-        let msg = match inner_message.msg.0 {
-            MsgInner::Broadcast(ref msg) => msg.as_ref(),
-            MsgInner::Tell(ref msg) => msg.as_ref(),
-            MsgInner::Ask { ref msg, .. } => msg.as_ref(),
-        };
-
-        Some((msg, addr))
-    }
-}
-
-impl Drop for MessageHandler {
-    fn drop(&mut self) {
-        if let Some(msg) = self.fallback_arg() {
-            panic!("Unhandled message: {:#?}", msg);
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
         }
     }
 }
