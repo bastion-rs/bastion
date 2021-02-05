@@ -37,6 +37,8 @@ impl<T> Message for T where T: Any + Send + Sync + Debug {}
 ///
 /// This type features the [`respond`] method, that allows to respond to a
 /// question.
+///
+/// [`respond`]: #method.respond
 #[derive(Debug)]
 pub struct AnswerSender(oneshot::Sender<SignedMessage>, RefAddr);
 
@@ -872,17 +874,121 @@ macro_rules! answer {
     }};
 }
 
+/// Matches a [`Msg`] (as returned by [`BastionContext::recv`]
+/// or [`BastionContext::try_recv`]) with different types.
+///
+/// This type may replace the [`msg!`] macro in the future.
+///
+/// The [`new`] function creates a new [`MessageHandler`], which is then
+/// matched on with the `on_*` functions.
+///
+/// There are different kind of messages:
+///   - messages that are broadcasted, which can be matched with the
+///     [`on_broadcast`] method,
+///   - messages that can be responded to, which are matched with the
+///     [`on_question`] method,
+///   - messages that can not be responded to, which are matched with
+///     [`on_tell`],
+///   - fallback case, which matches everything, entitled [`on_fallback`].
+///
+/// The closure passed to the functions described previously must return the
+/// same type. This value is retrieved when [`on_fallback`] is invoked.
+///
+/// Questions can be responded to by calling [`reply`] on the provided
+/// sender.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// # use bastion::message::MessageHandler;
+/// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
+///     # Bastion::init();
+/// // The message that will be broadcasted...
+/// const BCAST_MSG: &'static str = "A message containing data (broadcast).";
+/// // The message that will be "told" to the child...
+/// const TELL_MSG: &'static str = "A message containing data (tell).";
+/// // The message that will be "asked" to the child...
+/// const ASK_MSG: &'static str = "A message containing data (ask).";
+///
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             # ctx.tell(&ctx.current().addr(), TELL_MSG).unwrap();
+///             # ctx.ask(&ctx.current().addr(), ASK_MSG).unwrap();
+///             #
+///             loop {
+///                 MessageHandler::new(ctx.recv().await?)
+///                     // We match on broadcasts of &str
+///                     .on_broadcast(|msg: &&str| {
+///                         assert_eq!(*msg, BCAST_MSG);
+///                         // Handle the message...
+///                     })
+///                     // We match on messages of &str
+///                     .on_tell(|msg: &str| {
+///                         assert_eq!(msg, TELL_MSG);
+///                         // Handle the message...
+///                     })
+///                     // We match on questions of &str
+///                     .on_question(|msg: &str, sender| {
+///                         assert_eq!(msg, ASK_MSG);
+///                         // Handle the message...
+///
+///                         // ...and eventually answer to it...
+///                         sender.reply("An answer to the message.");
+///                     })
+///                     // We are only broadcasting, "telling" and "asking" a
+///                     // `&str` in this example, so we know that this won't
+///                     // happen...
+///                     .on_fallback(|msg| ());
+///             }
+///         }
+///     })
+/// }).expect("Couldn't start the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::broadcast(BCAST_MSG).unwrap();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
+/// [`new`]: Self::new
+/// [`on_broadcast`]: Self::on_broadcast
+/// [`on_question`]: Self::on_question
+/// [`on_tell`]: Self::on_tell
+/// [`on_fallback`]: Self::on_fallback
+/// [`reply`]: AnswerSender::reply
 #[derive(Debug)]
 pub struct MessageHandler {
     msg: Option<SignedMessage>,
 }
 
 impl MessageHandler {
+    /// Creates a new [`MessageHandler`] with an incoming message.
     pub fn new(msg: SignedMessage) -> MessageHandler {
         let msg = Some(msg);
         MessageHandler { msg }
     }
 
+    /// Matches on a question of a specific type.
+    ///
+    /// This will consume the inner data and call `f` if the contained message
+    /// can be replied to.
     pub fn on_question<T, F>(self, f: F) -> MessageHandler
     where
         T: 'static,
@@ -897,6 +1003,10 @@ impl MessageHandler {
         }
     }
 
+    /// Calls a fallback function if the message has still not matched yet.
+    ///
+    /// This consumes the [`MessageHandler`], so that no matching can be
+    /// performed anymore.
     pub fn on_fallback<F>(mut self, f: F)
     where
         F: FnOnce(&dyn Any),
@@ -907,6 +1017,8 @@ impl MessageHandler {
         }
     }
 
+    /// Calls a function if the incoming message is a broadcast and has a
+    /// specific type.
     pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler
     where
         T: 'static + Send + Sync,
@@ -921,6 +1033,8 @@ impl MessageHandler {
         }
     }
 
+    /// Calls a function if the incoming message can't be replied to and has a
+    /// specific type.
     pub fn on_tell<T, F>(self, f: F) -> MessageHandler
     where
         T: 'static,
