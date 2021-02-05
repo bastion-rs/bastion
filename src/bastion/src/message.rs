@@ -279,6 +279,11 @@ impl AnswerSender {
             .send(SignedMessage::new(msg, sign))
             .map_err(|smsg| smsg.msg.try_unwrap().unwrap())
     }
+
+    /// Returns the sender signature.
+    pub fn signature(&self) -> &RefAddr {
+        &self.1
+    }
 }
 
 impl Msg {
@@ -932,12 +937,12 @@ macro_rules! answer {
 ///             loop {
 ///                 MessageHandler::new(ctx.recv().await?)
 ///                     // We match on broadcasts of &str
-///                     .on_broadcast(|msg: &&str| {
+///                     .on_broadcast(|msg: &&str, _sender_addr| {
 ///                         assert_eq!(*msg, BCAST_MSG);
 ///                         // Handle the message...
 ///                     })
 ///                     // We match on messages of &str
-///                     .on_tell(|msg: &str| {
+///                     .on_tell(|msg: &str, _sender_addr| {
 ///                         assert_eq!(msg, TELL_MSG);
 ///                         // Handle the message...
 ///                     })
@@ -952,7 +957,7 @@ macro_rules! answer {
 ///                     // We are only broadcasting, "telling" and "asking" a
 ///                     // `&str` in this example, so we know that this won't
 ///                     // happen...
-///                     .on_fallback(|msg| ());
+///                     .on_fallback(|msg, _sender_addr| ());
 ///             }
 ///         }
 ///     })
@@ -1009,10 +1014,10 @@ impl MessageHandler {
     /// performed anymore.
     pub fn on_fallback<F>(mut self, f: F)
     where
-        F: FnOnce(&dyn Any),
+        F: FnOnce(&dyn Any, RefAddr),
     {
-        if let Some(msg) = self.fallback_arg() {
-            f(msg);
+        if let Some((msg, addr)) = self.fallback_arg() {
+            f(msg, addr.clone());
             self.msg.take();
         }
     }
@@ -1022,11 +1027,11 @@ impl MessageHandler {
     pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler
     where
         T: 'static + Send + Sync,
-        F: FnOnce(&T),
+        F: FnOnce(&T, RefAddr),
     {
         match self.try_into_broadcast::<T>() {
-            Ok(arg) => {
-                f(arg.as_ref());
+            Ok((arg, addr)) => {
+                f(arg.as_ref(), addr);
                 MessageHandler::empty()
             }
             Err(this) => this,
@@ -1038,11 +1043,11 @@ impl MessageHandler {
     pub fn on_tell<T, F>(self, f: F) -> MessageHandler
     where
         T: 'static,
-        F: FnOnce(T),
+        F: FnOnce(T, RefAddr),
     {
         match self.try_into_tell::<T>() {
-            Ok(msg) => {
-                f(msg);
+            Ok((msg, addr)) => {
+                f(msg, addr);
                 MessageHandler::empty()
             }
             Err(this) => this,
@@ -1071,42 +1076,47 @@ impl MessageHandler {
         }
     }
 
-    fn try_into_broadcast<T: Send + Sync + 'static>(mut self) -> Result<Arc<T>, MessageHandler> {
+    fn try_into_broadcast<T: Send + Sync + 'static>(
+        mut self,
+    ) -> Result<(Arc<T>, RefAddr), MessageHandler> {
         match self.msg.take() {
             Some(SignedMessage {
                 msg: Msg(MsgInner::Broadcast(msg)),
-                ..
+                sign,
             }) if msg.is::<T>() => {
                 let msg: Arc<dyn Any + Send + Sync + 'static> = msg;
-                Ok(msg.downcast::<T>().unwrap())
+                Ok((msg.downcast::<T>().unwrap(), sign))
             }
 
             _ => Err(self),
         }
     }
 
-    fn try_into_tell<T: 'static>(mut self) -> Result<T, MessageHandler> {
+    fn try_into_tell<T: 'static>(mut self) -> Result<(T, RefAddr), MessageHandler> {
         match self.msg.take() {
             Some(SignedMessage {
                 msg: Msg(MsgInner::Tell(msg)),
-                ..
+                sign,
             }) if msg.is::<T>() => {
                 let msg: Box<dyn Any> = msg;
-                Ok(*msg.downcast::<T>().unwrap())
+                Ok((*msg.downcast::<T>().unwrap(), sign))
             }
 
             _ => Err(self),
         }
     }
 
-    fn fallback_arg(&self) -> Option<&dyn Any> {
-        let msg = match self.msg.as_ref()?.msg.0 {
+    fn fallback_arg(&self) -> Option<(&dyn Any, &RefAddr)> {
+        let inner_message = self.msg.as_ref()?;
+        let addr = inner_message.signature();
+
+        let msg = match inner_message.msg.0 {
             MsgInner::Broadcast(ref msg) => msg.as_ref(),
             MsgInner::Tell(ref msg) => msg.as_ref(),
             MsgInner::Ask { ref msg, .. } => msg.as_ref(),
         };
 
-        Some(msg)
+        Some((msg, addr))
     }
 }
 
