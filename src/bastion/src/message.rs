@@ -897,10 +897,41 @@ impl MessageHandler {
         }
     }
 
-    pub fn on_fallback(mut self, f: impl FnOnce(&dyn Any)) {
+    pub fn on_fallback<F>(mut self, f: F)
+    where
+        F: FnOnce(&dyn Any),
+    {
         if let Some(msg) = self.fallback_arg() {
             f(msg);
             self.msg.take();
+        }
+    }
+
+    pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler
+    where
+        T: 'static + Send + Sync,
+        F: FnOnce(&T),
+    {
+        match self.try_into_broadcast::<T>() {
+            Ok(arg) => {
+                f(arg.as_ref());
+                MessageHandler::empty()
+            }
+            Err(this) => this,
+        }
+    }
+
+    pub fn on_tell<T, F>(self, f: F) -> MessageHandler
+    where
+        T: 'static,
+        F: FnOnce(T),
+    {
+        match self.try_into_tell::<T>() {
+            Ok(msg) => {
+                f(msg);
+                MessageHandler::empty()
+            }
+            Err(this) => this,
         }
     }
 
@@ -920,6 +951,34 @@ impl MessageHandler {
             }) if msg.is::<T>() => {
                 let msg: Box<dyn Any> = msg;
                 Ok((*msg.downcast::<T>().unwrap(), sender))
+            }
+
+            _ => Err(self),
+        }
+    }
+
+    fn try_into_broadcast<T: Send + Sync + 'static>(mut self) -> Result<Arc<T>, MessageHandler> {
+        match self.msg.take() {
+            Some(SignedMessage {
+                msg: Msg(MsgInner::Broadcast(msg)),
+                ..
+            }) if msg.is::<T>() => {
+                let msg: Arc<dyn Any + Send + Sync + 'static> = msg;
+                Ok(msg.downcast::<T>().unwrap())
+            }
+
+            _ => Err(self),
+        }
+    }
+
+    fn try_into_tell<T: 'static>(mut self) -> Result<T, MessageHandler> {
+        match self.msg.take() {
+            Some(SignedMessage {
+                msg: Msg(MsgInner::Tell(msg)),
+                ..
+            }) if msg.is::<T>() => {
+                let msg: Box<dyn Any> = msg;
+                Ok(*msg.downcast::<T>().unwrap())
             }
 
             _ => Err(self),
