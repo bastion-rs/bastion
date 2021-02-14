@@ -279,11 +279,6 @@ impl AnswerSender {
             .send(SignedMessage::new(msg, sign))
             .map_err(|smsg| smsg.msg.try_unwrap().unwrap())
     }
-
-    /// Returns the sender signature.
-    pub fn signature(&self) -> &RefAddr {
-        &self.1
-    }
 }
 
 impl Msg {
@@ -1049,7 +1044,7 @@ impl<O> MessageHandler<O> {
         F: FnOnce(&dyn Any, RefAddr) -> O,
     {
         self.state
-            .output_or_else(|msg| f(msg.msg.as_ref(), msg.signature().clone()))
+            .output_or_else(|SignedMessage { msg, sign }| f(msg.as_ref(), sign))
     }
 
     /// Calls a function if the incoming message is a broadcast and has a
