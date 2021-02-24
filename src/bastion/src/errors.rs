@@ -8,7 +8,10 @@ use std::time::Duration;
 
 #[derive(Debug)]
 /// These errors happen
-/// when try_recv() or try_recv_timeout() are invoked
+/// when [`try_recv`] or [`try_recv_timeout`] are invoked
+///
+/// [`try_recv`]: crate::context::BastionContext::try_recv
+/// [`try_recv_timeout`]: crate::context::BastionContext::try_recv_timeout
 pub enum ReceiveError {
     /// We didn't receive a message on time
     Timeout(Duration),

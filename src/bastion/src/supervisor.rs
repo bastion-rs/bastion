@@ -70,10 +70,8 @@ use tracing::{debug, trace, warn};
 /// # }
 /// ```
 ///
-/// [`Children`]: children/struct.Children.html
-/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
-/// [`with_strategy`]: #method.with_strategy
-/// [`Bastion::children`]: struct.Bastion.html#method.children
+/// [`Bastion::children`]: crate::Bastion::children
+/// [`with_strategy`]: Self::with_strategy
 pub struct Supervisor {
     bcast: Broadcast,
     // The order in which children and supervisors were added.
@@ -140,7 +138,7 @@ enum ActorSearchMethod {
 /// A "reference" to a [`Supervisor`], allowing to
 /// communicate with it.
 ///
-/// [`Supervisor`]: supervisor/struct.Supervisor.html
+// [`Supervisor`]: supervisor/struct.Supervisor.html
 pub struct SupervisorRef {
     id: BastionId,
     sender: Sender,
@@ -200,8 +198,8 @@ pub enum RestartPolicy {
 /// restoring failed actors. It it fails after N attempts,
 /// the supervisor will remove an actor.
 ///
-/// The default strategy used is `ActorRestartStrategy::Immediate`
-/// with the `RestartPolicy::Always` restart policy.
+/// The default strategy used is [`ActorRestartStrategy::Immediate`]
+/// with the [`RestartPolicy::Always`] restart policy.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RestartStrategy {
     restart_policy: RestartPolicy,
@@ -212,7 +210,9 @@ pub struct RestartStrategy {
 /// The strategy for restating an actor as far as it
 /// returned an failure.
 ///
-/// The default strategy is `Immediate`.
+/// The default strategy is [`Immediate`].
+///
+/// [`Immediate`]: ActorRestartStrategy::Immediate
 pub enum ActorRestartStrategy {
     /// Restart an actor as soon as possible, since the moment
     /// the actor finished with a failure.
@@ -468,8 +468,7 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: ../struct.SupervisorRef.html
-    /// [`supervisor_ref`]: #method.supervisor_ref
+    /// [`supervisor_ref`]: Self::supervisor_ref
     pub fn supervisor<S>(self, init: S) -> Self
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -545,8 +544,7 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: ../struct.SupervisorRef.html
-    /// [`supervisor`]: #method.supervisor
+    /// [`supervisor`]: Self::supervisor
     pub fn supervisor_ref<S>(&mut self, init: S) -> SupervisorRef
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -630,9 +628,9 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`children_ref`]: #method.children_ref
+    // [`Children`]: children/struct.Children.html
+    // [`ChildrenRef`]: children/struct.ChildrenRef.html
+    /// [`children_ref`]: Self::children_ref
     pub fn children<C>(self, init: C) -> Self
     where
         C: FnOnce(Children) -> Children,
@@ -721,9 +719,7 @@ impl Supervisor {
     /// # }
     /// ```
     ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
-    /// [`children`]: #method.children
+    /// [`children`]: Self::children
     pub fn children_ref<C>(&self, init: C) -> ChildrenRef
     where
         C: FnOnce(Children) -> Children,
@@ -810,10 +806,6 @@ impl Supervisor {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
-    /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
-    /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn with_strategy(mut self, strategy: SupervisionStrategy) -> Self {
         trace!(
             "Supervisor({}): Setting strategy: {:?}",
@@ -921,8 +913,6 @@ impl Supervisor {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         trace!(
             "Supervisor({}): Setting callbacks: {:?}",
@@ -1591,8 +1581,6 @@ impl SupervisorRef {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
     pub fn supervisor<S>(&self, init: S) -> Result<Self, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -1675,9 +1663,6 @@ impl SupervisorRef {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn children<C>(&self, init: C) -> Result<ChildrenRef, ()>
     where
         C: FnOnce(Children) -> Children,
@@ -1775,10 +1760,6 @@ impl SupervisorRef {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`SupervisionStrategy::OneForOne`]: supervisor/enum.SupervisionStrategy.html#variant.OneForOne
-    /// [`SupervisionStrategy::OneForAll`]: supervisor/enum.SupervisionStrategy.html#variant.OneForAll
-    /// [`SupervisionStrategy::RestForOne`]: supervisor/enum.SupervisionStrategy.html#variant.RestForOne
     pub fn strategy(&self, strategy: SupervisionStrategy) -> Result<(), ()> {
         debug!(
             "SupervisorRef({}): Setting strategy: {:?}",
@@ -2051,11 +2032,11 @@ impl RestartStrategy {
     /// # Arguments
     ///
     /// * `restart_policy` - Defines a restart policy to use for failed actor:
-    ///     - [`RestartStrategy::Always`] would restart the
+    ///     - [`RestartPolicy::Always`] would restart the
     ///         failed actor each time as it fails.
-    ///     - [`RestartStrategy::Never`] would not restart the
+    ///     - [`RestartPolicy::Never`] would not restart the
     ///         failed actor and remove it from tracking.
-    ///     - [`RestartStrategy::Tries`] would restart the
+    ///     - [`RestartPolicy::Tries`] would restart the
     ///         failed actor a limited amount of times. If can't be started,
     ///         then will remove it from tracking.   
     ///
@@ -2079,13 +2060,6 @@ impl RestartStrategy {
     /// let restart_strategy = RestartStrategy::default()
     ///     .with_actor_restart_strategy(actor_restart_strategy);
     /// ```
-    ///
-    /// [`RestartStrategy::Always`]: enum.RestartPolicy.html#variant.Always
-    /// [`RestartStrategy::Never`]: enum.RestartPolicy.html#variant.Never
-    /// [`RestartStrategy::Tries`]: enum.RestartPolicy.html#variant.Tries
-    /// [`ActorRestartStrategy::Immediate`]: enum.ActorRestartStrategy.html#variant.Immediate
-    /// [`ActorRestartStrategy::LinearBackOff`]: enum.ActorRestartStrategy.html#variant.LinearBackOff
-    /// [`ActorRestartStrategy::ExponentialBackOff`]: enum.ActorRestartStrategy.html#variant.ExponentialBackOff
     pub fn new(restart_policy: RestartPolicy, strategy: ActorRestartStrategy) -> Self {
         RestartStrategy {
             restart_policy,

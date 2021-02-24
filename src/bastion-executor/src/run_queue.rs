@@ -18,39 +18,34 @@
 //!
 //! [`Worker`] has two constructors:
 //!
-//! * [`new_fifo()`] - Creates a FIFO queue, in which tasks are pushed and popped from opposite
+//! * [`new_fifo`] - Creates a FIFO queue, in which tasks are pushed and popped from opposite
 //!   ends.
-//! * [`new_lifo()`] - Creates a LIFO queue, in which tasks are pushed and popped from the same
+//! * [`new_lifo`] - Creates a LIFO queue, in which tasks are pushed and popped from the same
 //!   end.
 //!
 //! Each [`Worker`] is owned by a single thread and supports only push and pop operations.
 //!
-//! Method [`stealer()`] creates a [`Stealer`] that may be shared among threads and can only steal
+//! Method [`stealer`] creates a [`Stealer`] that may be shared among threads and can only steal
 //! tasks from its [`Worker`]. Tasks are stolen from the end opposite to where they get pushed.
 //!
 //! # Stealing
 //!
 //! Steal operations come in three flavors:
 //!
-//! 1. [`steal()`] - Steals one task.
-//! 2. [`steal_batch()`] - Steals a batch of tasks and moves them into another worker.
-//! 3. [`steal_batch_and_pop()`] - Steals a batch of tasks, moves them into another queue, and pops
+//! 1. [`steal`] - Steals one task.
+//! 2. [`steal_batch`] - Steals a batch of tasks and moves them into another worker.
+//! 3. [`steal_batch_and_pop`] - Steals a batch of tasks, moves them into another queue, and pops
 //!    one task from that worker.
 //!
 //! In contrast to push and pop operations, stealing can spuriously fail with [`Steal::Retry`], in
 //! which case the steal operation needs to be retried.
 //!
-//!
-//! [`Worker`]: struct.Worker.html
-//! [`Stealer`]: struct.Stealer.html
-//! [`Injector`]: struct.Injector.html
-//! [`Steal::Retry`]: enum.Steal.html#variant.Retry
-//! [`new_fifo()`]: struct.Worker.html#method.new_fifo
-//! [`new_lifo()`]: struct.Worker.html#method.new_lifo
-//! [`stealer()`]: struct.Worker.html#method.stealer
-//! [`steal()`]: struct.Stealer.html#method.steal
-//! [`steal_batch()`]: struct.Stealer.html#method.steal_batch
-//! [`steal_batch_and_pop()`]: struct.Stealer.html#method.steal_batch_and_pop
+//! [`new_fifo`]: Worker::new_fifo
+//! [`new_lifo`]: Worker::new_lifo
+//! [`stealer`]: Worker::stealer
+//! [`steal`]: Stealer::steal
+//! [`steal_batch`]: Stealer::steal_batch
+//! [`steal_batch_and_pop`]: Stealer::steal_batch_and_pop
 use crossbeam_epoch::{self as epoch, Atomic, Owned};
 use crossbeam_utils::{Backoff, CachePadded};
 use std::cell::{Cell, UnsafeCell};
@@ -1784,10 +1779,14 @@ impl<T> fmt::Debug for Steal<T> {
 }
 
 impl<T> FromIterator<Steal<T>> for Steal<T> {
-    /// Consumes items until a `Success` is found and returns it.
+    /// Consumes items until a [`Success`] is found and returns it.
     ///
-    /// If no `Success` was found, but there was at least one `Retry`, then returns `Retry`.
-    /// Otherwise, `Empty` is returned.
+    /// If no [`Success`] was found, but there was at least one [`Retry`], then returns [`Retry`].
+    /// Otherwise, [`Empty`] is returned.
+    ///
+    /// [`Success`]: Steal::Success
+    /// [`Retry`]: Steal::Retry
+    /// [`Empty`]: Steal::Empty
     fn from_iter<I>(iter: I) -> Steal<T>
     where
         I: IntoIterator<Item = Steal<T>>,
