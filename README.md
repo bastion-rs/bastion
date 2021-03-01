@@ -160,6 +160,10 @@ For more information please check [Bastion Documentation](https://docs.rs/bastio
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
 
+Supervision strategies define how child actor failures are handled, how often a child can fail, and how long to wait before a child actor is recreated. As the name suggests, One-For-One strategy means the supervision strategy is applied only to the failed child. All-For-One strategy means that the supervision strategy is applied to all the actor siblings as well. One-for-one supervision is used at the root supervisor, while child groups may have different strategies like rest-for-one or one-for-all.
+
+![Bastion Architecture](img/bastion-architecture.png)
+
 ## License
 
 Licensed under either of
