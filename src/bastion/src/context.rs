@@ -730,7 +730,7 @@ impl BastionContext {
             msg,
             to
         );
-        let (msg, answer) = BastionMessage::ask(msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.signature());
         let env = Envelope::new_with_sign(msg, self.signature());
         // FIXME: panics?
         to.sender()
