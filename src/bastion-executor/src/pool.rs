@@ -1,8 +1,11 @@
 //!
 //! Pool of threads to run lightweight processes
 //!
-//! We spawn futures onto the pool with [spawn] method of global run queue or
-//! with corresponding [Worker]'s spawn method.
+//! We spawn futures onto the pool with [`spawn`] method of global run queue or
+//! with corresponding [`Worker`]'s spawn method.
+//!
+//! [`spawn`]: crate::pool::spawn
+//! [`Worker`]: crate::run_queue::Worker
 
 use crate::thread_manager::{DynamicPoolManager, DynamicRunner};
 use crate::worker;

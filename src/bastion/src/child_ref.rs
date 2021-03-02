@@ -303,7 +303,6 @@ impl ChildRef {
     /// # }
     /// ```
     ///
-    /// [`Answer`]: message/struct.Answer.html
     pub fn ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg, self.addr());
@@ -435,7 +434,7 @@ impl ChildRef {
         &self.path
     }
 
-    /// Return the [`name`] of the child
+    /// Return the `name` of the child
     pub fn name(&self) -> &str {
         &self.name
     }

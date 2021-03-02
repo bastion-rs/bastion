@@ -26,10 +26,10 @@ use tracing::{debug, trace};
 /// implement the following traits: [`Any`], [`Send`],
 /// [`Sync`] and [`Debug`]).
 ///
-/// [`Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-/// [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
-/// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
+/// [`Any`]: std::any::Any
+/// [`Send`]: std::marker::Send
+/// [`Sync`]: std::marker::Sync
+/// [`Debug`]: std::fmt::Debug
 pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
@@ -44,7 +44,7 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>, RefAddr);
 
 #[derive(Debug)]
 /// A [`Future`] returned when successfully "asking" a
-/// message using [`ChildRef::ask`] and which resolves to
+/// message using [`ChildRef::ask_anonymously`] and which resolves to
 /// a `Result<Msg, ()>` where the [`Msg`] is the message
 /// answered by the child (see the [`msg!`] macro for more
 /// information).
@@ -125,10 +125,8 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>, RefAddr);
 /// # }
 /// ```
 ///
-/// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-/// [`ChildRef::ask`]: ../children/struct.ChildRef.html#method.ask
-/// [`Msg`]: message/struct.Msg.html
-/// [`msg!`]: macro.msg.html
+/// [`Future`]: std::future::Future
+/// [`ChildRef::ask_anonymously`]: crate::child_ref::ChildRef::ask_anonymously
 pub struct Answer(Receiver<SignedMessage>);
 
 #[derive(Debug)]
@@ -198,9 +196,8 @@ pub struct Answer(Receiver<SignedMessage>);
 /// # }
 /// ```
 ///
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
-/// [`msg!`]: macro.msg.html
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
 pub struct Msg(MsgInner);
 
 #[derive(Debug)]
@@ -676,9 +673,8 @@ impl Future for Answer {
 /// # }
 /// ```
 ///
-/// [`Msg`]: children/struct.Msg.html
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
 macro_rules! msg {
     ($msg:expr, $($tokens:tt)+) => {
         msg!(@internal $msg, (), (), (), $($tokens)+)
