@@ -2,6 +2,8 @@
   <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
+---
+
 <table>
   <tr>
     <td>Latest Release</td>
