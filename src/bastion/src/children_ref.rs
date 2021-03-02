@@ -112,8 +112,6 @@ impl ChildrenRef {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn dispatchers(&self) -> &Vec<DispatcherType> {
         &self.dispatchers
     }
@@ -148,8 +146,6 @@ impl ChildrenRef {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn elems(&self) -> &[ChildRef] {
         &self.children
     }
@@ -216,7 +212,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     ///
-    /// [`elems`]: #method.elems
+    /// [`elems`]: Self::elems
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
         debug!(
             "ChildrenRef({}): Broadcasting message: {:?}",

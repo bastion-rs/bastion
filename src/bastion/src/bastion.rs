@@ -206,9 +206,6 @@ impl Bastion {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init_with`]: #method.init_with
     pub fn init() {
         let config = Config::default();
         Bastion::init_with(config)
@@ -254,9 +251,6 @@ impl Bastion {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init`]: #method.init
     pub fn init_with(config: Config) {
         debug!("Bastion: Initializing with config: {:?}", config);
         if config.backtraces().is_hide() {
@@ -310,9 +304,6 @@ impl Bastion {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     pub fn supervisor<S>(init: S) -> Result<SupervisorRef, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -392,9 +383,6 @@ impl Bastion {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn children<C>(init: C) -> Result<ChildrenRef, ()>
     where
         C: FnOnce(Children) -> Children,
@@ -446,11 +434,6 @@ impl Bastion {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Children::with_exec`]: children/struct.Children.html#method.with_exec
-    /// [`Bastion::children`]: #method.children
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn spawn<I, F>(action: I) -> Result<ChildrenRef, ()>
     where
         I: Fn(BastionContext) -> F + Send + 'static,
@@ -674,7 +657,7 @@ impl Bastion {
     }
 
     /// Blocks the current thread until the system is stopped
-    /// (either by calling [`Bastion::stop()`] or
+    /// (either by calling [`Bastion::stop`] or
     /// [`Bastion::kill`]).
     ///
     /// # Example
@@ -708,9 +691,6 @@ impl Bastion {
     /// // stopped or killed it...
     /// # }
     /// ```
-    ///
-    /// [`Bastion::stop()`]: #method.stop
-    /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
         SYSTEM.wait_until_stopped();

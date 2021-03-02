@@ -1,8 +1,10 @@
 //!
 //! Pool of threads to run heavy processes
 //!
-//! We spawn futures onto the pool with [spawn_blocking] method of global run queue or
-//! with corresponding [Worker]'s spawn method.
+//! We spawn futures onto the pool with [`spawn_blocking`] method of global run queue or
+//! with corresponding [`Worker`]'s spawn method.
+//!
+//! [`Worker`]: crate::run_queue::Worker
 
 use crate::thread_manager::{DynamicPoolManager, DynamicRunner};
 use crossbeam_channel::{unbounded, Receiver, Sender};

@@ -34,7 +34,7 @@
 /// # }
 /// ```
 ///
-/// [`Bastion::init_with`]: struct.Bastion.html#method.init_with
+/// [`Bastion::init_with`]: crate::Bastion::init_with
 pub struct Config {
     backtraces: Backtraces,
 }
@@ -53,8 +53,6 @@ impl Config {
     /// Creates a new configuration with the following default
     /// behaviors:
     /// - All backtraces are shown (see [`Config::show_backtraces`]).
-    ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
     pub fn new() -> Self {
         Config::default()
     }
@@ -133,8 +131,6 @@ impl Config {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
     pub fn hide_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::hide();
         self

@@ -74,7 +74,7 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 pub struct BastionId(pub(crate) Uuid);
 
 #[derive(Debug)]
-/// A child's execution context, allowing its [`exec`] future
+/// A child's execution context, allowing its [`with_exec`] future
 /// to receive messages and access a [`ChildRef`] referencing
 /// it, a [`ChildrenRef`] referencing its children group and
 /// a [`SupervisorRef`] referencing its supervisor.
@@ -130,6 +130,8 @@ pub struct BastionId(pub(crate) Uuid);
 /// # Bastion::block_until_stopped();
 /// # }
 /// ```
+///
+/// [`with_exec`]: crate::children::Children::with_exec
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
@@ -212,8 +214,6 @@ impl BastionContext {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn current(&self) -> &ChildRef {
         &self.child
     }
@@ -257,8 +257,6 @@ impl BastionContext {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn parent(&self) -> &ChildrenRef {
         &self.children
     }
@@ -325,7 +323,6 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     /// [`Bastion::children`]: struct.Bastion.html#method.children
     pub fn supervisor(&self) -> Option<&SupervisorRef> {
         self.supervisor.as_ref()
@@ -380,9 +377,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`recv`]: #method.recv
-    /// [`try_recv_timeout`]: #method.try_recv_timeout
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`recv`]: Self::method.recv
+    /// [`try_recv_timeout`]: Self::method.try_recv_timeout
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         // We want to let a tick pass
         // otherwise guard will never contain anything.
@@ -448,9 +444,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`try_recv`]: #method.try_recv
-    /// [`try_recv_timeout`]: #method.try_recv_timeout
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`try_recv`]: Self::try_recv
+    /// [`try_recv_timeout`]: Self::try_recv_timeout
     pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
@@ -517,9 +512,9 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`recv`]: #method.recv
-    /// [`try_recv`]: #method.try_recv
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`recv`]: Self::recv
+    /// [`try_recv`]: Self::try_recv
+    /// [`SignedMessage`]: .crate::enveloppe::SignedMessage
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
         debug!(
             "BastionContext({}): Waiting to receive message within {} milliseconds.",
@@ -574,7 +569,8 @@ impl BastionContext {
     /// # }
     /// ```
     ///
-    /// [`RefAddr`]: /prelude/struct.Answer.html
+    // TODO(scrabsha): should we link to Answer or to RefAddr?
+    // [`RefAddr`]: /prelude/struct.Answer.html
     pub fn signature(&self) -> RefAddr {
         RefAddr::new(
             self.current().path().clone(),
@@ -627,8 +623,6 @@ impl BastionContext {
     /// # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`RefAddr`]: ../prelude/struct.RefAddr.html
     pub fn tell<M: Message>(&self, to: &RefAddr, msg: M) -> Result<(), M> {
         debug!(
             "{:?}: Telling message: {:?} to: {:?}",
@@ -729,8 +723,6 @@ impl BastionContext {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Answer`]: /message/struct.Answer.html
     pub fn ask<M: Message>(&self, to: &RefAddr, msg: M) -> Result<Answer, M> {
         debug!(
             "{:?}: Asking message: {:?} to: {:?}",
@@ -770,7 +762,6 @@ impl BastionContext {
     /// the [`BroadcastTarget`] value.
     /// * `message` - The broadcasted message.
     ///
-    /// [`BroadcastTarget`]: ../dispatcher/enum.DispatcherType.html
     pub fn broadcast_message<M: Message>(&self, target: BroadcastTarget, message: M) {
         let msg = Arc::new(SignedMessage {
             msg: Msg::broadcast(message),
