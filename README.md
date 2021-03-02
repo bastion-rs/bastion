@@ -2,7 +2,7 @@
   <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
-<table align="center">
+<table>
   <tr>
     <td>Latest Release</td>
     <td>
