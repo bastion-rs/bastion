@@ -2,11 +2,7 @@
   <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
------------------
-
-<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
-
-<table align="left" style="float: left; margin: 5px 10px 0px 0px; border: 1px solid #000000;">
+<table align="center">
   <tr>
     <td>Latest Release</td>
     <td>
@@ -14,17 +10,12 @@
       <img alt="Crates.io" src="https://img.shields.io/crates/v/bastion.svg?style=popout-square">
       </a>
     </td>
-  </tr>
-  <tr>
-    <td></td>
-  </tr>
-  <tr>
     <td>License</td>
     <td>
       <a href="https://github.com/bastion-rs/bastion/blob/master/LICENSE">
       <img alt="Crates.io" src="https://img.shields.io/crates/l/bastion.svg?style=popout-square">
       </a>
-  </td>
+    </td>
   </tr>
   <tr>
     <td>Doc [Bastion]</td>
@@ -33,32 +24,6 @@
       <img alt="Documentation (Bastion)" src="https://img.shields.io/badge/rustdoc-bastion-blue.svg" />
       </a>
     </td>
-  </tr>
-  <tr>
-    <td>Doc [Bastion Executor]</td>
-    <td>
-      <a href="https://docs.rs/bastion-executor">
-      <img alt="Documentation (Bastion Executor)" src="https://img.shields.io/badge/rustdoc-bastion_executor-blue.svg" />
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td>Doc [LightProc]</td>
-    <td>
-      <a href="https://docs.rs/lightproc">
-      <img alt="Documentation (LightProc)" src="https://img.shields.io/badge/rustdoc-lightproc-blue.svg" />
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td>Build Status</td>
-    <td>
-      <a href="https://github.com/bastion-rs/bastion/actions">
-      <img alt="Build Status" src="https://github.com/bastion-rs/bastion/workflows/CI/badge.svg" />
-      </a>
-    </td>
-  </tr>
-  <tr>
     <td>Downloads</td>
     <td>
       <a href="https://crates.io/crates/bastion">
@@ -67,6 +32,12 @@
     </td>
   </tr>
   <tr>
+  <td>Doc [Bastion Executor]</td>
+    <td>
+      <a href="https://docs.rs/bastion-executor">
+      <img alt="Documentation (Bastion Executor)" src="https://img.shields.io/badge/rustdoc-bastion_executor-blue.svg" />
+      </a>
+    </td>
     <td>Discord</td>
     <td>
       <a href="https://discord.gg/DqRqtRT">
@@ -74,9 +45,27 @@
       </a>
     </td>
   </tr>
+  <tr>
+  </tr>
+  <tr>
+    <td>Doc [LightProc]</td>
+    <td>
+      <a href="https://docs.rs/lightproc">
+      <img alt="Documentation (LightProc)" src="https://img.shields.io/badge/rustdoc-lightproc-blue.svg" />
+      </a>
+    </td>
+    <td>Build Status</td>
+    <td>
+      <a href="https://github.com/bastion-rs/bastion/actions">
+      <img alt="Build Status" src="https://github.com/bastion-rs/bastion/workflows/CI/badge.svg" />
+      </a>
+    </td>
+  </tr>
 </table>
 
 ---
+
+<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
 
 Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery.
 
