@@ -2,81 +2,72 @@
   <img src="https://github.com/bastion-rs/bastion/blob/master/img/bastion.png"><br>
 </div>
 
------------------
+---
 
-<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
-
-<table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
-<tr>
-  <td>Latest Release</td>
-  <td>
-    <a href="https://crates.io/crates/bastion">
-    <img alt="Crates.io" src="https://img.shields.io/crates/v/bastion.svg?style=popout-square">
-    </a>
-  </td>
-</tr>
-<tr>
-  <td></td>
-</tr>
-<tr>
-  <td>License</td>
-  <td>
-    <a href="https://github.com/bastion-rs/bastion/blob/master/LICENSE">
-    <img alt="Crates.io" src="https://img.shields.io/crates/l/bastion.svg?style=popout-square">
-    </a>
-</td>
-</tr>
-<tr>
-  <td>Doc [Bastion]</td>
-  <td>
-    <a href="https://docs.rs/bastion">
-    <img alt="Documentation (Bastion)" src="https://img.shields.io/badge/rustdoc-bastion-blue.svg" />
-    </a>
-  </td>
-</tr>
-<tr>
+<table>
+  <tr>
+    <td>Latest Release</td>
+    <td>
+      <a href="https://crates.io/crates/bastion">
+      <img alt="Crates.io" src="https://img.shields.io/crates/v/bastion.svg?style=popout-square">
+      </a>
+    </td>
+    <td>License</td>
+    <td>
+      <a href="https://github.com/bastion-rs/bastion/blob/master/LICENSE">
+      <img alt="Crates.io" src="https://img.shields.io/crates/l/bastion.svg?style=popout-square">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td>Doc [Bastion]</td>
+    <td>
+      <a href="https://docs.rs/bastion">
+      <img alt="Documentation (Bastion)" src="https://img.shields.io/badge/rustdoc-bastion-blue.svg" />
+      </a>
+    </td>
+    <td>Downloads</td>
+    <td>
+      <a href="https://crates.io/crates/bastion">
+      <img alt="Crates.io" src="https://img.shields.io/crates/d/bastion.svg?style=popout-square">
+      </a>
+    </td>
+  </tr>
+  <tr>
   <td>Doc [Bastion Executor]</td>
-  <td>
-    <a href="https://docs.rs/bastion-executor">
-    <img alt="Documentation (Bastion Executor)" src="https://img.shields.io/badge/rustdoc-bastion_executor-blue.svg" />
-    </a>
-  </td>
-</tr>
-<tr>
-  <td>Doc [LightProc]</td>
-  <td>
-    <a href="https://docs.rs/lightproc">
-    <img alt="Documentation (LightProc)" src="https://img.shields.io/badge/rustdoc-lightproc-blue.svg" />
-    </a>
-  </td>
-</tr>
-<tr>
-  <td>Build Status</td>
-  <td>
-    <a href="https://github.com/bastion-rs/bastion/actions">
-    <img alt="Build Status" src="https://github.com/bastion-rs/bastion/workflows/CI/badge.svg" />
-    </a>
-  </td>
-</tr>
-<tr>
-  <td>Downloads</td>
-  <td>
-    <a href="https://crates.io/crates/bastion">
-    <img alt="Crates.io" src="https://img.shields.io/crates/d/bastion.svg?style=popout-square">
-    </a>
-  </td>
-</tr>
-<tr>
-	<td>Discord</td>
-	<td>
-		<a href="https://discord.gg/DqRqtRT">
-		<img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
-		</a>
-	</td>
-</tr>
+    <td>
+      <a href="https://docs.rs/bastion-executor">
+      <img alt="Documentation (Bastion Executor)" src="https://img.shields.io/badge/rustdoc-bastion_executor-blue.svg" />
+      </a>
+    </td>
+    <td>Discord</td>
+    <td>
+      <a href="https://discord.gg/DqRqtRT">
+      <img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+  </tr>
+  <tr>
+    <td>Doc [LightProc]</td>
+    <td>
+      <a href="https://docs.rs/lightproc">
+      <img alt="Documentation (LightProc)" src="https://img.shields.io/badge/rustdoc-lightproc-blue.svg" />
+      </a>
+    </td>
+    <td>Build Status</td>
+    <td>
+      <a href="https://github.com/bastion-rs/bastion/actions">
+      <img alt="Build Status" src="https://github.com/bastion-rs/bastion/workflows/CI/badge.svg" />
+      </a>
+    </td>
+  </tr>
 </table>
 
 ---
+
+<h1 align="center">Highly-available Distributed Fault-tolerant Runtime</h1>
 
 Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispatch-oriented, lightweight process model. It supplies actor-model-like concurrency with a lightweight process implementation and utilizes all of the system resources efficiently guaranteeing of at-most-once message delivery.
 
@@ -86,6 +77,23 @@ Bastion is a highly-available, fault-tolerant runtime system with dynamic, dispa
 
 Bastion comes with a default one-for-one strategy root supervisor.
 You can use this to launch automatically supervised tasks.
+
+## Get Started
+
+Include bastion to your project with:
+```toml
+bastion = "0.4"
+```
+
+### Documentation
+
+Official documentation is hosted on [docs.rs](https://docs.rs/bastion).
+
+### Examples
+
+Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
+
+[Examples](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples) cover possible use cases of the crate.
 
 ## Features
 * Message-based communication makes this project a lean mesh of actor system.
@@ -144,18 +152,6 @@ It's independent of it's framework implementation. It uses lightproc to encapsul
 ### [Agnostik](https://github.com/bastion-rs/agnostik)
 Agnostik is a layer between your application and the executor for your async stuff. It lets you switch the executors smooth and easy without having to change your applications code. Valid features are `runtime_bastion` (default), `runtime_tokio`, `runtime_asyncstd` and `runtime_nostd` (coming soon).
 
-## Get Started
-Check the [getting started example](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples/getting_started.rs) in <code>bastion/examples</code>
-
-[Examples](https://github.com/bastion-rs/bastion/blob/master/src/bastion/examples) cover possible use cases of the crate.
-
-Include bastion to your project with:
-```toml
-bastion = "0.4"
-```
-
-For more information please check [Bastion Documentation](https://docs.rs/bastion)
-
 ## Architecture of the Runtime
 Runtime is structured by the user. Only root supervision comes in batteries-included fashion.
 Worker code, worker group redundancy, supervisors and their supervision strategies are defined by the user.
@@ -163,6 +159,20 @@ Worker code, worker group redundancy, supervisors and their supervision strategi
 Supervision strategies define how child actor failures are handled, how often a child can fail, and how long to wait before a child actor is recreated. As the name suggests, One-For-One strategy means the supervision strategy is applied only to the failed child. All-For-One strategy means that the supervision strategy is applied to all the actor siblings as well. One-for-one supervision is used at the root supervisor, while child groups may have different strategies like rest-for-one or one-for-all.
 
 ![Bastion Architecture](img/bastion-architecture.png)
+
+## Community
+### Getting Help
+Please head to our [Discord](https://discord.gg/DqRqtRT) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastion)
+
+### Discussion and Development
+We use [Discord](https://discord.gg/DqRqtRT) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
+More interaction and more ideas are better!
+
+### Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
+
+All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
+
+A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](https://github.com/bastion-rs/.github/blob/master/CONTRIBUTING.md) on GitHub[.](https://youtu.be/w55YCDzZjvA)
 
 ## License
 
@@ -172,25 +182,6 @@ Licensed under either of
  * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
-
-## Documentation
-
-Official documentation is hosted on [docs.rs](https://docs.rs/bastion).
-
-## Getting Help
-Please head to our [Discord](https://discord.gg/DqRqtRT) or use [StackOverflow](https://stackoverflow.com/questions/tagged/bastion)
-
-## Discussion and Development
-We use [Discord](https://discord.gg/DqRqtRT) for development discussions. Also please don't hesitate to open issues on GitHub ask for features, report bugs, comment on design and more!
-More interaction and more ideas are better!
-
-## Contributing to Bastion [![Open Source Helpers](https://www.codetriage.com/bastion-rs/bastion/badges/users.svg)](https://www.codetriage.com/bastion-rs/bastion)
-
-All contributions, bug reports, bug fixes, documentation improvements, enhancements and ideas are welcome.
-
-A detailed overview on how to contribute can be found in the  [CONTRIBUTING guide](https://github.com/bastion-rs/.github/blob/master/CONTRIBUTING.md) on GitHub[.](https://youtu.be/w55YCDzZjvA)
-
-## License
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbastion-rs%2Fbastion?ref=badge_large)
 
