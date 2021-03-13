@@ -380,7 +380,7 @@ impl Children {
     ///
     /// # Arguments
     ///
-    /// * `redundancy` - An instance of struct that implements the
+    /// * `dispatcher` - An instance of struct that implements the
     /// [`DispatcherHandler`] trait.
     ///
     /// # Example
