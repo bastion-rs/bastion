@@ -12,7 +12,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
@@ -92,7 +92,7 @@ impl DispatcherHandler for RoundRobinHandler {
         let current_index = self.index.load(Ordering::SeqCst) % entries.len();
 
         if let Some(entry) = entries.get(current_index) {
-            warn!(
+            debug!(
                 "sending message to child {}/{} - {}",
                 current_index + 1,
                 entries.len(),
@@ -354,7 +354,7 @@ impl GlobalDispatcher {
                 // TODO: Put the message into the dead queue
                 None => {
                     let name = dispatcher_type.name();
-                    warn!(
+                    debug!(
                         "The message can't be delivered to the group with the '{}' name.",
                         name
                     );
@@ -369,7 +369,7 @@ impl GlobalDispatcher {
         let is_registered = self.dispatchers.contains_key(&dispatcher_type);
 
         if is_registered && dispatcher_type != DispatcherType::Anonymous {
-            warn!(
+            debug!(
                 "The dispatcher with the '{:?}' name already registered in the cluster.",
                 dispatcher_type
             );
