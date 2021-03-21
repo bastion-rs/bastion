@@ -26,11 +26,11 @@ maintenance = { status = "actively-developed" }
 
 [features]
 unstable = []
+tokio-runtime = ["tokio"]
 
 [dependencies]
-lightproc = "0.3.5"
 bastion-utils = "0.3.2"
-# lightproc = { path = "../lightproc" }
+lightproc = "0.3"
 # bastion-utils = { path = "../bastion-utils" }
 
 crossbeam-utils = "0.8"
@@ -49,10 +49,15 @@ lever = "0.1"
 tracing = "0.1.19"
 crossbeam-queue = "0.3.0"
 
+# Feature tokio
+tokio = {version = "1.1", features = ["rt", "rt-multi-thread"], optional = true }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "^0.3.8", features = ["basetsd"] }
 
 [dev-dependencies]
+tokio = {version = "1.1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-test = "0.4.0"
 proptest = "^0.10"
 futures = "0.3.5"
 tracing-subscriber = "0.2.11"

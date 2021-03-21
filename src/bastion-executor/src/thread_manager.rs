@@ -216,8 +216,7 @@ impl DynamicPoolManager {
                 .name("bastion-driver-dynamic".to_string())
                 .spawn(move || {
                     Self::affinity_pinner();
-                    let parker = || self.park_thread();
-                    clone.run_dynamic(&parker);
+                    clone.run_dynamic(&|| self.park_thread());
                 })
                 .expect("cannot start dynamic thread");
         });

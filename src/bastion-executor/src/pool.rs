@@ -1,8 +1,11 @@
 //!
 //! Pool of threads to run lightweight processes
 //!
-//! We spawn futures onto the pool with [spawn] method of global run queue or
-//! with corresponding [Worker]'s spawn method.
+//! We spawn futures onto the pool with [`spawn`] method of global run queue or
+//! with corresponding [`Worker`]'s spawn method.
+//!
+//! [`spawn`]: crate::pool::spawn
+//! [`Worker`]: crate::run_queue::Worker
 
 use crate::thread_manager::{DynamicPoolManager, DynamicRunner};
 use crate::worker;
@@ -27,6 +30,18 @@ use tracing::trace;
 /// use bastion_executor::prelude::*;
 /// use lightproc::prelude::*;
 ///
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    start();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    start();    
+/// # }
+/// #
+/// # fn start() {
 /// let pid = 1;
 /// let stack = ProcStack::default().with_pid(pid);
 ///
@@ -43,6 +58,7 @@ use tracing::trace;
 ///     },
 ///     stack.clone(),
 /// );
+/// # }
 /// ```
 pub fn spawn<F, T>(future: F, stack: ProcStack) -> RecoverableHandle<T>
 where
@@ -134,14 +150,20 @@ pub struct Pool {
     receiver: Receiver<LightProc>,
 }
 
-struct AsyncRunner {}
+struct AsyncRunner {
+    // We keep a handle to the tokio runtime here to make sure
+    // it will never be dropped while the DynamicPoolManager is alive,
+    // In case we need to spin up some threads.
+    #[cfg(feature = "tokio-runtime")]
+    runtime_handle: tokio::runtime::Handle,
+}
 
 impl DynamicRunner for AsyncRunner {
     fn run_static(&self, park_timeout: Duration) -> ! {
         loop {
             for task in &POOL.receiver {
                 trace!("static: running task");
-                task.run();
+                self.run(task);
             }
 
             trace!("static: empty queue, parking with timeout");
@@ -152,7 +174,7 @@ impl DynamicRunner for AsyncRunner {
         loop {
             while let Ok(task) = POOL.receiver.try_recv() {
                 trace!("dynamic thread: running task");
-                task.run();
+                self.run(task);
             }
             trace!(
                 "dynamic thread: parking - {:?}",
@@ -163,20 +185,50 @@ impl DynamicRunner for AsyncRunner {
     }
     fn run_standalone(&self) {
         while let Ok(task) = POOL.receiver.try_recv() {
-            task.run();
+            self.run(task);
         }
         trace!("standalone thread: quitting.");
+    }
+}
+
+impl AsyncRunner {
+    fn run(&self, task: LightProc) {
+        #[cfg(feature = "tokio-runtime")]
+        {
+            self.runtime_handle.spawn_blocking(|| task.run());
+        }
+        #[cfg(not(feature = "tokio-runtime"))]
+        {
+            task.run();
+        }
     }
 }
 
 static DYNAMIC_POOL_MANAGER: OnceCell<DynamicPoolManager> = OnceCell::new();
 
 static POOL: Lazy<Pool> = Lazy::new(|| {
-    let runner = Arc::new(AsyncRunner {});
+    #[cfg(feature = "tokio-runtime")]
+    {
+        let runner = Arc::new(AsyncRunner {
+            // We use current() here instead of try_current()
+            // because we want bastion to crash as soon as possible
+            // if there is no available runtime.
+            runtime_handle: tokio::runtime::Handle::current(),
+        });
 
-    DYNAMIC_POOL_MANAGER
-        .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
-        .expect("couldn't create dynamic pool manager");
+        DYNAMIC_POOL_MANAGER
+            .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
+            .expect("couldn't create dynamic pool manager");
+    }
+    #[cfg(not(feature = "tokio-runtime"))]
+    {
+        let runner = Arc::new(AsyncRunner {});
+
+        DYNAMIC_POOL_MANAGER
+            .set(DynamicPoolManager::new(*low_watermark() as usize, runner))
+            .expect("couldn't create dynamic pool manager");
+    }
+
     DYNAMIC_POOL_MANAGER
         .get()
         .expect("couldn't get static pool manager")

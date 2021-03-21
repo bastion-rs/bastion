@@ -10,6 +10,18 @@
 /// ```rust
 /// use bastion::prelude::*;
 ///
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// let config = Config::new().show_backtraces();
 ///
 /// Bastion::init_with(config);
@@ -19,9 +31,10 @@
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 ///
-/// [`Bastion::init_with`]: struct.Bastion.html#method.init_with
+/// [`Bastion::init_with`]: crate::Bastion::init_with
 pub struct Config {
     backtraces: Backtraces,
 }
@@ -40,8 +53,6 @@ impl Config {
     /// Creates a new configuration with the following default
     /// behaviors:
     /// - All backtraces are shown (see [`Config::show_backtraces`]).
-    ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
     pub fn new() -> Self {
         Config::default()
     }
@@ -57,6 +68,18 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// let config = Config::new().show_backtraces();
     ///
     /// Bastion::init_with(config);
@@ -67,6 +90,7 @@ impl Config {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn show_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::show();
@@ -83,6 +107,18 @@ impl Config {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// let config = Config::new().hide_backtraces();
     ///
     /// Bastion::init_with(config);
@@ -93,9 +129,8 @@ impl Config {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Config::show_backtraces`]: #method.show_backtraces
     pub fn hide_backtraces(mut self) -> Self {
         self.backtraces = Backtraces::hide();
         self

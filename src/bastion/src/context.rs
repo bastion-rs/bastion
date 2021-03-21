@@ -42,6 +42,18 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -57,11 +69,12 @@ pub const NIL_ID: BastionId = BastionId(Uuid::nil());
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 pub struct BastionId(pub(crate) Uuid);
 
 #[derive(Debug)]
-/// A child's execution context, allowing its [`exec`] future
+/// A child's execution context, allowing its [`with_exec`] future
 /// to receive messages and access a [`ChildRef`] referencing
 /// it, a [`ChildrenRef`] referencing its children group and
 /// a [`SupervisorRef`] referencing its supervisor.
@@ -71,6 +84,18 @@ pub struct BastionId(pub(crate) Uuid);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -103,7 +128,10 @@ pub struct BastionId(pub(crate) Uuid);
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
+///
+/// [`with_exec`]: crate::children::Children::with_exec
 pub struct BastionContext {
     id: BastionId,
     child: ChildRef,
@@ -155,6 +183,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -172,9 +212,8 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn current(&self) -> &ChildRef {
         &self.child
     }
@@ -187,6 +226,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -204,9 +255,8 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn parent(&self) -> &ChildrenRef {
         &self.children
     }
@@ -222,6 +272,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// // When calling the method from a children group supervised
@@ -258,9 +320,9 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     /// [`Bastion::children`]: struct.Bastion.html#method.children
     pub fn supervisor(&self) -> Option<&SupervisorRef> {
         self.supervisor.as_ref()
@@ -283,6 +345,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -300,11 +374,11 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`recv`]: #method.recv
-    /// [`try_recv_timeout`]: #method.try_recv_timeout
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`recv`]: Self::method.recv
+    /// [`try_recv_timeout`]: Self::method.try_recv_timeout
     pub async fn try_recv(&self) -> Option<SignedMessage> {
         // We want to let a tick pass
         // otherwise guard will never contain anything.
@@ -339,6 +413,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -355,11 +441,11 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`try_recv`]: #method.try_recv
-    /// [`try_recv_timeout`]: #method.try_recv_timeout
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`try_recv`]: Self::try_recv
+    /// [`try_recv_timeout`]: Self::try_recv_timeout
     pub async fn recv(&self) -> Result<SignedMessage, ()> {
         debug!("BastionContext({}): Waiting to receive message.", self.id);
         loop {
@@ -390,6 +476,18 @@ impl BastionContext {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -411,11 +509,12 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`recv`]: #method.recv
-    /// [`try_recv`]: #method.try_recv
-    /// [`SignedMessage`]: ../prelude/struct.SignedMessage.html
+    /// [`recv`]: Self::recv
+    /// [`try_recv`]: Self::try_recv
+    /// [`SignedMessage`]: .crate::enveloppe::SignedMessage
     pub async fn try_recv_timeout(&self, timeout: Duration) -> Result<SignedMessage, ReceiveError> {
         debug!(
             "BastionContext({}): Waiting to receive message within {} milliseconds.",
@@ -439,6 +538,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     ///
@@ -455,9 +566,11 @@ impl BastionContext {
     /// #
     /// # Bastion::start();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`RefAddr`]: /prelude/struct.Answer.html
+    // TODO(scrabsha): should we link to Answer or to RefAddr?
+    // [`RefAddr`]: /prelude/struct.Answer.html
     pub fn signature(&self) -> RefAddr {
         RefAddr::new(
             self.current().path().clone(),
@@ -477,6 +590,18 @@ impl BastionContext {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -496,9 +621,8 @@ impl BastionContext {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`RefAddr`]: ../prelude/struct.RefAddr.html
     pub fn tell<M: Message>(&self, to: &RefAddr, msg: M) -> Result<(), M> {
         debug!(
             "{:?}: Telling message: {:?} to: {:?}",
@@ -529,7 +653,18 @@ impl BastionContext {
     /// ```
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     /// // The message that will be "asked"...
     /// const ASK_MSG: &'static str = "A message containing data (ask).";
@@ -588,8 +723,6 @@ impl BastionContext {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
-    /// [`Answer`]: /message/struct.Answer.html
     pub fn ask<M: Message>(&self, to: &RefAddr, msg: M) -> Result<Answer, M> {
         debug!(
             "{:?}: Asking message: {:?} to: {:?}",
@@ -597,7 +730,7 @@ impl BastionContext {
             msg,
             to
         );
-        let (msg, answer) = BastionMessage::ask(msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.signature());
         let env = Envelope::new_with_sign(msg, self.signature());
         // FIXME: panics?
         to.sender()
@@ -629,7 +762,6 @@ impl BastionContext {
     /// the [`BroadcastTarget`] value.
     /// * `message` - The broadcasted message.
     ///
-    /// [`BroadcastTarget`]: ../dispatcher/enum.DispatcherType.html
     pub fn broadcast_message<M: Message>(&self, target: BroadcastTarget, message: M) {
         let msg = Arc::new(SignedMessage {
             msg: Msg::broadcast(message),
@@ -699,7 +831,22 @@ mod context_tests {
     use crate::Bastion;
     use std::panic;
 
-    #[test]
+    #[cfg(feature = "tokio-runtime")]
+    mod tokio_tests {
+        #[tokio::test]
+        async fn test_context() {
+            super::test_context()
+        }
+    }
+
+    #[cfg(not(feature = "tokio-runtime"))]
+    mod no_tokio_tests {
+        #[test]
+        fn test_context() {
+            super::test_context()
+        }
+    }
+
     fn test_context() {
         Bastion::init();
         Bastion::start();

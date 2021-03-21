@@ -52,6 +52,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// let children_ref = Bastion::children(|children| {
@@ -64,6 +76,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -77,6 +90,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -85,9 +110,8 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn dispatchers(&self) -> &Vec<DispatcherType> {
         &self.dispatchers
     }
@@ -100,6 +124,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -108,9 +144,8 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`ChildRef`]: children/struct.ChildRef.html
     pub fn elems(&self) -> &[ChildRef] {
         &self.children
     }
@@ -135,7 +170,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     ///     # let children_ref = Bastion::children(|children| children).unwrap();
@@ -166,7 +212,7 @@ impl ChildrenRef {
     /// # }
     /// ```
     ///
-    /// [`elems`]: #method.elems
+    /// [`elems`]: Self::elems
     pub fn broadcast<M: Message>(&self, msg: M) -> Result<(), M> {
         debug!(
             "ChildrenRef({}): Broadcasting message: {:?}",
@@ -191,6 +237,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -199,6 +257,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Stopping.", self.id());
@@ -219,6 +278,18 @@ impl ChildrenRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -227,6 +298,7 @@ impl ChildrenRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildrenRef({}): Killing.", self.id());

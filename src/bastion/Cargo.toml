@@ -43,17 +43,17 @@ distributed = [
 ]
 scaling = []
 docs = ["distributed", "scaling", "default"]
-
+tokio-runtime = ["bastion-executor/tokio-runtime"]
 
 [package.metadata.docs.rs]
 features = ["docs"]
 rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
-bastion-executor = "0.4"
-lightproc = "0.3.5"
+bastion-executor = { git = "https://github.com/bastion-rs/bastion.git" }
+lightproc = "0.3"
 # bastion-executor = { version = "= 0.3.7-alpha.0", path = "../bastion-executor" }
-# lightproc = { version = "= 0.3.6-alpha.0", path = "../lightproc" }
+# lightproc = { version = "= 0.3", path = "../lightproc" }
 
 lever = "0.1"
 futures = "0.3.5"
@@ -75,6 +75,7 @@ tracing-subscriber = "0.2.6"
 tracing = "0.1.15"
 anyhow = "1.0.31"
 crossbeam-queue = "0.3.0"
+log = "0.4.14"
 
 [target.'cfg(not(windows))'.dependencies]
 nuclei = "0.1"
@@ -85,6 +86,11 @@ proptest = "0.10"
 snap = "1.0"
 # prime_numbers example
 bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
-rand = "0.7.3"
+rand = "0.8"
 rayon = "1.3.1"
 num_cpus = "1.13.0"
+# hello_tokio example
+tokio = { version="1.1", features = ["time", "macros"] }
+bastion-executor = { git = "https://github.com/bastion-rs/bastion.git" }
+once_cell = "1.5.2"
+tokio-test = "0.4.0"

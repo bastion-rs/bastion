@@ -29,7 +29,18 @@ distributed_api! {
 /// ```rust
 /// use bastion::prelude::*;
 ///
-/// fn main() {
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// fn run() {
 ///     /// Creating the system's configuration...
 ///     let config = Config::new().hide_backtraces();
 ///     // ...and initializing the system with it (this is required)...
@@ -172,6 +183,18 @@ impl Bastion {
     /// # Example
     ///
     /// ```rust
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// use bastion::prelude::*;
     ///
     /// Bastion::init();
@@ -181,10 +204,8 @@ impl Bastion {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init_with`]: #method.init_with
     pub fn init() {
         let config = Config::default();
         Bastion::init_with(config)
@@ -206,6 +227,18 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// let config = Config::new()
     ///     .show_backtraces();
     ///
@@ -216,10 +249,8 @@ impl Bastion {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Config`]: struct.Config.html
-    /// [`Bastion::init`]: #method.init
     pub fn init_with(config: Config) {
         debug!("Bastion: Initializing with config: {:?}", config);
         if config.backtraces().is_hide() {
@@ -248,6 +279,18 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// let sp_ref: SupervisorRef = Bastion::supervisor(|sp| {
@@ -259,10 +302,8 @@ impl Bastion {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`SupervisorRef`]: supervisor/struct.SupervisorRef.html
     pub fn supervisor<S>(init: S) -> Result<SupervisorRef, ()>
     where
         S: FnOnce(Supervisor) -> Supervisor,
@@ -307,6 +348,18 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// let children_ref: ChildrenRef = Bastion::children(|children| {
@@ -328,10 +381,8 @@ impl Bastion {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn children<C>(init: C) -> Result<ChildrenRef, ()>
     where
         C: FnOnce(Children) -> Children,
@@ -357,6 +408,18 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// let children_ref: ChildrenRef = Bastion::spawn(|ctx: BastionContext| {
@@ -369,12 +432,8 @@ impl Bastion {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Children::with_exec`]: children/struct.Children.html#method.with_exec
-    /// [`Bastion::children`]: #method.children
-    /// [`Children`]: children/struct.Children.html
-    /// [`ChildrenRef`]: children/struct.ChildrenRef.html
     pub fn spawn<I, F>(action: I) -> Result<ChildrenRef, ()>
     where
         I: Fn(BastionContext) -> F + Send + 'static,
@@ -410,7 +469,18 @@ impl Bastion {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     /// let msg = "A message containing data.";
@@ -437,7 +507,7 @@ impl Bastion {
     ///     # Bastion::start();
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
-    /// # }
+    /// # }    
     /// ```
     pub fn broadcast<M: Message>(msg: M) -> Result<(), M> {
         debug!("Bastion: Broadcasting message: {:?}", msg);
@@ -459,6 +529,18 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// Bastion::init();
     ///
     /// // Use bastion, spawn children and supervisors...
@@ -470,6 +552,7 @@ impl Bastion {
     /// #
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn start() {
         debug!("Bastion: Starting.");
@@ -488,6 +571,19 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    ///
     /// Bastion::init();
     ///
     /// // Use bastion, spawn children and supervisors...
@@ -499,6 +595,7 @@ impl Bastion {
     ///
     /// Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn stop() {
         debug!("Bastion: Stopping.");
@@ -517,6 +614,18 @@ impl Bastion {
     /// ```rust
     /// use bastion::prelude::*;
     ///
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// Bastion::init();
     ///
     /// // Use bastion, spawn children and supervisors...
@@ -527,6 +636,7 @@ impl Bastion {
     ///
     /// Bastion::kill();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn kill() {
         debug!("Bastion: Killing.");
@@ -547,12 +657,24 @@ impl Bastion {
     }
 
     /// Blocks the current thread until the system is stopped
-    /// (either by calling [`Bastion::stop()`] or
+    /// (either by calling [`Bastion::stop`] or
     /// [`Bastion::kill`]).
     ///
     /// # Example
     ///
     /// ```rust
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// use bastion::prelude::*;
     ///
     /// Bastion::init();
@@ -567,10 +689,8 @@ impl Bastion {
     /// Bastion::block_until_stopped();
     /// // The system is now stopped. A child might have
     /// // stopped or killed it...
+    /// # }
     /// ```
-    ///
-    /// [`Bastion::stop()`]: #method.stop
-    /// [`Bastion::kill()`]: #method.kill
     pub fn block_until_stopped() {
         debug!("Bastion: Blocking until system is stopped.");
         SYSTEM.wait_until_stopped();

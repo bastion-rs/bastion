@@ -10,10 +10,23 @@ use std::future::Future;
 /// # Example
 /// ```
 /// # use std::{thread, time};
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// use bastion::executor::blocking;
 /// let task = blocking(async move {
 ///     thread::sleep(time::Duration::from_millis(3000));
 /// });
+/// # }
 /// ```
 pub fn blocking<F, R>(future: F) -> RecoverableHandle<R>
 where
@@ -29,6 +42,18 @@ where
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// use bastion::executor::run;
 /// let future1 = async move {
 ///     123
@@ -45,6 +70,7 @@ where
 ///
 /// let result = run(future2);
 /// assert_eq!(result, 5);
+/// # }
 /// ```
 pub fn run<F, T>(future: F) -> T
 where
@@ -58,11 +84,24 @@ where
 /// # Example
 /// ```
 /// # use bastion::prelude::*;
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// use bastion::executor::{spawn, run};
 /// let handle = spawn(async {
 ///     panic!("test");
 /// });
 /// run(handle);
+/// # }
 /// ```
 pub fn spawn<F, T>(future: F) -> RecoverableHandle<T>
 where

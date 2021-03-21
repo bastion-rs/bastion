@@ -26,20 +26,25 @@ use tracing::{debug, trace};
 /// implement the following traits: [`Any`], [`Send`],
 /// [`Sync`] and [`Debug`]).
 ///
-/// [`Any`]: https://doc.rust-lang.org/std/any/trait.Any.html
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-/// [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
-/// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
+/// [`Any`]: std::any::Any
+/// [`Send`]: std::marker::Send
+/// [`Sync`]: std::marker::Sync
+/// [`Debug`]: std::fmt::Debug
 pub trait Message: Any + Send + Sync + Debug {}
 impl<T> Message for T where T: Any + Send + Sync + Debug {}
 
+/// Allows to respond to questions.
+///
+/// This type features the [`respond`] method, that allows to respond to a
+/// question.
+///
+/// [`respond`]: #method.respond
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct AnswerSender(oneshot::Sender<SignedMessage>);
+pub struct AnswerSender(oneshot::Sender<SignedMessage>, RefAddr);
 
 #[derive(Debug)]
 /// A [`Future`] returned when successfully "asking" a
-/// message using [`ChildRef::ask`] and which resolves to
+/// message using [`ChildRef::ask_anonymously`] and which resolves to
 /// a `Result<Msg, ()>` where the [`Msg`] is the message
 /// answered by the child (see the [`msg!`] macro for more
 /// information).
@@ -49,7 +54,18 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// // The message that will be "asked"...
 /// const ASK_MSG: &'static str = "A message containing data (ask).";
@@ -109,10 +125,8 @@ pub struct AnswerSender(oneshot::Sender<SignedMessage>);
 /// # }
 /// ```
 ///
-/// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
-/// [`ChildRef::ask`]: ../children/struct.ChildRef.html#method.ask
-/// [`Msg`]: message/struct.Msg.html
-/// [`msg!`]: macro.msg.html
+/// [`Future`]: std::future::Future
+/// [`ChildRef::ask_anonymously`]: crate::child_ref::ChildRef::ask_anonymously
 pub struct Answer(Receiver<SignedMessage>);
 
 #[derive(Debug)]
@@ -125,7 +139,18 @@ pub struct Answer(Receiver<SignedMessage>);
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// Bastion::children(|children| {
 ///     children.with_exec(|ctx: BastionContext| {
@@ -171,9 +196,8 @@ pub struct Answer(Receiver<SignedMessage>);
 /// # }
 /// ```
 ///
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
-/// [`msg!`]: macro.msg.html
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
 pub struct Msg(MsgInner);
 
 #[derive(Debug)]
@@ -238,14 +262,17 @@ pub(crate) enum Deployment {
 }
 
 impl AnswerSender {
-    // FIXME: we can't let manipulating Signature in a public API
-    // but now it's being called only by a macro so we are trusting it
-    #[doc(hidden)]
-    pub fn send<M: Message>(self, msg: M, sign: RefAddr) -> Result<(), M> {
+    /// Sends data back to the original sender.
+    ///
+    /// Returns  `Ok` if the data was sent successfully, otherwise returns the
+    /// original data.
+    pub fn reply<M: Message>(self, msg: M) -> Result<(), M> {
         debug!("{:?}: Sending answer: {:?}", self, msg);
         let msg = Msg::tell(msg);
         trace!("{:?}: Sending message: {:?}", self, msg);
-        self.0
+
+        let AnswerSender(sender, sign) = self;
+        sender
             .send(SignedMessage::new(msg, sign))
             .map_err(|smsg| smsg.msg.try_unwrap().unwrap())
     }
@@ -262,10 +289,10 @@ impl Msg {
         Msg(inner)
     }
 
-    pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
+    pub(crate) fn ask<M: Message>(msg: M, sign: RefAddr) -> (Self, Answer) {
         let msg = Box::new(msg);
         let (sender, recver) = oneshot::channel();
-        let sender = AnswerSender(sender);
+        let sender = AnswerSender(sender, sign);
         let answer = Answer(recver);
 
         let sender = Some(sender);
@@ -378,6 +405,16 @@ impl Msg {
     }
 }
 
+impl AsRef<dyn Any> for Msg {
+    fn as_ref(&self) -> &dyn Any {
+        match &self.0 {
+            MsgInner::Broadcast(msg) => msg.as_ref(),
+            MsgInner::Tell(msg) => msg.as_ref(),
+            MsgInner::Ask { msg, .. } => msg.as_ref(),
+        }
+    }
+}
+
 impl BastionMessage {
     pub(crate) fn start() -> Self {
         BastionMessage::Start
@@ -437,8 +474,8 @@ impl BastionMessage {
         BastionMessage::Message(msg)
     }
 
-    pub(crate) fn ask<M: Message>(msg: M) -> (Self, Answer) {
-        let (msg, answer) = Msg::ask(msg);
+    pub(crate) fn ask<M: Message>(msg: M, sign: RefAddr) -> (Self, Answer) {
+        let (msg, answer) = Msg::ask(msg, sign);
         (BastionMessage::Message(msg), answer)
     }
 
@@ -572,7 +609,18 @@ impl Future for Answer {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 /// // The message that will be broadcasted...
 /// const BCAST_MSG: &'static str = "A message containing data (broadcast).";
@@ -625,9 +673,8 @@ impl Future for Answer {
 /// # }
 /// ```
 ///
-/// [`Msg`]: children/struct.Msg.html
-/// [`BastionContext::recv`]: context/struct.BastionContext.html#method.recv
-/// [`BastionContext::try_recv`]: context/struct.BastionContext.html#method.try_recv
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
 macro_rules! msg {
     ($msg:expr, $($tokens:tt)+) => {
         msg!(@internal $msg, (), (), (), $($tokens)+)
@@ -734,7 +781,7 @@ macro_rules! msg {
                 ($ctx:expr, $answer:expr) => {
                     {
                         let sign = $ctx.signature();
-                        sender.send($answer, sign)
+                        sender.reply($answer)
                     }
                 };
             }
@@ -776,7 +823,18 @@ macro_rules! msg {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 ///     # Bastion::init();
 ///     # let children_ref =
 /// // Create a new child...
@@ -818,6 +876,258 @@ macro_rules! answer {
     ($msg:expr, $answer:expr) => {{
         let (mut msg, sign) = $msg.extract();
         let sender = msg.take_sender().expect("failed to take render");
-        sender.send($answer, sign)
+        sender.reply($answer)
     }};
+}
+
+#[derive(Debug)]
+enum MessageHandlerState<O> {
+    Matched(O),
+    Unmatched(SignedMessage),
+}
+
+impl<O> MessageHandlerState<O> {
+    fn take_message(self) -> Result<SignedMessage, O> {
+        match self {
+            MessageHandlerState::Unmatched(msg) => Ok(msg),
+            MessageHandlerState::Matched(output) => Err(output),
+        }
+    }
+
+    fn output_or_else(self, f: impl FnOnce(SignedMessage) -> O) -> O {
+        match self {
+            MessageHandlerState::Matched(output) => output,
+            MessageHandlerState::Unmatched(msg) => f(msg),
+        }
+    }
+}
+
+/// Matches a [`Msg`] (as returned by [`BastionContext::recv`]
+/// or [`BastionContext::try_recv`]) with different types.
+///
+/// This type may replace the [`msg!`] macro in the future.
+///
+/// The [`new`] function creates a new [`MessageHandler`], which is then
+/// matched on with the `on_*` functions.
+///
+/// There are different kind of messages:
+///   - messages that are broadcasted, which can be matched with the
+///     [`on_broadcast`] method,
+///   - messages that can be responded to, which are matched with the
+///     [`on_question`] method,
+///   - messages that can not be responded to, which are matched with
+///     [`on_tell`],
+///   - fallback case, which matches everything, entitled [`on_fallback`].
+///
+/// The closure passed to the functions described previously must return the
+/// same type. This value is retrieved when [`on_fallback`] is invoked.
+///
+/// Questions can be responded to by calling [`reply`] on the provided
+/// sender.
+///
+/// # Example
+///
+/// ```rust
+/// # use bastion::prelude::*;
+/// # use bastion::message::MessageHandler;
+/// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
+///     # Bastion::init();
+/// // The message that will be broadcasted...
+/// const BCAST_MSG: &'static str = "A message containing data (broadcast).";
+/// // The message that will be "told" to the child...
+/// const TELL_MSG: &'static str = "A message containing data (tell).";
+/// // The message that will be "asked" to the child...
+/// const ASK_MSG: &'static str = "A message containing data (ask).";
+///
+/// Bastion::children(|children| {
+///     children.with_exec(|ctx: BastionContext| {
+///         async move {
+///             # ctx.tell(&ctx.current().addr(), TELL_MSG).unwrap();
+///             # ctx.ask(&ctx.current().addr(), ASK_MSG).unwrap();
+///             #
+///             loop {
+///                 MessageHandler::new(ctx.recv().await?)
+///                     // We match on broadcasts of &str
+///                     .on_broadcast(|msg: &&str, _sender_addr| {
+///                         assert_eq!(*msg, BCAST_MSG);
+///                         // Handle the message...
+///                     })
+///                     // We match on messages of &str
+///                     .on_tell(|msg: &str, _sender_addr| {
+///                         assert_eq!(msg, TELL_MSG);
+///                         // Handle the message...
+///                     })
+///                     // We match on questions of &str
+///                     .on_question(|msg: &str, sender| {
+///                         assert_eq!(msg, ASK_MSG);
+///                         // Handle the message...
+///
+///                         // ...and eventually answer to it...
+///                         sender.reply("An answer to the message.");
+///                     })
+///                     // We are only broadcasting, "telling" and "asking" a
+///                     // `&str` in this example, so we know that this won't
+///                     // happen...
+///                     .on_fallback(|msg, _sender_addr| ());
+///             }
+///         }
+///     })
+/// }).expect("Couldn't start the children group.");
+///     #
+///     # Bastion::start();
+///     # Bastion::broadcast(BCAST_MSG).unwrap();
+///     # Bastion::stop();
+///     # Bastion::block_until_stopped();
+/// # }
+/// ```
+///
+/// [`BastionContext::recv`]: crate::context::BastionContext::recv
+/// [`BastionContext::try_recv`]: crate::context::BastionContext::try_recv
+/// [`new`]: Self::new
+/// [`on_broadcast`]: Self::on_broadcast
+/// [`on_question`]: Self::on_question
+/// [`on_tell`]: Self::on_tell
+/// [`on_fallback`]: Self::on_fallback
+/// [`reply`]: AnswerSender::reply
+#[derive(Debug)]
+pub struct MessageHandler<O> {
+    state: MessageHandlerState<O>,
+}
+
+impl<O> MessageHandler<O> {
+    /// Creates a new [`MessageHandler`] with an incoming message.
+    pub fn new(msg: SignedMessage) -> MessageHandler<O> {
+        let state = MessageHandlerState::Unmatched(msg);
+        MessageHandler { state }
+    }
+
+    /// Matches on a question of a specific type.
+    ///
+    /// This will consume the inner data and call `f` if the contained message
+    /// can be replied to.
+    pub fn on_question<T, F>(self, f: F) -> MessageHandler<O>
+    where
+        T: 'static,
+        F: FnOnce(T, AnswerSender) -> O,
+    {
+        match self.try_into_question::<T>() {
+            Ok((arg, sender)) => {
+                let val = f(arg, sender);
+                MessageHandler::matched(val)
+            }
+            Err(this) => this,
+        }
+    }
+
+    /// Calls a fallback function if the message has still not matched yet.
+    ///
+    /// This consumes the [`MessageHandler`], so that no matching can be
+    /// performed anymore.
+    pub fn on_fallback<F>(self, f: F) -> O
+    where
+        F: FnOnce(&dyn Any, RefAddr) -> O,
+    {
+        self.state
+            .output_or_else(|SignedMessage { msg, sign }| f(msg.as_ref(), sign))
+    }
+
+    /// Calls a function if the incoming message is a broadcast and has a
+    /// specific type.
+    pub fn on_broadcast<T, F>(self, f: F) -> MessageHandler<O>
+    where
+        T: 'static + Send + Sync,
+        F: FnOnce(&T, RefAddr) -> O,
+    {
+        match self.try_into_broadcast::<T>() {
+            Ok((arg, addr)) => {
+                let val = f(arg.as_ref(), addr);
+                MessageHandler::matched(val)
+            }
+            Err(this) => this,
+        }
+    }
+
+    /// Calls a function if the incoming message can't be replied to and has a
+    /// specific type.
+    pub fn on_tell<T, F>(self, f: F) -> MessageHandler<O>
+    where
+        T: 'static,
+        F: FnOnce(T, RefAddr) -> O,
+    {
+        match self.try_into_tell::<T>() {
+            Ok((msg, addr)) => {
+                let val = f(msg, addr);
+                MessageHandler::matched(val)
+            }
+            Err(this) => this,
+        }
+    }
+
+    fn matched(output: O) -> MessageHandler<O> {
+        let state = MessageHandlerState::Matched(output);
+        MessageHandler { state }
+    }
+
+    fn try_into_question<T: 'static>(self) -> Result<(T, AnswerSender), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
+                msg:
+                    Msg(MsgInner::Ask {
+                        msg,
+                        sender: Some(sender),
+                    }),
+                ..
+            }) if msg.is::<T>() => {
+                let msg: Box<dyn Any> = msg;
+                Ok((*msg.downcast::<T>().unwrap(), sender))
+            }
+
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
+        }
+    }
+
+    fn try_into_broadcast<T: Send + Sync + 'static>(
+        self,
+    ) -> Result<(Arc<T>, RefAddr), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
+                msg: Msg(MsgInner::Broadcast(msg)),
+                sign,
+            }) if msg.is::<T>() => {
+                let msg: Arc<dyn Any + Send + Sync + 'static> = msg;
+                Ok((msg.downcast::<T>().unwrap(), sign))
+            }
+
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
+        }
+    }
+
+    fn try_into_tell<T: 'static>(self) -> Result<(T, RefAddr), MessageHandler<O>> {
+        match self.state.take_message() {
+            Ok(SignedMessage {
+                msg: Msg(MsgInner::Tell(msg)),
+                sign,
+            }) if msg.is::<T>() => {
+                let msg: Box<dyn Any> = msg;
+                Ok((*msg.downcast::<T>().unwrap(), sign))
+            }
+
+            Ok(anything) => Err(MessageHandler::new(anything)),
+            Err(output) => Err(MessageHandler::matched(output)),
+        }
+    }
 }

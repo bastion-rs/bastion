@@ -67,6 +67,18 @@ impl ChildRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -82,6 +94,7 @@ impl ChildRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn id(&self) -> &BastionId {
         &self.id
@@ -98,6 +111,18 @@ impl ChildRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -114,6 +139,7 @@ impl ChildRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn is_public(&self) -> bool {
         self.is_public
@@ -135,7 +161,18 @@ impl ChildRef {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     /// // The message that will be "told"...
     /// const TELL_MSG: &'static str = "A message containing data (tell).";
@@ -195,7 +232,18 @@ impl ChildRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     /// // The message that will be "asked"...
     /// const ASK_MSG: &'static str = "A message containing data (ask).";
@@ -255,10 +303,9 @@ impl ChildRef {
     /// # }
     /// ```
     ///
-    /// [`Answer`]: message/struct.Answer.html
     pub fn ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
-        let (msg, answer) = BastionMessage::ask(msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.addr());
         let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
         self.send(env).map_err(|env| env.into_msg().unwrap())?;
@@ -277,6 +324,18 @@ impl ChildRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// # let children_ref =
     /// # Bastion::children(|children| {
@@ -304,6 +363,7 @@ impl ChildRef {
     ///     #
     ///     # Bastion::stop();
     ///     # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn stop(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Stopping.", self.id);
@@ -323,6 +383,18 @@ impl ChildRef {
     /// ```
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # let children_ref = Bastion::children(|children| children).unwrap();
@@ -332,6 +404,7 @@ impl ChildRef {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn kill(&self) -> Result<(), ()> {
         debug!("ChildRef({}): Killing.", self.id());
@@ -361,7 +434,7 @@ impl ChildRef {
         &self.path
     }
 
-    /// Return the [`name`] of the child
+    /// Return the `name` of the child
     pub fn name(&self) -> &str {
         &self.name
     }

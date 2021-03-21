@@ -19,6 +19,18 @@ pub(crate) enum CallbackType {
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// Bastion::children(|children| {
@@ -41,10 +53,11 @@ pub(crate) enum CallbackType {
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 ///
-/// [`Supervisor`]: supervisor/struct.Supervisor.html
-/// [`Children`]: children/struct.Children.html
+/// [`Supervisor`]: crate::supervisor::Supervisor
+/// [`Children`]: crate::children::Children
 pub struct Callbacks {
     before_start: Option<Arc<dyn Fn() + Send + Sync>>,
     before_restart: Option<Arc<dyn Fn() + Send + Sync>>,
@@ -61,6 +74,18 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -83,10 +108,11 @@ impl Callbacks {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`Supervisor::with_callbacks`]: supervisor/struct.Supervisor.html#method.with_callbacks
-    /// [`Children::with_callbacks`]: children/struct.Children.html#method.with_callbacks
+    /// [`Supervisor::with_callbacks`]: crate::supervisor::Supervisor::with_callbacks
+    /// [`Children::with_callbacks`]: crate::children::Children::with_callbacks
     pub fn new() -> Self {
         Callbacks::default()
     }
@@ -107,6 +133,18 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # Bastion::supervisor(|supervisor| {
@@ -138,11 +176,12 @@ impl Callbacks {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_after_restart`]: #method.with_after_start
+    /// [`Supervisor`]: crate::supervisor::Supervisor
+    /// [`Children`]: crate::children::Children
+    /// [`with_after_restart`]: Self::with_after_restart
     pub fn with_before_start<C>(mut self, before_start: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -166,6 +205,18 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # Bastion::supervisor(|supervisor| {
@@ -199,11 +250,12 @@ impl Callbacks {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_after_stop`]: #method.with_after_stop
+    /// [`Supervisor`]: crate::supervisor::Supervisor
+    /// [`Children`]: crate::children::Children
+    /// [`with_after_stop`]: Self::with_after_stop
     pub fn with_before_restart<C>(mut self, before_restart: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -227,6 +279,18 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # Bastion::supervisor(|supervisor| {
@@ -260,11 +324,12 @@ impl Callbacks {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_before_start`]: #method.with_before_start
+    /// [`Supervisor`]: crate::supervisor::Supervisor
+    /// [`Children`]: crate::children::Children
+    /// [`with_before_start`]: Self::method.with_before_start
     pub fn with_after_restart<C>(mut self, after_restart: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -292,6 +357,18 @@ impl Callbacks {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// # Bastion::supervisor(|supervisor| {
@@ -323,11 +400,12 @@ impl Callbacks {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`Supervisor`]: supervisor/struct.Supervisor.html
-    /// [`Children`]: children/struct.Children.html
-    /// [`with_before_restart`]: #method.with_before_restart
+    /// [`Supervisor`]: crate::supervisor::Supervisor
+    /// [`Children`]: crate::children::Children
+    /// [`with_before_restart`]: Self::with_before_restart
     pub fn with_after_stop<C>(mut self, after_stop: C) -> Self
     where
         C: Fn() + Send + Sync + 'static,
@@ -350,7 +428,7 @@ impl Callbacks {
     /// assert!(callbacks.has_before_start());
     /// ```
     ///
-    /// [`with_before_start`]: #method.with_before_start
+    /// [`with_before_start`]: Self::with_before_start
     pub fn has_before_start(&self) -> bool {
         self.before_start.is_some()
     }
@@ -368,7 +446,7 @@ impl Callbacks {
     /// assert!(callbacks.has_before_restart());
     /// ```
     ///
-    /// [`with_before_restart`]: #method.with_before_restart
+    /// [`with_before_restart`]: Self::with_before_restart
     pub fn has_before_restart(&self) -> bool {
         self.before_restart.is_some()
     }
@@ -386,7 +464,7 @@ impl Callbacks {
     /// assert!(callbacks.has_after_restart());
     /// ```
     ///
-    /// [`with_after_restart`]: #method.with_after_restart
+    /// [`with_after_restart`]: Self::with_after_restart
     pub fn has_after_restart(&self) -> bool {
         self.after_restart.is_some()
     }
@@ -404,7 +482,7 @@ impl Callbacks {
     /// assert!(callbacks.has_after_stop());
     /// ```
     ///
-    /// [`with_after_stop`]: #method.with_after_stop
+    /// [`with_after_stop`]: Self::with_after_stop
     pub fn has_after_stop(&self) -> bool {
         self.after_stop.is_some()
     }

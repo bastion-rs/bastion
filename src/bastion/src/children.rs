@@ -49,6 +49,18 @@ use tracing::{debug, trace, warn};
 /// ```rust
 /// # use bastion::prelude::*;
 /// #
+/// # #[cfg(feature = "tokio-runtime")]
+/// # #[tokio::main]
+/// # async fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # #[cfg(not(feature = "tokio-runtime"))]
+/// # fn main() {
+/// #    run();    
+/// # }
+/// #
+/// # fn run() {
 /// # Bastion::init();
 /// #
 /// let children_ref: ChildrenRef = Bastion::children(|children| {
@@ -70,11 +82,12 @@ use tracing::{debug, trace, warn};
 /// # Bastion::start();
 /// # Bastion::stop();
 /// # Bastion::block_until_stopped();
+/// # }
 /// ```
 ///
-/// [`with_redundancy`]: #method.with_redundancy
-/// [`with_exec`]: #method.with_exec
-/// [`SupervisionStrategy`]: supervisor/enum.SupervisionStrategy.html
+/// [`with_redundancy`]: Self::with_redundancy
+/// [`with_exec`]: Self::with_exec
+/// [`SupervisionStrategy`]: crate::supervisor::SupervisionStrategy
 pub struct Children {
     bcast: Broadcast,
     // The currently launched elements of the group.
@@ -157,6 +170,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -168,6 +193,7 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn id(&self) -> &BastionId {
         self.bcast.id()
@@ -244,6 +270,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -263,6 +301,7 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     pub fn with_exec<I, F>(mut self, init: I) -> Self
     where
@@ -290,6 +329,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -300,9 +351,10 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
     ///
-    /// [`with_exec`]: #method.with_exec
+    /// [`with_exec`]: Self::with_exec
     pub fn with_redundancy(mut self, redundancy: usize) -> Self {
         trace!(
             "Children({}): Setting redundancy: {}",
@@ -328,7 +380,7 @@ impl Children {
     ///
     /// # Arguments
     ///
-    /// * `redundancy` - An instance of struct that implements the
+    /// * `dispatcher` - An instance of struct that implements the
     /// [`DispatcherHandler`] trait.
     ///
     /// # Example
@@ -336,6 +388,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -348,8 +412,9 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    /// [`DispatcherHandler`]: ../dispatcher/trait.DispatcherHandler.html
+    /// [`DispatcherHandler`]: crate::dispatcher::DispatcherHandler
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
         self.dispatchers.push(Arc::new(Box::new(dispatcher)));
         self
@@ -369,7 +434,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     ///     # Bastion::init();
     ///     #
     /// Bastion::children(|children| {
@@ -386,7 +462,6 @@ impl Children {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    /// [`Resizer`]: ../resizer/struct.Resizer.html
     pub fn with_resizer(mut self, mut resizer: OptimalSizeExploringResizer) -> Self {
         self.redundancy = resizer.lower_bound() as usize;
         self.resizer = Box::new(resizer);
@@ -409,6 +484,18 @@ impl Children {
     /// ```rust
     /// # use bastion::prelude::*;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -431,9 +518,8 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    ///
-    /// [`Callbacks`]: struct.Callbacks.html
     pub fn with_callbacks(mut self, callbacks: Callbacks) -> Self {
         trace!(
             "Children({}): Setting callbacks: {:?}",
@@ -458,6 +544,18 @@ impl Children {
     /// # use bastion::prelude::*;
     /// # use std::time::Duration;
     /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
     /// # Bastion::init();
     /// #
     /// Bastion::children(|children| {
@@ -476,8 +574,8 @@ impl Children {
     /// # Bastion::start();
     /// # Bastion::stop();
     /// # Bastion::block_until_stopped();
+    /// # }
     /// ```
-    /// [`std::time::Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
     pub fn with_heartbeat_tick(mut self, interval: Duration) -> Self {
         trace!(
             "Children({}): Set heartbeat tick to {:?}",
