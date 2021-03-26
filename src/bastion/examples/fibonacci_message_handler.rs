@@ -1,4 +1,4 @@
-use bastion::{message::MessageHandler, prelude::*};
+use bastion::prelude::*;
 
 use tracing::{error, info};
 

@@ -1,4 +1,3 @@
-use bastion::message::MessageHandler;
 use bastion::prelude::*;
 use std::fmt::Debug;
 use tracing::error;
