@@ -112,7 +112,7 @@ pub mod prelude {
     pub use crate::errors::*;
     #[cfg(not(target_os = "windows"))]
     pub use crate::io::*;
-    pub use crate::message::{Answer, AnswerSender, Message, Msg};
+    pub use crate::message::{Answer, AnswerSender, Message, MessageHandler, Msg};
     pub use crate::msg;
     pub use crate::path::{BastionPath, BastionPathElement};
     #[cfg(feature = "scaling")]
