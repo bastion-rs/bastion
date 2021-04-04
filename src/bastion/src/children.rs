@@ -7,6 +7,7 @@ use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::dispatcher::Dispatcher;
+pub use crate::dispatcher::RecipientTarget;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
@@ -106,6 +107,7 @@ pub struct Children {
     started: bool,
     // List of dispatchers attached to each actor in the group.
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
+    recipients: Vec<Arc<RecipientTarget>>,
     // The name of children
     name: Option<String>,
     #[cfg(feature = "scaling")]
@@ -131,6 +133,7 @@ impl Children {
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
+        let recipients = Vec::new();
         let name = None;
         #[cfg(feature = "scaling")]
         let resizer = Box::new(OptimalSizeExploringResizer::default());
@@ -146,6 +149,7 @@ impl Children {
             pre_start_msgs,
             started,
             dispatchers,
+            recipients,
             name,
             #[cfg(feature = "scaling")]
             resizer,
@@ -240,7 +244,9 @@ impl Children {
             .map(|dispatcher| dispatcher.dispatcher_type())
             .collect();
 
-        ChildrenRef::new(id, sender, path, children, dispatchers)
+        let recipients = self.recipients.clone();
+
+        ChildrenRef::new(id, sender, path, children, dispatchers, recipients)
     }
 
     /// Sets the name of this children group.
@@ -417,6 +423,11 @@ impl Children {
     /// [`DispatcherHandler`]: crate::dispatcher::DispatcherHandler
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher) -> Self {
         self.dispatchers.push(Arc::new(Box::new(dispatcher)));
+        self
+    }
+
+    pub fn with_recipient_target(mut self, recipient: RecipientTarget) -> Self {
+        self.recipients.push(Arc::new(recipient));
         self
     }
 
@@ -646,6 +657,9 @@ impl Children {
         if let Err(e) = self.remove_dispatchers() {
             warn!("couldn't remove all dispatchers from the registry: {}", e);
         };
+        if let Err(e) = self.remove_recipients() {
+            warn!("couldn't remove all recipients from the registry: {}", e);
+        };
         self.bcast.stopped();
     }
 
@@ -653,6 +667,9 @@ impl Children {
         debug!("Children({}): Faulted.", self.id());
         if let Err(e) = self.remove_dispatchers() {
             warn!("couldn't remove all dispatchers from the registry: {}", e);
+        };
+        if let Err(e) = self.remove_recipients() {
+            warn!("couldn't remove all recipients from the registry: {}", e);
         };
         self.bcast.faulted();
     }
@@ -1096,6 +1113,16 @@ impl Children {
 
         for dispatcher in self.dispatchers.iter() {
             global_dispatcher.remove_dispatcher(dispatcher)?;
+        }
+        Ok(())
+    }
+
+    /// Removes all declared local recipients from the global dispatcher.
+    pub(crate) fn remove_recipients(&self) -> AnyResult<()> {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for recipient in self.recipients.iter() {
+            global_dispatcher.remove_recipient(recipient)?;
         }
         Ok(())
     }

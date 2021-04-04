@@ -125,6 +125,7 @@ impl Child {
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
         self.remove_from_dispatchers();
+        self.remove_from_recipients();
         self.bcast.stopped();
     }
 
@@ -305,6 +306,10 @@ impl Child {
             error!("couldn't add actor to the registry: {}", e);
             return;
         };
+        if let Err(e) = self.register_to_recipients() {
+            error!("couldn't add actor to the registry: {}", e);
+            return;
+        };
 
         loop {
             #[cfg(feature = "scaling")]
@@ -396,6 +401,35 @@ impl Child {
             // FIXME: Pass the module name explicitly?
             let module_name = module_path!().to_string();
             global_dispatcher.register(used_dispatchers, &child_ref, module_name)?;
+        }
+        Ok(())
+    }
+
+    /// Adds the actor into each recipients declared in the parent node.
+    fn register_to_recipients(&self) -> AnyResult<()> {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let recipients = parent.recipients();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            recipients
+                .iter()
+                .map(|recipient| {
+                    global_dispatcher.register_recipient(**recipient, child_ref.clone())
+                })
+                .collect::<AnyResult<Vec<_>>>()?;
+        }
+        Ok(())
+    }
+
+    /// Cleanup the actor's record from each declared recipients.
+    fn remove_from_recipients(&self) -> AnyResult<()> {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let recipients = parent.recipients();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            global_dispatcher.remove_from_recipients(recipients, child_ref)?;
         }
         Ok(())
     }

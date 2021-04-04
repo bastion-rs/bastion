@@ -89,6 +89,8 @@ pub mod supervisor;
 
 pub mod errors;
 
+pub mod recipient;
+
 distributed_api! {
     // pub mod dist_messages;
     pub mod distributed;
@@ -101,6 +103,7 @@ pub mod prelude {
     pub use crate::callbacks::Callbacks;
     pub use crate::child_ref::ChildRef;
     pub use crate::children::Children;
+    pub use crate::children::RecipientTarget;
     pub use crate::children_ref::ChildrenRef;
     pub use crate::config::Config;
     pub use crate::context::{BastionContext, BastionId, NIL_ID};

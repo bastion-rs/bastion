@@ -1,15 +1,56 @@
 //!
 //! Allows users to communicate with Child through the mailboxes.
-use crate::broadcast::Sender;
-use crate::context::BastionId;
-use crate::envelope::{Envelope, RefAddr};
 use crate::message::{Answer, BastionMessage, Message};
 use crate::path::BastionPath;
+use crate::{broadcast::Sender, message::Msg};
+use crate::{context::BastionId, dispatcher::RecipientTarget};
+use crate::{
+    dispatcher::INTERNER,
+    envelope::{Envelope, RefAddr},
+};
+use futures::channel::mpsc::TrySendError;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use thiserror::Error;
 use tracing::{debug, trace};
+
+#[derive(Error, Debug)]
+pub enum SendError {
+    #[error("couldn't send message. Channel Disconnected.")]
+    Disconnected(Msg),
+    #[error("couldn't send message. Channel is Full.")]
+    Full(Msg),
+    #[error("couldn't send a message I should have not sent. {0}")]
+    Other(anyhow::Error),
+    #[error("No available Recipients matching {0}")]
+    NoRecipient(String),
+    #[error("Recipient has 0 childrefs")]
+    EmptyRecipient,
+}
+
+impl From<TrySendError<Envelope>> for SendError {
+    fn from(tse: TrySendError<Envelope>) -> Self {
+        let is_disconnected = tse.is_disconnected();
+        match tse.into_inner().msg {
+            BastionMessage::Message(msg) => {
+                if is_disconnected {
+                    Self::Disconnected(msg)
+                } else {
+                    Self::Full(msg)
+                }
+            }
+            other => Self::Other(anyhow::anyhow!("{:?}", other)),
+        }
+    }
+}
+
+impl From<RecipientTarget> for SendError {
+    fn from(target: RecipientTarget) -> Self {
+        Self::NoRecipient(INTERNER.resolve(target.interned()).to_string())
+    }
+}
 
 #[derive(Debug, Clone)]
 /// A "reference" to an element of a children group, allowing to
@@ -215,6 +256,13 @@ impl ChildRef {
         self.send(env).map_err(|env| env.into_msg().unwrap())
     }
 
+    pub fn try_tell_anonymously<M: Message>(&self, msg: M) -> Result<(), SendError> {
+        debug!("ChildRef({}): Try Telling message: {:?}", self.id(), msg);
+        let msg = BastionMessage::tell(msg);
+        let env = Envelope::from_dead_letters(msg);
+        self.try_send(env).map_err(Into::into)
+    }
+
     /// Sends a message to the child this `ChildRef` is referencing,
     /// allowing it to answer.
     /// This message is intended to be used outside of Bastion context when
@@ -309,6 +357,15 @@ impl ChildRef {
         let env = Envelope::from_dead_letters(msg);
         // FIXME: panics?
         self.send(env).map_err(|env| env.into_msg().unwrap())?;
+
+        Ok(answer)
+    }
+
+    pub fn try_ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, SendError> {
+        debug!("ChildRef({}): Try Asking message: {:?}", self.id(), msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.addr());
+        let env = Envelope::from_dead_letters(msg);
+        self.try_send(env)?;
 
         Ok(answer)
     }
@@ -423,6 +480,11 @@ impl ChildRef {
         self.sender
             .unbounded_send(env)
             .map_err(|err| err.into_inner())
+    }
+
+    pub(crate) fn try_send(&self, env: Envelope) -> Result<(), SendError> {
+        trace!("ChildRef({}): Sending message: {:?}", self.id(), env);
+        self.sender.unbounded_send(env).map_err(Into::into)
     }
 
     pub(crate) fn sender(&self) -> &Sender {
