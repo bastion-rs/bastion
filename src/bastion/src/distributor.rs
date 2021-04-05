@@ -4,7 +4,7 @@ use futures::channel::mpsc;
 use lasso::Spur;
 
 use crate::{
-    child_ref::SendError,
+    child_ref::{SendError, SendResult},
     message::{AnswerSender, Message},
     prelude::{RefAddr, SignedMessage},
     system::{STRING_INTERNER, SYSTEM},
@@ -24,8 +24,7 @@ impl Distributor {
         &self.0
     }
 
-    // todo: this will probably return a future<Output=impl Message> or something
-    pub fn ask_one(&self, question: impl Message) {
+    pub fn ask_one(&self, question: impl Message) -> SendResult {
         // wrap it into a question payload
         let payload = Payload::Question {
             message: Box::new(question),
@@ -34,22 +33,22 @@ impl Distributor {
         // wrap it into an envelope
         let envelope = Envelope::Letter(payload);
         // send it
-        self.send(envelope).unwrap();
+        self.send(envelope)
     }
 
-    pub fn tell_one(&self, message: impl Message) {
+    pub fn tell_one(&self, message: impl Message) -> SendResult {
         let payload = Payload::Statement(Box::new(message));
         let envelope = Envelope::Letter(payload);
-        self.send(envelope).unwrap()
+        self.send(envelope)
     }
 
-    pub fn tell_everyone(&self, message: impl Message) {
+    pub fn tell_everyone(&self, message: impl Message) -> SendResult {
         let payload = ClonePayload::Statement(Arc::new(message));
         let envelope = Envelope::Leaflet(payload);
-        self.send(envelope).unwrap()
+        self.send(envelope)
     }
 
-    fn send<M: Message>(self, envelope: Envelope<M>) -> Result<(), SendError> {
+    fn send<M: Message>(self, envelope: Envelope<M>) -> SendResult {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.distribute(self, envelope)
     }

@@ -3,7 +3,7 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child_ref::{ChildRef, SendError},
+    child_ref::{ChildRef, SendError, SendResult},
     distributor::{ClonePayload, Envelope, Payload},
     message::{Answer, Message},
     system::STRING_INTERNER,
@@ -490,7 +490,7 @@ impl GlobalDispatcher {
         &self,
         distributor: Distributor,
         envelope: Envelope<M>,
-    ) -> Result<(), SendError>
+    ) -> SendResult
     where
         M: Message,
     {
@@ -501,10 +501,7 @@ impl GlobalDispatcher {
         }
     }
 
-    fn distribute_message<M>(
-        handler: &dyn RecipientHandler,
-        envelope: Envelope<M>,
-    ) -> Result<(), SendError>
+    fn distribute_message<M>(handler: &dyn RecipientHandler, envelope: Envelope<M>) -> SendResult
     where
         M: Message,
     {
@@ -512,13 +509,12 @@ impl GlobalDispatcher {
         match envelope {
             Envelope::Letter(Payload::Statement(message)) => {
                 let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
-                child.try_tell_anonymously(message)
+                child.try_tell_anonymously(message).map(Into::into)
             }
             Envelope::Letter(Payload::Question { message, reply_to }) => {
                 let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
                 // TODO: HANDLE REPLIES!
-                let _ = child.try_ask_anonymously(message)?;
-                Ok(())
+                child.try_ask_anonymously(message).map(Into::into)
             }
             Envelope::Leaflet(ClonePayload::Statement(message)) => {
                 let all_children = handler.all();
@@ -538,11 +534,10 @@ impl GlobalDispatcher {
                 } else {
                     // TODO: HANDLE REPLIES!
 
-                    let _ = all_children
+                    all_children
                         .iter()
                         .map(|child| child.try_ask_anonymously(Arc::clone(&message)))
-                        .collect::<Result<Vec<_>, _>>();
-                    Ok(())
+                        .collect()
                 }
             }
         }
