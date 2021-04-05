@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+//! `Distributor` is a mechanism that allows you to send messages to children.
 
 use crate::{
     child_ref::SendError,
@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Result as AnyResult;
 use lasso::Spur;
+use std::fmt::Debug;
 
 // Copy is fine here because we're working
 // with interned strings here
