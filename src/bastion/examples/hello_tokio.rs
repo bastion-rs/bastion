@@ -1,7 +1,10 @@
+#[cfg(feature = "tokio-runtime")]
 use anyhow::Result as AnyResult;
+#[cfg(feature = "tokio-runtime")]
 use bastion::prelude::*;
 #[cfg(feature = "tokio-runtime")]
 use tokio;
+#[cfg(feature = "tokio-runtime")]
 use tracing::{error, warn, Level};
 
 /// `cargo run --features=tokio-runtime --example hello_tokio`
