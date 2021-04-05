@@ -119,6 +119,36 @@ impl ChildrenRef {
         &self.dispatchers
     }
 
+    /// Returns a list of distributors that can be used for
+    /// communication with other actors in the same group(s).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
+    /// let distributors = children_ref.distributors();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
     pub fn distributors(&self) -> &Vec<Distributor> {
         &self.distributors
     }

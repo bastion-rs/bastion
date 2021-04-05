@@ -6,7 +6,6 @@ use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::dispatcher::Dispatcher;
-pub use crate::dispatcher::RecipientTarget;
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
@@ -429,6 +428,45 @@ impl Children {
         self
     }
 
+    /// Appends a distributor to the children.
+    ///
+    /// By default supervised elements aren't added to any distributor.
+    ///
+    /// # Arguments
+    ///
+    /// * `distributor` - An instance of struct that implements the
+    /// [`RecipientHandler`] trait.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// #
+    /// Bastion::children(|children| {
+    ///     children
+    ///         .with_distributor(Distributor::named("my distributor"))
+    /// }).expect("Couldn't create the children group.");
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    /// [`RecipientHandler`]: crate::dispatcher::RecipientHandler
     pub fn with_distributor(mut self, distributor: Distributor) -> Self {
         self.distributors.push(distributor);
         self

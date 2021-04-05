@@ -23,6 +23,8 @@ use tracing::{debug, trace};
 /// the Bastion identifier as the key and the module name as the value.
 pub type DispatcherMap = LOTable<ChildRef, String>;
 
+/// Type alias for the recipients hashset.
+/// Each key-value pair stores the Bastion identifier as the key.
 pub type RecipientMap = LOTable<ChildRef, ()>;
 
 #[derive(Debug, Clone)]
@@ -48,25 +50,6 @@ pub enum BroadcastTarget {
     All,
     /// Send the broadcasted message to each actor in group.
     Group(String),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-// Copy is fine here because we're working
-// with interned strings here
-pub struct RecipientTarget(Spur);
-
-impl RecipientTarget {
-    pub fn new(s: Spur) -> Self {
-        Self(s)
-    }
-
-    pub fn named(name: &str) -> Self {
-        Self(STRING_INTERNER.get_or_intern(name))
-    }
-
-    pub fn interned(&self) -> &Spur {
-        &self.0
-    }
 }
 
 pub trait RecipientHandler {
