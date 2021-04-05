@@ -9,37 +9,12 @@ use crate::{
 };
 use crate::{path::BastionPath, system::STRING_INTERNER};
 use futures::channel::mpsc::TrySendError;
+use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::{
-    cmp::{Eq, PartialEq},
-    iter::FromIterator,
-};
 use thiserror::Error;
 use tracing::{debug, trace};
-
-pub type TellResult = Result<(), SendError>;
-pub type AskResult = Result<Answer, SendError>;
-pub type SendResult = Result<Sent, SendError>;
-
-#[derive(Debug)]
-pub enum Sent {
-    Tell(()),
-    Ask(Answer),
-}
-
-impl From<()> for Sent {
-    fn from(_: ()) -> Self {
-        Self::Tell(())
-    }
-}
-
-impl From<Answer> for Sent {
-    fn from(answer: Answer) -> Self {
-        Self::Ask(answer)
-    }
-}
 
 #[derive(Error, Debug)]
 pub enum SendError {
@@ -53,8 +28,6 @@ pub enum SendError {
     NoDistributor(String),
     #[error("Distributor has 0 Recipients")]
     EmptyRecipient,
-    #[error("Didn't receive the expected reply type. {0:?}")]
-    WrongReplyType(Sent),
 }
 
 impl From<TrySendError<Envelope>> for SendError {
@@ -283,7 +256,7 @@ impl ChildRef {
         self.send(env).map_err(|env| env.into_msg().unwrap())
     }
 
-    pub fn try_tell_anonymously<M: Message>(&self, msg: M) -> TellResult {
+    pub fn try_tell_anonymously<M: Message>(&self, msg: M) -> Result<(), SendError> {
         debug!("ChildRef({}): Try Telling message: {:?}", self.id(), msg);
         let msg = BastionMessage::tell(msg);
         let env = Envelope::from_dead_letters(msg);
@@ -388,7 +361,7 @@ impl ChildRef {
         Ok(answer)
     }
 
-    pub fn try_ask_anonymously<M: Message>(&self, msg: M) -> AskResult {
+    pub fn try_ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, SendError> {
         debug!("ChildRef({}): Try Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg, self.addr());
         let env = Envelope::from_dead_letters(msg);
@@ -507,7 +480,7 @@ impl ChildRef {
             .map_err(|err| err.into_inner())
     }
 
-    pub(crate) fn try_send(&self, env: Envelope) -> TellResult {
+    pub(crate) fn try_send(&self, env: Envelope) -> Result<(), SendError> {
         trace!("ChildRef({}): Sending message: {:?}", self.id(), env);
         self.sender.unbounded_send(env).map_err(Into::into)
     }

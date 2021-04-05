@@ -1,13 +1,12 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use crate::{
-    child_ref::{AskResult, SendError, SendResult, Sent},
-    message::{Answer, AnswerSender, Message},
-    prelude::{ChildRef, RefAddr, SignedMessage},
+    child_ref::SendError,
+    message::{Answer, Message},
+    prelude::ChildRef,
     system::{STRING_INTERNER, SYSTEM},
 };
 use anyhow::Result as AnyResult;
-use futures::channel::mpsc;
 use lasso::Spur;
 
 // Copy is fine here because we're working
@@ -18,10 +17,6 @@ pub struct Distributor(Spur);
 impl Distributor {
     pub fn named(name: impl AsRef<str>) -> Self {
         Self(STRING_INTERNER.get_or_intern(name.as_ref()))
-    }
-
-    pub fn interned(&self) -> &Spur {
-        &self.0
     }
 
     pub fn ask_one(&self, question: impl Message) -> Result<Answer, SendError> {
@@ -49,5 +44,9 @@ impl Distributor {
     pub fn unsubscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.remove_recipient(&vec![*self], child_ref)
+    }
+
+    pub(crate) fn interned(&self) -> &Spur {
+        &self.0
     }
 }

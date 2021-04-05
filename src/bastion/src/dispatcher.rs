@@ -3,15 +3,14 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child_ref::{AskResult, ChildRef, SendError, SendResult, TellResult},
+    child_ref::{ChildRef, SendError},
     message::{Answer, Message},
     system::STRING_INTERNER,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
-use lasso::{Spur, ThreadedRodeo};
+use lasso::Spur;
 use lever::prelude::*;
-use once_cell::sync::Lazy;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::{
@@ -175,13 +174,11 @@ impl RecipientHandler for RoundRobinHandler {
     }
 
     fn register(&self, actor: ChildRef) {
-        self.recipients
-            .insert(actor, ())
-            .map_err(|e| anyhow::anyhow!(e));
+        let _ = self.recipients.insert(actor, ());
     }
 
     fn remove(&self, actor: &ChildRef) {
-        self.recipients.remove(&actor);
+        let _ = self.recipients.remove(&actor);
     }
 }
 

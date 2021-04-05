@@ -90,7 +90,6 @@ pub mod supervisor;
 pub mod errors;
 
 pub mod distributor;
-pub mod recipient;
 
 distributed_api! {
     // pub mod dist_messages;

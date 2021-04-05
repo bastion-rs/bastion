@@ -476,7 +476,7 @@ impl Children {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    pub fn with_resizer(mut self, mut resizer: OptimalSizeExploringResizer) -> Self {
+    pub fn with_resizer(mut self, resizer: OptimalSizeExploringResizer) -> Self {
         self.redundancy = resizer.lower_bound() as usize;
         self.resizer = Box::new(resizer);
         self

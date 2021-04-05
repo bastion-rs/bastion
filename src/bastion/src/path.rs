@@ -69,13 +69,6 @@ impl BastionPath {
         }
     }
 
-    pub(crate) fn recipient(recipient_id: BastionId) -> BastionPath {
-        BastionPath {
-            parent_chain: vec![],
-            this: BastionPathElement::Recipient(recipient_id).into(),
-        }
-    }
-
     /// iterates over path elements
     pub(crate) fn iter(&self) -> impl Iterator<Item = &BastionId> {
         let parent_iter = self.parent_chain.iter();
@@ -257,8 +250,7 @@ impl fmt::Debug for BastionPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.this {
             Some(this @ BastionPathElement::Supervisor(_))
-            | Some(this @ BastionPathElement::Children(_))
-            | Some(this @ BastionPathElement::Recipient(_)) => write!(
+            | Some(this @ BastionPathElement::Children(_)) => write!(
                 f,
                 "/{}",
                 self.parent_chain
@@ -349,8 +341,6 @@ pub enum BastionPathElement {
     #[doc(hidden)]
     /// Child element
     Child(BastionId),
-    /// Recipient element
-    Recipient(BastionId),
 }
 
 impl fmt::Debug for BastionPathElement {
@@ -359,7 +349,6 @@ impl fmt::Debug for BastionPathElement {
             BastionPathElement::Supervisor(id) => write!(f, "supervisor#{}", id),
             BastionPathElement::Children(id) => write!(f, "children#{}", id),
             BastionPathElement::Child(id) => write!(f, "child#{}", id),
-            BastionPathElement::Recipient(id) => write!(f, "recipient#{}", id),
         }
     }
 }
@@ -370,7 +359,6 @@ impl BastionPathElement {
             BastionPathElement::Supervisor(id) => id,
             BastionPathElement::Children(id) => id,
             BastionPathElement::Child(id) => id,
-            BastionPathElement::Recipient(id) => id,
         }
     }
 
@@ -448,9 +436,6 @@ impl fmt::Display for AppendError {
                 Some(BastionPathElement::Child(..)) => {
                     write!(f, "Supervisor is not appendable to a child")
                 }
-                Some(BastionPathElement::Recipient(..)) => {
-                    write!(f, "Supervisor is not appendable to a recipient")
-                }
             },
             BastionPathElement::Children(..) => match self.path.this {
                 None => write!(f, "Children is not appendable to root"),
@@ -461,9 +446,6 @@ impl fmt::Display for AppendError {
                 Some(BastionPathElement::Child(..)) => {
                     write!(f, "Children is not appendable to a child")
                 }
-                Some(BastionPathElement::Recipient(..)) => {
-                    write!(f, "Children is not appendable to a recipient")
-                }
             },
             BastionPathElement::Child(..) => match self.path.this {
                 None => write!(f, "Child is not appendable to root"),
@@ -473,22 +455,6 @@ impl fmt::Display for AppendError {
                 Some(BastionPathElement::Children(..)) => unreachable!(),
                 Some(BastionPathElement::Child(..)) => {
                     write!(f, "Child is not appendable to a child")
-                }
-                Some(BastionPathElement::Recipient(..)) => {
-                    write!(f, "Child is not appendable to a recipient")
-                }
-            },
-            BastionPathElement::Recipient(..) => match self.path.this {
-                None => write!(f, "Recipient is not appendable to root"),
-                Some(BastionPathElement::Supervisor(..)) => {
-                    write!(f, "Recipient is not appendable to a supervisor")
-                }
-                Some(BastionPathElement::Children(..)) => unreachable!(),
-                Some(BastionPathElement::Child(..)) => {
-                    write!(f, "Recipient is not appendable to a child")
-                }
-                Some(BastionPathElement::Recipient(..)) => {
-                    write!(f, "Recipient is not appendable to a recipient")
                 }
             },
         }
@@ -523,27 +489,6 @@ impl BastionPath {
                         this,
                     },
                     element: sv,
-                }),
-            },
-            recipient @ BastionPathElement::Recipient(_) => match self.this {
-                None => Ok(BastionPath {
-                    parent_chain: self.parent_chain,
-                    this: Some(recipient),
-                }),
-                Some(BastionPathElement::Supervisor(id)) => {
-                    let mut path = BastionPath {
-                        parent_chain: self.parent_chain,
-                        this: Some(recipient),
-                    };
-                    path.parent_chain.push(id);
-                    Ok(path)
-                }
-                this => Err(AppendError {
-                    path: BastionPath {
-                        parent_chain: self.parent_chain,
-                        this,
-                    },
-                    element: recipient,
                 }),
             },
             children @ BastionPathElement::Children(_) => match self.this {
