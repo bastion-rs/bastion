@@ -12,15 +12,17 @@ use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::{pending, poll};
 use fxhash::{FxHashMap, FxHashSet};
-use lazy_static::lazy_static;
+use lasso::ThreadedRodeo;
 use lightproc::prelude::*;
+use once_cell::sync::Lazy;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::Poll;
 use tracing::{debug, error, info, trace, warn};
 
-lazy_static! {
-    pub(crate) static ref SYSTEM: GlobalSystem = System::init();
-}
+pub(crate) static STRING_INTERNER: Lazy<Arc<ThreadedRodeo>> =
+    Lazy::new(|| Arc::new(Default::default()));
+
+pub(crate) static SYSTEM: Lazy<GlobalSystem> = Lazy::new(|| System::init());
 
 pub(crate) struct GlobalSystem {
     sender: Sender,

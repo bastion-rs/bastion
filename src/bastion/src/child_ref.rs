@@ -1,16 +1,13 @@
 //!
 //! Allows users to communicate with Child through the mailboxes.
-use crate::path::BastionPath;
+use crate::context::BastionId;
+use crate::envelope::{Envelope, RefAddr};
 use crate::{broadcast::Sender, message::Msg};
-use crate::{context::BastionId, dispatcher::RecipientTarget};
-use crate::{
-    dispatcher::INTERNER,
-    envelope::{Envelope, RefAddr},
-};
 use crate::{
     distributor::Distributor,
     message::{Answer, BastionMessage, Message},
 };
+use crate::{path::BastionPath, system::STRING_INTERNER};
 use futures::channel::mpsc::TrySendError;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
@@ -51,7 +48,7 @@ impl From<TrySendError<Envelope>> for SendError {
 
 impl From<Distributor> for SendError {
     fn from(distributor: Distributor) -> Self {
-        Self::NoDistributor(INTERNER.resolve(distributor.interned()).to_string())
+        Self::NoDistributor(STRING_INTERNER.resolve(distributor.interned()).to_string())
     }
 }
 

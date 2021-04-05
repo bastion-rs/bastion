@@ -5,7 +5,8 @@
 use crate::{
     child_ref::{ChildRef, SendError},
     distributor::{ClonePayload, Envelope, Payload},
-    message::Answer,
+    message::{Answer, Message},
+    system::STRING_INTERNER,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
@@ -51,8 +52,6 @@ pub enum BroadcastTarget {
     Group(String),
 }
 
-pub(crate) static INTERNER: Lazy<Arc<ThreadedRodeo>> = Lazy::new(|| Arc::new(Default::default()));
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 // Copy is fine here because we're working
 // with interned strings here
@@ -64,7 +63,7 @@ impl RecipientTarget {
     }
 
     pub fn named(name: &str) -> Self {
-        Self(INTERNER.get_or_intern(name))
+        Self(STRING_INTERNER.get_or_intern(name))
     }
 
     pub fn interned(&self) -> &Spur {
@@ -77,77 +76,6 @@ pub trait RecipientHandler {
     fn all(&self) -> Vec<ChildRef>;
     fn register(&self, actor: ChildRef);
     fn remove(&self, actor: &ChildRef);
-
-    fn distribute(&self, envelope: Envelope) -> Result<(), SendError> {
-        // check type of message and number of recipients
-        match envelope {
-            Envelope::Letter(Payload::Statement(message)) => {
-                let child = self.next().ok_or_else(|| SendError::EmptyRecipient)?;
-                child.try_tell_anonymously(message)
-            }
-            Envelope::Letter(Payload::Question { message, reply_to }) => {
-                let child = self.next().ok_or_else(|| SendError::EmptyRecipient)?;
-                // TODO: HANDLE REPLIES!
-                let _ = child.try_ask_anonymously(message)?;
-                Ok(())
-            }
-            Envelope::Leaflet(ClonePayload::Statement(message)) => {
-                let all_children = self.all();
-                if all_children.is_empty() {
-                    Err(SendError::EmptyRecipient)
-                } else {
-                    all_children
-                        .iter()
-                        .map(|child| child.try_tell_anonymously(Arc::clone(&message)))
-                        .collect()
-                }
-            }
-            Envelope::Leaflet(ClonePayload::Question { message, reply_to }) => {
-                let all_children = self.all();
-                if all_children.is_empty() {
-                    Err(SendError::EmptyRecipient)
-                } else {
-                    // TODO: HANDLE REPLIES!
-
-                    let _ = all_children
-                        .iter()
-                        .map(|child| child.try_ask_anonymously(Arc::clone(&message)))
-                        .collect::<Result<Vec<_>, _>>();
-                    Ok(())
-                }
-            }
-        }
-    }
-
-    fn ask(&self, message: SignedMessage) -> Result<Answer, SendError> {
-        self.next()
-            .ok_or_else(|| SendError::EmptyRecipient)?
-            .try_ask_anonymously(message)
-    }
-
-    fn tell_everyone(&self, message: Arc<SignedMessage>) -> Result<Vec<()>, SendError> {
-        let all_children = self.all();
-        if all_children.is_empty() {
-            Err(SendError::EmptyRecipient)
-        } else {
-            all_children
-                .iter()
-                .map(|recipient| recipient.try_tell_anonymously(Arc::clone(&message)))
-                .collect()
-        }
-    }
-
-    fn ask_everyone(&self, message: Arc<SignedMessage>) -> Result<Vec<Answer>, SendError> {
-        let all_children = self.all();
-        if all_children.is_empty() {
-            Err(SendError::EmptyRecipient)
-        } else {
-            all_children
-                .iter()
-                .map(|recipient| recipient.try_ask_anonymously(Arc::clone(&message)))
-                .collect()
-        }
-    }
 }
 
 pub struct Recipient {
@@ -558,15 +486,65 @@ impl GlobalDispatcher {
         }
     }
 
-    pub(crate) fn distribute(
+    pub(crate) fn distribute<M>(
         &self,
         distributor: Distributor,
-        envelope: Envelope,
-    ) -> Result<(), SendError> {
+        envelope: Envelope<M>,
+    ) -> Result<(), SendError>
+    where
+        M: Message,
+    {
         if let Some(distributor) = self.distributors.get(&distributor) {
-            distributor.handler().distribute(envelope)
+            Self::distribute_message(distributor.handler(), envelope)
         } else {
             Err(distributor.into())
+        }
+    }
+
+    fn distribute_message<M>(
+        handler: &dyn RecipientHandler,
+        envelope: Envelope<M>,
+    ) -> Result<(), SendError>
+    where
+        M: Message,
+    {
+        // check type of message and number of recipients
+        match envelope {
+            Envelope::Letter(Payload::Statement(message)) => {
+                let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
+                child.try_tell_anonymously(message)
+            }
+            Envelope::Letter(Payload::Question { message, reply_to }) => {
+                let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
+                // TODO: HANDLE REPLIES!
+                let _ = child.try_ask_anonymously(message)?;
+                Ok(())
+            }
+            Envelope::Leaflet(ClonePayload::Statement(message)) => {
+                let all_children = handler.all();
+                if all_children.is_empty() {
+                    Err(SendError::EmptyRecipient)
+                } else {
+                    all_children
+                        .iter()
+                        .map(|child| child.try_tell_anonymously(Arc::clone(&message)))
+                        .collect()
+                }
+            }
+            Envelope::Leaflet(ClonePayload::Question { message, reply_to }) => {
+                let all_children = handler.all();
+                if all_children.is_empty() {
+                    Err(SendError::EmptyRecipient)
+                } else {
+                    // TODO: HANDLE REPLIES!
+
+                    let _ = all_children
+                        .iter()
+                        .map(|child| child.try_ask_anonymously(Arc::clone(&message)))
+                        .collect::<Result<Vec<_>, _>>();
+                    Ok(())
+                }
+            }
         }
     }
 

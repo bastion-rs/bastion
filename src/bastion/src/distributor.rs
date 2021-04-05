@@ -1,17 +1,14 @@
 use std::{fmt::Debug, sync::Arc};
 
 use futures::channel::mpsc;
-use lasso::{Spur, ThreadedRodeo};
-use once_cell::sync::Lazy;
+use lasso::Spur;
 
 use crate::{
     child_ref::SendError,
     message::{AnswerSender, Message},
     prelude::{RefAddr, SignedMessage},
-    system::SYSTEM,
+    system::{STRING_INTERNER, SYSTEM},
 };
-
-pub(crate) static INTERNER: Lazy<Arc<ThreadedRodeo>> = Lazy::new(|| Arc::new(Default::default()));
 
 // Copy is fine here because we're working
 // with interned strings here
@@ -20,7 +17,7 @@ pub struct Distributor(Spur);
 
 impl Distributor {
     pub fn named(name: impl AsRef<str>) -> Self {
-        Self(INTERNER.get_or_intern(name.as_ref()))
+        Self(STRING_INTERNER.get_or_intern(name.as_ref()))
     }
 
     pub fn interned(&self) -> &Spur {
@@ -36,34 +33,41 @@ impl Distributor {
         // wrap it into an envelope
         let envelope = Envelope::Letter(payload);
         // send it
-        let _ = self.send(envelope);
+        self.send(envelope).unwrap();
     }
 
-    fn send(self, envelope: Envelope) -> Result<(), SendError> {
+    pub fn tell_one(&self, message: impl Message) {
+        let boxed = Box::new(message);
+        let payload = Payload::Statement(boxed);
+        let envelope = Envelope::Letter(payload);
+        self.send(envelope).unwrap()
+    }
+
+    fn send<M: Message>(self, envelope: Envelope<M>) -> Result<(), SendError> {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.distribute(self, envelope)
     }
 }
 
-pub enum Envelope {
-    Letter(Payload),
-    Leaflet(ClonePayload),
+pub enum Envelope<M: Message> {
+    Letter(Payload<M>),
+    Leaflet(ClonePayload<M>),
 }
 
 #[derive(Debug)]
 pub struct MultiSender(mpsc::Sender<SignedMessage>, RefAddr);
-pub enum ClonePayload {
-    Statement(Arc<dyn Message>),
+pub enum ClonePayload<M: Message> {
+    Statement(Arc<M>),
     Question {
-        message: Arc<dyn Message>,
+        message: Arc<M>,
         reply_to: Option<MultiSender>,
     },
 }
 
-pub enum Payload {
-    Statement(Box<dyn Message>),
+pub enum Payload<M: Message> {
+    Statement(M),
     Question {
-        message: Box<dyn Message>,
+        message: M,
         reply_to: Option<AnswerSender>,
     },
 }
