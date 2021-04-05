@@ -1,6 +1,5 @@
 //!
 //! Allows users to communicate with children through the mailboxes.
-use crate::child_ref::ChildRef;
 use crate::context::BastionId;
 use crate::dispatcher::DispatcherType;
 use crate::envelope::Envelope;
@@ -8,6 +7,7 @@ use crate::message::{BastionMessage, Message};
 use crate::path::BastionPath;
 use crate::system::SYSTEM;
 use crate::{broadcast::Sender, dispatcher::RecipientTarget};
+use crate::{child_ref::ChildRef, distributor::Distributor};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ pub struct ChildrenRef {
     path: Arc<BastionPath>,
     children: Vec<ChildRef>,
     dispatchers: Vec<DispatcherType>,
-    recipients: Vec<Arc<RecipientTarget>>,
+    distributors: Vec<Distributor>,
 }
 
 impl ChildrenRef {
@@ -32,7 +32,7 @@ impl ChildrenRef {
         path: Arc<BastionPath>,
         children: Vec<ChildRef>,
         dispatchers: Vec<DispatcherType>,
-        recipients: Vec<Arc<RecipientTarget>>,
+        distributors: Vec<Distributor>,
     ) -> Self {
         ChildrenRef {
             id,
@@ -40,7 +40,7 @@ impl ChildrenRef {
             path,
             children,
             dispatchers,
-            recipients,
+            distributors,
         }
     }
 
@@ -119,8 +119,8 @@ impl ChildrenRef {
         &self.dispatchers
     }
 
-    pub fn recipients(&self) -> &Vec<Arc<RecipientTarget>> {
-        &self.recipients
+    pub fn distributors(&self) -> &Vec<Distributor> {
+        &self.distributors
     }
 
     /// Returns a list of [`ChildRef`] referencing the elements

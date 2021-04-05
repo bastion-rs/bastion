@@ -1,12 +1,15 @@
 //!
 //! Allows users to communicate with Child through the mailboxes.
-use crate::message::{Answer, BastionMessage, Message};
 use crate::path::BastionPath;
 use crate::{broadcast::Sender, message::Msg};
 use crate::{context::BastionId, dispatcher::RecipientTarget};
 use crate::{
     dispatcher::INTERNER,
     envelope::{Envelope, RefAddr},
+};
+use crate::{
+    distributor::Distributor,
+    message::{Answer, BastionMessage, Message},
 };
 use futures::channel::mpsc::TrySendError;
 use std::cmp::{Eq, PartialEq};
@@ -24,9 +27,9 @@ pub enum SendError {
     Full(Msg),
     #[error("couldn't send a message I should have not sent. {0}")]
     Other(anyhow::Error),
-    #[error("No available Recipients matching {0}")]
-    NoRecipient(String),
-    #[error("Recipient has 0 childrefs")]
+    #[error("No available Distributor matching {0}")]
+    NoDistributor(String),
+    #[error("Distributor has 0 Recipients")]
     EmptyRecipient,
 }
 
@@ -46,9 +49,9 @@ impl From<TrySendError<Envelope>> for SendError {
     }
 }
 
-impl From<RecipientTarget> for SendError {
-    fn from(target: RecipientTarget) -> Self {
-        Self::NoRecipient(INTERNER.resolve(target.interned()).to_string())
+impl From<Distributor> for SendError {
+    fn from(distributor: Distributor) -> Self {
+        Self::NoDistributor(INTERNER.resolve(distributor.interned()).to_string())
     }
 }
 

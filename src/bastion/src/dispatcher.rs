@@ -2,11 +2,12 @@
 //! Special module that allows users to interact and communicate with a
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
-use crate::envelope::SignedMessage;
 use crate::{
     child_ref::{ChildRef, SendError},
+    distributor::{ClonePayload, Envelope, Payload},
     message::Answer,
 };
+use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
 use lasso::{Spur, ThreadedRodeo};
 use lever::prelude::*;
@@ -77,10 +78,45 @@ pub trait RecipientHandler {
     fn register(&self, actor: ChildRef);
     fn remove(&self, actor: &ChildRef);
 
-    fn tell(&self, message: SignedMessage) -> Result<(), SendError> {
-        self.next()
-            .ok_or_else(|| SendError::EmptyRecipient)?
-            .try_tell_anonymously(message)
+    fn distribute(&self, envelope: Envelope) -> Result<(), SendError> {
+        // check type of message and number of recipients
+        match envelope {
+            Envelope::Letter(Payload::Statement(message)) => {
+                let child = self.next().ok_or_else(|| SendError::EmptyRecipient)?;
+                child.try_tell_anonymously(message)
+            }
+            Envelope::Letter(Payload::Question { message, reply_to }) => {
+                let child = self.next().ok_or_else(|| SendError::EmptyRecipient)?;
+                // TODO: HANDLE REPLIES!
+                let _ = child.try_ask_anonymously(message)?;
+                Ok(())
+            }
+            Envelope::Leaflet(ClonePayload::Statement(message)) => {
+                let all_children = self.all();
+                if all_children.is_empty() {
+                    Err(SendError::EmptyRecipient)
+                } else {
+                    all_children
+                        .iter()
+                        .map(|child| child.try_tell_anonymously(Arc::clone(&message)))
+                        .collect()
+                }
+            }
+            Envelope::Leaflet(ClonePayload::Question { message, reply_to }) => {
+                let all_children = self.all();
+                if all_children.is_empty() {
+                    Err(SendError::EmptyRecipient)
+                } else {
+                    // TODO: HANDLE REPLIES!
+
+                    let _ = all_children
+                        .iter()
+                        .map(|child| child.try_ask_anonymously(Arc::clone(&message)))
+                        .collect::<Result<Vec<_>, _>>();
+                    Ok(())
+                }
+            }
+        }
     }
 
     fn ask(&self, message: SignedMessage) -> Result<Answer, SendError> {
@@ -428,7 +464,7 @@ impl Into<DispatcherType> for String {
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
     pub dispatchers: LOTable<DispatcherType, Arc<Box<Dispatcher>>>,
-    pub recipients: LOTable<RecipientTarget, Arc<Box<Recipient>>>,
+    pub distributors: LOTable<Distributor, Arc<Box<Recipient>>>,
 }
 
 impl GlobalDispatcher {
@@ -436,7 +472,7 @@ impl GlobalDispatcher {
     pub(crate) fn new() -> Self {
         GlobalDispatcher {
             dispatchers: LOTable::new(),
-            recipients: LOTable::new(),
+            distributors: LOTable::new(),
         }
     }
 
@@ -522,15 +558,15 @@ impl GlobalDispatcher {
         }
     }
 
-    pub(crate) fn send_to_recipient(
+    pub(crate) fn distribute(
         &self,
-        target: RecipientTarget,
-        message: SignedMessage,
+        distributor: Distributor,
+        envelope: Envelope,
     ) -> Result<(), SendError> {
-        if let Some(target) = self.recipients.get(&target) {
-            target.handler().tell(message)
+        if let Some(distributor) = self.distributors.get(&distributor) {
+            distributor.handler().distribute(envelope)
         } else {
-            Err(target.into())
+            Err(distributor.into())
         }
     }
 
@@ -561,38 +597,36 @@ impl GlobalDispatcher {
     /// Appends the information about actor to the recipients.
     pub(crate) fn register_recipient(
         &self,
-        recipient: RecipientTarget,
+        distributor: Distributor,
         child_ref: ChildRef,
     ) -> AnyResult<()> {
-        if let Some(recipient) = self.recipients.get(&recipient) {
+        if let Some(recipient) = self.distributors.get(&distributor) {
             recipient.register(child_ref);
         } else {
             let actors = Recipient::default();
             actors.register(child_ref);
-            self.recipients
-                .insert(recipient, Arc::new(Box::new(actors)))?;
+            self.distributors
+                .insert(distributor, Arc::new(Box::new(actors)))?;
         }
         Ok(())
     }
 
-    pub(crate) fn remove_from_recipients(
+    pub(crate) fn remove_recipient(
         &self,
-        recipients: &Vec<Arc<RecipientTarget>>,
+        distributor_list: &Vec<Distributor>,
         child_ref: ChildRef,
     ) -> AnyResult<()> {
-        recipients
-            .iter()
-            .filter(|key| self.recipients.contains_key(*key))
-            .for_each(|key| {
-                if let Some(recipient) = self.recipients.get(key) {
-                    recipient.remove(&child_ref);
-                }
-            });
+        distributor_list.iter().for_each(|distributor| {
+            if let Some(recipient) = self.distributors.get(distributor) {
+                recipient.remove(&child_ref);
+            }
+        });
         Ok(())
     }
 
-    pub(crate) fn remove_recipient(&self, recipient: &Arc<RecipientTarget>) -> AnyResult<()> {
-        self.recipients.remove(recipient)?;
+    /// Removes distributor from the global registry.
+    pub(crate) fn remove_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
+        self.distributors.remove(distributor)?;
         Ok(())
     }
 }

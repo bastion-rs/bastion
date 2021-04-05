@@ -1,6 +1,5 @@
 //!
 //! Children are a group of child supervised under a supervisor
-use crate::broadcast::{Broadcast, Parent, Sender};
 use crate::callbacks::{CallbackType, Callbacks};
 use crate::child::{Child, Init};
 use crate::child_ref::ChildRef;
@@ -14,6 +13,10 @@ use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
 use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
 use crate::system::SYSTEM;
+use crate::{
+    broadcast::{Broadcast, Parent, Sender},
+    distributor::Distributor,
+};
 use anyhow::Result as AnyResult;
 
 use bastion_executor::pool;
@@ -107,7 +110,7 @@ pub struct Children {
     started: bool,
     // List of dispatchers attached to each actor in the group.
     dispatchers: Vec<Arc<Box<Dispatcher>>>,
-    recipients: Vec<Arc<RecipientTarget>>,
+    distributors: Vec<Distributor>,
     // The name of children
     name: Option<String>,
     #[cfg(feature = "scaling")]
@@ -133,7 +136,7 @@ impl Children {
         let pre_start_msgs = Vec::new();
         let started = false;
         let dispatchers = Vec::new();
-        let recipients = Vec::new();
+        let distributors = Vec::new();
         let name = None;
         #[cfg(feature = "scaling")]
         let resizer = Box::new(OptimalSizeExploringResizer::default());
@@ -149,7 +152,7 @@ impl Children {
             pre_start_msgs,
             started,
             dispatchers,
-            recipients,
+            distributors,
             name,
             #[cfg(feature = "scaling")]
             resizer,
@@ -244,9 +247,9 @@ impl Children {
             .map(|dispatcher| dispatcher.dispatcher_type())
             .collect();
 
-        let recipients = self.recipients.clone();
+        let distributors = self.distributors.clone();
 
-        ChildrenRef::new(id, sender, path, children, dispatchers, recipients)
+        ChildrenRef::new(id, sender, path, children, dispatchers, distributors)
     }
 
     /// Sets the name of this children group.
@@ -426,8 +429,8 @@ impl Children {
         self
     }
 
-    pub fn with_recipient_target(mut self, recipient: RecipientTarget) -> Self {
-        self.recipients.push(Arc::new(recipient));
+    pub fn with_distributor(mut self, distributor: Distributor) -> Self {
+        self.distributors.push(distributor);
         self
     }
 
@@ -657,8 +660,8 @@ impl Children {
         if let Err(e) = self.remove_dispatchers() {
             warn!("couldn't remove all dispatchers from the registry: {}", e);
         };
-        if let Err(e) = self.remove_recipients() {
-            warn!("couldn't remove all recipients from the registry: {}", e);
+        if let Err(e) = self.remove_distributors() {
+            warn!("couldn't remove all distributors from the registry: {}", e);
         };
         self.bcast.stopped();
     }
@@ -668,8 +671,8 @@ impl Children {
         if let Err(e) = self.remove_dispatchers() {
             warn!("couldn't remove all dispatchers from the registry: {}", e);
         };
-        if let Err(e) = self.remove_recipients() {
-            warn!("couldn't remove all recipients from the registry: {}", e);
+        if let Err(e) = self.remove_distributors() {
+            warn!("couldn't remove all distributors from the registry: {}", e);
         };
         self.bcast.faulted();
     }
@@ -1117,12 +1120,12 @@ impl Children {
         Ok(())
     }
 
-    /// Removes all declared local recipients from the global dispatcher.
-    pub(crate) fn remove_recipients(&self) -> AnyResult<()> {
+    /// Removes all declared local distributors from the global dispatcher.
+    pub(crate) fn remove_distributors(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
 
-        for recipient in self.recipients.iter() {
-            global_dispatcher.remove_recipient(recipient)?;
+        for distributor in self.distributors.iter() {
+            global_dispatcher.remove_distributor(distributor)?;
         }
         Ok(())
     }

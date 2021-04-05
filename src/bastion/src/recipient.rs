@@ -36,12 +36,13 @@ impl Recipient {
     }
 
     fn send(&self, msg: Msg) -> Result<(), SendError> {
-        let signed_message = SignedMessage {
-            msg,
-            sign: self.sign.clone(),
-        };
+        todo!();
+        // let signed_message = SignedMessage {
+        //     msg,
+        //     sign: self.sign.clone(),
+        // };
 
-        let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.send_to_recipient(self.target, signed_message)
+        // let global_dispatcher = SYSTEM.dispatcher();
+        // global_dispatcher.send_to_recipient(self.target, signed_message)
     }
 }

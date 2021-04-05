@@ -125,13 +125,14 @@ impl Child {
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
         self.remove_from_dispatchers();
-        self.remove_from_recipients();
+        let _ = self.remove_from_distributors();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
         self.remove_from_dispatchers();
+        let _ = self.remove_from_distributors();
 
         let parent = self.bcast.parent().clone().into_children().unwrap();
         let path = self.bcast.path().clone();
@@ -306,8 +307,8 @@ impl Child {
             error!("couldn't add actor to the registry: {}", e);
             return;
         };
-        if let Err(e) = self.register_to_recipients() {
-            error!("couldn't add actor to the registry: {}", e);
+        if let Err(e) = self.register_to_distributors() {
+            error!("couldn't add actor to the distributors: {}", e);
             return;
         };
 
@@ -405,31 +406,31 @@ impl Child {
         Ok(())
     }
 
-    /// Adds the actor into each recipients declared in the parent node.
-    fn register_to_recipients(&self) -> AnyResult<()> {
+    /// Adds the actor into each distributor declared in the parent node.
+    fn register_to_distributors(&self) -> AnyResult<()> {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
             let child_ref = self.child_ref.clone();
-            let recipients = parent.recipients();
+            let distributors = parent.distributors();
 
             let global_dispatcher = SYSTEM.dispatcher();
-            recipients
+            distributors
                 .iter()
-                .map(|recipient| {
-                    global_dispatcher.register_recipient(**recipient, child_ref.clone())
+                .map(|&distributor| {
+                    global_dispatcher.register_recipient(distributor, child_ref.clone())
                 })
                 .collect::<AnyResult<Vec<_>>>()?;
         }
         Ok(())
     }
 
-    /// Cleanup the actor's record from each declared recipients.
-    fn remove_from_recipients(&self) -> AnyResult<()> {
+    /// Cleanup the actor's record from each declared distributor.
+    fn remove_from_distributors(&self) -> AnyResult<()> {
         if let Some(parent) = self.bcast.parent().clone().into_children() {
             let child_ref = self.child_ref.clone();
-            let recipients = parent.recipients();
+            let distributors = parent.distributors();
 
             let global_dispatcher = SYSTEM.dispatcher();
-            global_dispatcher.remove_from_recipients(recipients, child_ref)?;
+            global_dispatcher.remove_recipient(distributors, child_ref)?;
         }
         Ok(())
     }
