@@ -17,8 +17,40 @@ struct ConferenceSchedule {
     misc: String,
 }
 
+fn run() {
+    Bastion::init();
+    Bastion::supervisor(|supervisor| {
+        supervisor.children(|children| {
+            children
+                .with_redundancy(1)
+                .with_distributor(Distributor::named("my distributor"))
+                .with_exec(|ctx: BastionContext| async move {
+                    loop {
+                        let _: Option<SignedMessage> = ctx.try_recv().await;
+                    }
+                    Ok(())
+                })
+        })
+    })
+    .unwrap();
+
+    Bastion::start();
+
+    let distributor = Distributor::named("my distributor");
+
+    let answer: Vec<Answer> = distributor
+        .ask_everyone("hello?".to_string())
+        .expect("couldn't send question");
+
+    Bastion::stop();
+    Bastion::block_until_stopped();
+}
+
+/// cargo r --features=tokio-runtime distributor
 #[tokio::main]
 async fn main() -> AnyResult<()> {
+    run();
+    return Ok(());
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .finish();
@@ -55,7 +87,7 @@ async fn main() -> AnyResult<()> {
     Bastion::start();
 
     // Wait a bit until everyone is ready
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    // std::thread::sleep(std::time::Duration::from_secs(1));
 
     let staff = Distributor::named("staff");
     let enthusiasts = Distributor::named("enthusiasts");

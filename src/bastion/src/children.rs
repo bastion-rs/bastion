@@ -502,6 +502,7 @@ impl Children {
     ///     #
     /// Bastion::children(|children| {
     ///     children
+    ///         .with_redundancy(1)
     ///         .with_resizer(
     ///             OptimalSizeExploringResizer::default()
     ///                 .with_lower_bound(10)
