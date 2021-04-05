@@ -5,11 +5,9 @@
 use crate::{
     child_ref::{ChildRef, SendError},
     message::{Answer, Message},
-    system::STRING_INTERNER,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
-use lasso::Spur;
 use lever::prelude::*;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
@@ -52,47 +50,23 @@ pub enum BroadcastTarget {
     Group(String),
 }
 
-pub trait RecipientHandler {
+/// A `Recipient` is responsible for maintaining it's list
+/// of recipients, and deciding which child gets to receive which message.
+pub trait Recipient {
+    /// Provide this function to declare out which recipient will receive the next message
     fn next(&self) -> Option<ChildRef>;
+    /// Return all recipients that will receive a broadcast message
     fn all(&self) -> Vec<ChildRef>;
+    /// Add this actor to your list of recipients
     fn register(&self, actor: ChildRef);
+    /// Remove this actor from your list of recipients
     fn remove(&self, actor: &ChildRef);
 }
 
-pub struct Recipient {
-    handler: Box<dyn RecipientHandler + Send + Sync + 'static>,
-    actors: RecipientMap,
-}
+/// A `RecipientHandler` is a `Recipient` implementor, that can be stored in the dispatcher
+pub trait RecipientHandler: Recipient + Send + Sync + Debug {}
 
-impl Default for Recipient {
-    fn default() -> Self {
-        Self {
-            handler: Box::new(DefaultRecipientHandler::default()),
-            actors: Default::default(),
-        }
-    }
-}
-
-impl Recipient {
-    /// Returns the used handler by the dispatcher.
-    pub fn handler(&self) -> &(dyn RecipientHandler + Send + Sync + 'static) {
-        &*self.handler
-    }
-
-    pub fn register(&self, actor: ChildRef) {
-        self.handler.register(actor);
-    }
-
-    pub fn remove(&self, actor: &ChildRef) {
-        self.handler.remove(actor);
-    }
-}
-
-impl Debug for Recipient {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Recipient(actors: {:?})", self.actors.len())
-    }
-}
+impl RecipientHandler for RoundRobinHandler {}
 
 /// The default handler, which does round-robin.
 pub type DefaultRecipientHandler = RoundRobinHandler;
@@ -139,7 +113,7 @@ impl RoundRobinHandler {
     }
 }
 
-impl RecipientHandler for RoundRobinHandler {
+impl Recipient for RoundRobinHandler {
     fn next(&self) -> Option<ChildRef> {
         let entries = self.public_recipients();
 
@@ -371,7 +345,7 @@ impl Into<DispatcherType> for String {
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
     pub dispatchers: LOTable<DispatcherType, Arc<Box<Dispatcher>>>,
-    pub distributors: LOTable<Distributor, Arc<Box<Recipient>>>,
+    pub distributors: LOTable<Distributor, Arc<Box<(dyn RecipientHandler)>>>,
 }
 
 impl GlobalDispatcher {
@@ -526,14 +500,14 @@ impl GlobalDispatcher {
     fn next(&self, distributor: Distributor) -> Result<Option<ChildRef>, SendError> {
         self.distributors
             .get(&distributor)
-            .map(|recipient| recipient.handler().next())
+            .map(|recipient| recipient.next())
             .ok_or_else(|| SendError::from(distributor))
     }
 
     fn all(&self, distributor: Distributor) -> Result<Vec<ChildRef>, SendError> {
         self.distributors
             .get(&distributor)
-            .map(|recipient| recipient.handler().all())
+            .map(|recipient| recipient.all())
             .ok_or_else(|| SendError::from(distributor))
     }
 
@@ -570,7 +544,7 @@ impl GlobalDispatcher {
         if let Some(recipient) = self.distributors.get(&distributor) {
             recipient.register(child_ref);
         } else {
-            let actors = Recipient::default();
+            let actors = DefaultRecipientHandler::default();
             actors.register(child_ref);
             self.distributors
                 .insert(distributor, Arc::new(Box::new(actors)))?;
