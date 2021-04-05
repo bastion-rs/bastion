@@ -1,15 +1,15 @@
 Create a conference.
 
 1st Group
-Staff (10) - Going to organize the event
+Staff (10) - Going to organize the event // OK
 
 2nd Group
-Enthusiasts (100) - interested in participating to the conference (haven't registered yet)
+Enthusiasts (100) - interested in participating to the conference (haven't registered yet) // OK
 
 3rd Group
 Attendees (empty for now) - Participate
 
-Enthusiast -> Ask one of the staff members "when is the conference going to happen ?"
+Enthusiast -> Ask one of the staff members "when is the conference going to happen ?" // OK
 Broadcast / Question => Answer 0 or 1 Staff members are going to reply eventually?
 
 Staff -> Send a Leaflet to all of the enthusiasts, letting them know that they can register.
@@ -18,7 +18,7 @@ Staff -> Send a Leaflet to all of the enthusiasts, letting them know that they c
 Broadcast / Question -> if people reply with YES => fill the 3rd group
 some enthusiasts are now attendees
 
-Staff -> send the actual schedule and misc infos to Attendees
+Staff -> send the actual schedule and misc infos to Attendees // Ok
 Broadcast / Statement (Attendees)
 
 An attendee sends a thank you note to one staff member (and not bother everyone)

@@ -24,6 +24,7 @@ impl Distributor {
         &self.0
     }
 
+    // todo: this will probably return a future<Output=impl Message> or something
     pub fn ask_one(&self, question: impl Message) {
         // wrap it into a question payload
         let payload = Payload::Question {
@@ -37,9 +38,14 @@ impl Distributor {
     }
 
     pub fn tell_one(&self, message: impl Message) {
-        let boxed = Box::new(message);
-        let payload = Payload::Statement(boxed);
+        let payload = Payload::Statement(Box::new(message));
         let envelope = Envelope::Letter(payload);
+        self.send(envelope).unwrap()
+    }
+
+    pub fn tell_everyone(&self, message: impl Message) {
+        let payload = ClonePayload::Statement(Arc::new(message));
+        let envelope = Envelope::Leaflet(payload);
         self.send(envelope).unwrap()
     }
 

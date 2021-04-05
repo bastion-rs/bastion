@@ -1131,16 +1131,6 @@ impl<O> MessageHandler<O> {
                 let msg: Box<dyn Any> = msg;
                 Ok((*msg.downcast::<T>().unwrap(), sign))
             }
-            Ok(SignedMessage {
-                msg: Msg(MsgInner::Tell(msg)),
-                sign,
-            }) => {
-                dbg!(&msg);
-                Err(MessageHandler::new(SignedMessage {
-                    msg: Msg(MsgInner::Tell(msg)),
-                    sign,
-                }))
-            }
             Ok(anything) => Err(MessageHandler::new(anything)),
             Err(output) => Err(MessageHandler::matched(output)),
         }
