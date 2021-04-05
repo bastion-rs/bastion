@@ -23,27 +23,15 @@ pub type TellResult = Result<(), SendError>;
 pub type AskResult = Result<Answer, SendError>;
 pub type SendResult = Result<Sent, SendError>;
 
+#[derive(Debug)]
 pub enum Sent {
     Tell(()),
-    TellEveryone(Vec<()>),
     Ask(Answer),
-    AskEveryone(Vec<Answer>),
 }
 
 impl From<()> for Sent {
     fn from(_: ()) -> Self {
         Self::Tell(())
-    }
-}
-
-impl FromIterator<()> for Sent {
-    fn from_iter<T: IntoIterator<Item = ()>>(iter: T) -> Self {
-        Self::TellEveryone(iter.into_iter().collect())
-    }
-}
-impl FromIterator<Answer> for Sent {
-    fn from_iter<T: IntoIterator<Item = Answer>>(iter: T) -> Self {
-        Self::AskEveryone(iter.into_iter().collect())
     }
 }
 
@@ -65,6 +53,8 @@ pub enum SendError {
     NoDistributor(String),
     #[error("Distributor has 0 Recipients")]
     EmptyRecipient,
+    #[error("Didn't receive the expected reply type. {0:?}")]
+    WrongReplyType(Sent),
 }
 
 impl From<TrySendError<Envelope>> for SendError {

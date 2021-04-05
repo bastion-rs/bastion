@@ -3,8 +3,7 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child_ref::{ChildRef, SendError, SendResult},
-    distributor::{ClonePayload, Envelope, Payload},
+    child_ref::{AskResult, ChildRef, SendError, SendResult, TellResult},
     message::{Answer, Message},
     system::STRING_INTERNER,
 };
@@ -486,61 +485,76 @@ impl GlobalDispatcher {
         }
     }
 
-    pub(crate) fn distribute<M>(
-        &self,
-        distributor: Distributor,
-        envelope: Envelope<M>,
-    ) -> SendResult
+    pub(crate) fn tell<M>(&self, distributor: Distributor, message: M) -> Result<(), SendError>
     where
         M: Message,
     {
-        if let Some(distributor) = self.distributors.get(&distributor) {
-            Self::distribute_message(distributor.handler(), envelope)
+        let child = self
+            .next(distributor)?
+            .ok_or_else(|| SendError::EmptyRecipient)?;
+        child.try_tell_anonymously(message).map(Into::into)
+    }
+
+    pub(crate) fn ask<M>(&self, distributor: Distributor, message: M) -> Result<Answer, SendError>
+    where
+        M: Message,
+    {
+        let child = self
+            .next(distributor)?
+            .ok_or_else(|| SendError::EmptyRecipient)?;
+        child.try_ask_anonymously(message).map(Into::into)
+    }
+
+    pub(crate) fn ask_everyone<M>(
+        &self,
+        distributor: Distributor,
+        message: M,
+    ) -> Result<Vec<Answer>, SendError>
+    where
+        M: Message + Clone,
+    {
+        let all_children = self.all(distributor)?;
+        if all_children.is_empty() {
+            Err(SendError::EmptyRecipient)
         } else {
-            Err(distributor.into())
+            all_children
+                .iter()
+                .map(|child| child.try_ask_anonymously(message.clone()))
+                .collect::<Result<Vec<_>, _>>()
         }
     }
 
-    fn distribute_message<M>(handler: &dyn RecipientHandler, envelope: Envelope<M>) -> SendResult
+    pub(crate) fn tell_everyone<M>(
+        &self,
+        distributor: Distributor,
+        message: M,
+    ) -> Result<Vec<()>, SendError>
     where
-        M: Message,
+        M: Message + Clone,
     {
-        // check type of message and number of recipients
-        match envelope {
-            Envelope::Letter(Payload::Statement(message)) => {
-                let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
-                child.try_tell_anonymously(message).map(Into::into)
-            }
-            Envelope::Letter(Payload::Question { message, reply_to }) => {
-                let child = handler.next().ok_or_else(|| SendError::EmptyRecipient)?;
-                // TODO: HANDLE REPLIES!
-                child.try_ask_anonymously(message).map(Into::into)
-            }
-            Envelope::Leaflet(ClonePayload::Statement(message)) => {
-                let all_children = handler.all();
-                if all_children.is_empty() {
-                    Err(SendError::EmptyRecipient)
-                } else {
-                    all_children
-                        .iter()
-                        .map(|child| child.try_tell_anonymously(Arc::clone(&message)))
-                        .collect()
-                }
-            }
-            Envelope::Leaflet(ClonePayload::Question { message, reply_to }) => {
-                let all_children = handler.all();
-                if all_children.is_empty() {
-                    Err(SendError::EmptyRecipient)
-                } else {
-                    // TODO: HANDLE REPLIES!
-
-                    all_children
-                        .iter()
-                        .map(|child| child.try_ask_anonymously(Arc::clone(&message)))
-                        .collect()
-                }
-            }
+        let all_children = self.all(distributor)?;
+        if all_children.is_empty() {
+            Err(SendError::EmptyRecipient)
+        } else {
+            all_children
+                .iter()
+                .map(|child| child.try_tell_anonymously(message.clone()))
+                .collect()
         }
+    }
+
+    fn next(&self, distributor: Distributor) -> Result<Option<ChildRef>, SendError> {
+        self.distributors
+            .get(&distributor)
+            .map(|recipient| recipient.handler().next())
+            .ok_or_else(|| SendError::from(distributor))
+    }
+
+    fn all(&self, distributor: Distributor) -> Result<Vec<ChildRef>, SendError> {
+        self.distributors
+            .get(&distributor)
+            .map(|recipient| recipient.handler().all())
+            .ok_or_else(|| SendError::from(distributor))
     }
 
     /// Adds dispatcher to the global registry.

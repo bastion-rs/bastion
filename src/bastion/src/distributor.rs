@@ -1,14 +1,14 @@
 use std::{fmt::Debug, sync::Arc};
 
-use futures::channel::mpsc;
-use lasso::Spur;
-
 use crate::{
-    child_ref::{SendError, SendResult},
-    message::{AnswerSender, Message},
-    prelude::{RefAddr, SignedMessage},
+    child_ref::{AskResult, SendError, SendResult, Sent},
+    message::{Answer, AnswerSender, Message},
+    prelude::{ChildRef, RefAddr, SignedMessage},
     system::{STRING_INTERNER, SYSTEM},
 };
+use anyhow::Result as AnyResult;
+use futures::channel::mpsc;
+use lasso::Spur;
 
 // Copy is fine here because we're working
 // with interned strings here
@@ -24,55 +24,30 @@ impl Distributor {
         &self.0
     }
 
-    pub fn ask_one(&self, question: impl Message) -> SendResult {
-        // wrap it into a question payload
-        let payload = Payload::Question {
-            message: Box::new(question),
-            reply_to: None,
-        };
-        // wrap it into an envelope
-        let envelope = Envelope::Letter(payload);
-        // send it
-        self.send(envelope)
+    pub fn ask_one(&self, question: impl Message) -> Result<Answer, SendError> {
+        SYSTEM.dispatcher().ask(*self, question)
     }
 
-    pub fn tell_one(&self, message: impl Message) -> SendResult {
-        let payload = Payload::Statement(Box::new(message));
-        let envelope = Envelope::Letter(payload);
-        self.send(envelope)
+    // todo: create an actual iterator?
+    pub fn ask_everyone(&self, question: impl Message + Clone) -> Result<Vec<Answer>, SendError> {
+        SYSTEM.dispatcher().ask_everyone(*self, question)
     }
 
-    pub fn tell_everyone(&self, message: impl Message) -> SendResult {
-        let payload = ClonePayload::Statement(Arc::new(message));
-        let envelope = Envelope::Leaflet(payload);
-        self.send(envelope)
+    pub fn tell_one(&self, message: impl Message) -> Result<(), SendError> {
+        SYSTEM.dispatcher().tell(*self, message)
     }
 
-    fn send<M: Message>(self, envelope: Envelope<M>) -> SendResult {
+    pub fn tell_everyone(&self, message: impl Message + Clone) -> Result<Vec<()>, SendError> {
+        SYSTEM.dispatcher().tell_everyone(*self, message)
+    }
+
+    pub fn subscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.distribute(self, envelope)
+        global_dispatcher.register_recipient(*self, child_ref)
     }
-}
 
-pub enum Envelope<M: Message> {
-    Letter(Payload<M>),
-    Leaflet(ClonePayload<M>),
-}
-
-#[derive(Debug)]
-pub struct MultiSender(mpsc::Sender<SignedMessage>, RefAddr);
-pub enum ClonePayload<M: Message> {
-    Statement(Arc<M>),
-    Question {
-        message: Arc<M>,
-        reply_to: Option<MultiSender>,
-    },
-}
-
-pub enum Payload<M: Message> {
-    Statement(M),
-    Question {
-        message: M,
-        reply_to: Option<AnswerSender>,
-    },
+    pub fn unsubscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.remove_recipient(&vec![*self], child_ref)
+    }
 }
