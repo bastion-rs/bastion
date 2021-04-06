@@ -22,7 +22,7 @@ use tracing::{debug, error, info, trace, warn};
 pub(crate) static STRING_INTERNER: Lazy<Arc<ThreadedRodeo>> =
     Lazy::new(|| Arc::new(Default::default()));
 
-pub(crate) static SYSTEM: Lazy<GlobalSystem> = Lazy::new(|| System::init());
+pub(crate) static SYSTEM: Lazy<GlobalSystem> = Lazy::new(System::init);
 
 pub(crate) struct GlobalSystem {
     sender: Sender,

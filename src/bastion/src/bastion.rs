@@ -258,7 +258,7 @@ impl Bastion {
             std::panic::set_hook(Box::new(|_| ()));
         }
 
-        &SYSTEM;
+        let _ = &SYSTEM;
     }
 
     /// Creates a new [`Supervisor`], passes it through the specified

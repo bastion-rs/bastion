@@ -53,7 +53,7 @@ pub enum BroadcastTarget {
 /// A `Recipient` is responsible for maintaining it's list
 /// of recipients, and deciding which child gets to receive which message.
 pub trait Recipient {
-    /// Provide this function to declare out which recipient will receive the next message
+    /// Provide this function to declare which recipient will receive the next message
     fn next(&self) -> Option<ChildRef>;
     /// Return all recipients that will receive a broadcast message
     fn all(&self) -> Vec<ChildRef>;
@@ -443,9 +443,7 @@ impl GlobalDispatcher {
     where
         M: Message,
     {
-        let child = self
-            .next(distributor)?
-            .ok_or_else(|| SendError::EmptyRecipient)?;
+        let child = self.next(distributor)?.ok_or(SendError::EmptyRecipient)?;
         child.try_tell_anonymously(message).map(Into::into)
     }
 
@@ -453,9 +451,7 @@ impl GlobalDispatcher {
     where
         M: Message,
     {
-        let child = self
-            .next(distributor)?
-            .ok_or_else(|| SendError::EmptyRecipient)?;
+        let child = self.next(distributor)?.ok_or(SendError::EmptyRecipient)?;
         child.try_ask_anonymously(message).map(Into::into)
     }
 
@@ -554,7 +550,7 @@ impl GlobalDispatcher {
 
     pub(crate) fn remove_recipient(
         &self,
-        distributor_list: &Vec<Distributor>,
+        distributor_list: &[Distributor],
         child_ref: ChildRef,
     ) -> AnyResult<()> {
         distributor_list.iter().for_each(|distributor| {
