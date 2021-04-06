@@ -72,10 +72,10 @@ mod prime_number {
     fn number_or_panic(number_to_return: u128) -> u128 {
         // Let's roll a dice
         if rand::random::<u8>() % 6 == 0 {
-            panic!(format!(
+            panic!(
                 "I was about to return {} but I chose to panic instead!",
                 number_to_return
-            ))
+            )
         }
         number_to_return
     }

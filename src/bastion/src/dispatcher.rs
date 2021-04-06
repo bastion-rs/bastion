@@ -2,8 +2,11 @@
 //! Special module that allows users to interact and communicate with a
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
-use crate::child_ref::ChildRef;
-use crate::envelope::SignedMessage;
+use crate::{
+    child_ref::{ChildRef, SendError},
+    message::{Answer, Message},
+};
+use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
 use lever::prelude::*;
 use std::fmt::{self, Debug};
@@ -17,6 +20,10 @@ use tracing::{debug, trace};
 /// Type alias for the concurrency hashmap. Each key-value pair stores
 /// the Bastion identifier as the key and the module name as the value.
 pub type DispatcherMap = LOTable<ChildRef, String>;
+
+/// Type alias for the recipients hashset.
+/// Each key-value pair stores the Bastion identifier as the key.
+pub type RecipientMap = LOTable<ChildRef, ()>;
 
 #[derive(Debug, Clone)]
 /// Defines types of the notifications handled by the dispatcher
@@ -43,6 +50,27 @@ pub enum BroadcastTarget {
     Group(String),
 }
 
+/// A `Recipient` is responsible for maintaining it's list
+/// of recipients, and deciding which child gets to receive which message.
+pub trait Recipient {
+    /// Provide this function to declare which recipient will receive the next message
+    fn next(&self) -> Option<ChildRef>;
+    /// Return all recipients that will receive a broadcast message
+    fn all(&self) -> Vec<ChildRef>;
+    /// Add this actor to your list of recipients
+    fn register(&self, actor: ChildRef);
+    /// Remove this actor from your list of recipients
+    fn remove(&self, actor: &ChildRef);
+}
+
+/// A `RecipientHandler` is a `Recipient` implementor, that can be stored in the dispatcher
+pub trait RecipientHandler: Recipient + Send + Sync + Debug {}
+
+impl RecipientHandler for RoundRobinHandler {}
+
+/// The default handler, which does round-robin.
+pub type DefaultRecipientHandler = RoundRobinHandler;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// Defines the type of the dispatcher.
 ///
@@ -67,6 +95,48 @@ pub type DefaultDispatcherHandler = RoundRobinHandler;
 #[derive(Default, Debug)]
 pub struct RoundRobinHandler {
     index: AtomicUsize,
+    recipients: RecipientMap,
+}
+
+impl RoundRobinHandler {
+    fn public_recipients(&self) -> Vec<ChildRef> {
+        self.recipients
+            .iter()
+            .filter_map(|entry| {
+                if entry.0.is_public() {
+                    Some(entry.0)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+impl Recipient for RoundRobinHandler {
+    fn next(&self) -> Option<ChildRef> {
+        let entries = self.public_recipients();
+
+        if entries.is_empty() {
+            return None;
+        }
+
+        let current_index = self.index.load(Ordering::SeqCst) % entries.len();
+        self.index.store(current_index + 1, Ordering::SeqCst);
+        entries.get(current_index).map(std::clone::Clone::clone)
+    }
+
+    fn all(&self) -> Vec<ChildRef> {
+        self.public_recipients()
+    }
+
+    fn register(&self, actor: ChildRef) {
+        let _ = self.recipients.insert(actor, ());
+    }
+
+    fn remove(&self, actor: &ChildRef) {
+        let _ = self.recipients.remove(&actor);
+    }
 }
 
 impl DispatcherHandler for RoundRobinHandler {
@@ -80,25 +150,31 @@ impl DispatcherHandler for RoundRobinHandler {
     }
     // Each child in turn will receive a message.
     fn broadcast_message(&self, entries: &DispatcherMap, message: &Arc<SignedMessage>) {
-        let entries = entries
+        let public_childrefs = entries
             .iter()
-            .filter(|entry| entry.0.is_public())
+            .filter_map(|entry| {
+                if entry.0.is_public() {
+                    Some(entry.0)
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
-        if entries.is_empty() {
+        if public_childrefs.is_empty() {
             debug!("no public children to broadcast message to");
             return;
         }
-        let current_index = self.index.load(Ordering::SeqCst) % entries.len();
+        let current_index = self.index.load(Ordering::SeqCst) % public_childrefs.len();
 
-        if let Some(entry) = entries.get(current_index) {
+        if let Some(entry) = public_childrefs.get(current_index) {
             debug!(
                 "sending message to child {}/{} - {}",
                 current_index + 1,
                 entries.len(),
-                entry.0.path()
+                entry.path()
             );
-            entry.0.tell_anonymously(message.clone()).unwrap();
+            entry.tell_anonymously(message.clone()).unwrap();
             self.index.store(current_index + 1, Ordering::SeqCst);
         };
     }
@@ -269,6 +345,7 @@ impl Into<DispatcherType> for String {
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
     pub dispatchers: LOTable<DispatcherType, Arc<Box<Dispatcher>>>,
+    pub distributors: LOTable<Distributor, Arc<Box<(dyn RecipientHandler)>>>,
 }
 
 impl GlobalDispatcher {
@@ -276,6 +353,7 @@ impl GlobalDispatcher {
     pub(crate) fn new() -> Self {
         GlobalDispatcher {
             dispatchers: LOTable::new(),
+            distributors: LOTable::new(),
         }
     }
 
@@ -332,19 +410,17 @@ impl GlobalDispatcher {
 
     /// Broadcasts the given message in according with the specified target.
     pub(crate) fn broadcast_message(&self, target: BroadcastTarget, message: &Arc<SignedMessage>) {
-        let mut acked_dispatchers: Vec<DispatcherType> = Vec::new();
-
-        match target {
+        let acked_dispatchers = match target {
             BroadcastTarget::All => self
                 .dispatchers
                 .iter()
                 .map(|pair| pair.0.name().into())
-                .for_each(|group_name| acked_dispatchers.push(group_name)),
+                .collect(),
             BroadcastTarget::Group(name) => {
                 let target_dispatcher = name.into();
-                acked_dispatchers.push(target_dispatcher);
+                vec![target_dispatcher]
             }
-        }
+        };
 
         for dispatcher_type in acked_dispatchers {
             match self.dispatchers.get(&dispatcher_type) {
@@ -361,6 +437,74 @@ impl GlobalDispatcher {
                 }
             }
         }
+    }
+
+    pub(crate) fn tell<M>(&self, distributor: Distributor, message: M) -> Result<(), SendError>
+    where
+        M: Message,
+    {
+        let child = self.next(distributor)?.ok_or(SendError::EmptyRecipient)?;
+        child.try_tell_anonymously(message).map(Into::into)
+    }
+
+    pub(crate) fn ask<M>(&self, distributor: Distributor, message: M) -> Result<Answer, SendError>
+    where
+        M: Message,
+    {
+        let child = self.next(distributor)?.ok_or(SendError::EmptyRecipient)?;
+        child.try_ask_anonymously(message).map(Into::into)
+    }
+
+    pub(crate) fn ask_everyone<M>(
+        &self,
+        distributor: Distributor,
+        message: M,
+    ) -> Result<Vec<Answer>, SendError>
+    where
+        M: Message + Clone,
+    {
+        let all_children = self.all(distributor)?;
+        if all_children.is_empty() {
+            Err(SendError::EmptyRecipient)
+        } else {
+            all_children
+                .iter()
+                .map(|child| child.try_ask_anonymously(message.clone()))
+                .collect::<Result<Vec<_>, _>>()
+        }
+    }
+
+    pub(crate) fn tell_everyone<M>(
+        &self,
+        distributor: Distributor,
+        message: M,
+    ) -> Result<Vec<()>, SendError>
+    where
+        M: Message + Clone,
+    {
+        let all_children = self.all(distributor)?;
+        if all_children.is_empty() {
+            Err(SendError::EmptyRecipient)
+        } else {
+            all_children
+                .iter()
+                .map(|child| child.try_tell_anonymously(message.clone()))
+                .collect()
+        }
+    }
+
+    fn next(&self, distributor: Distributor) -> Result<Option<ChildRef>, SendError> {
+        self.distributors
+            .get(&distributor)
+            .map(|recipient| recipient.next())
+            .ok_or_else(|| SendError::from(distributor))
+    }
+
+    fn all(&self, distributor: Distributor) -> Result<Vec<ChildRef>, SendError> {
+        self.distributors
+            .get(&distributor)
+            .map(|recipient| recipient.all())
+            .ok_or_else(|| SendError::from(distributor))
     }
 
     /// Adds dispatcher to the global registry.
@@ -384,6 +528,42 @@ impl GlobalDispatcher {
     /// Removes dispatcher from the global registry.
     pub(crate) fn remove_dispatcher(&self, dispatcher: &Arc<Box<Dispatcher>>) -> AnyResult<()> {
         self.dispatchers.remove(&dispatcher.dispatcher_type())?;
+        Ok(())
+    }
+
+    /// Appends the information about actor to the recipients.
+    pub(crate) fn register_recipient(
+        &self,
+        distributor: Distributor,
+        child_ref: ChildRef,
+    ) -> AnyResult<()> {
+        if let Some(recipient) = self.distributors.get(&distributor) {
+            recipient.register(child_ref);
+        } else {
+            let actors = DefaultRecipientHandler::default();
+            actors.register(child_ref);
+            self.distributors
+                .insert(distributor, Arc::new(Box::new(actors)))?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn remove_recipient(
+        &self,
+        distributor_list: &[Distributor],
+        child_ref: ChildRef,
+    ) -> AnyResult<()> {
+        distributor_list.iter().for_each(|distributor| {
+            if let Some(recipient) = self.distributors.get(distributor) {
+                recipient.remove(&child_ref);
+            }
+        });
+        Ok(())
+    }
+
+    /// Removes distributor from the global registry.
+    pub(crate) fn remove_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
+        self.distributors.remove(distributor)?;
         Ok(())
     }
 }

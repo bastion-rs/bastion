@@ -1,13 +1,13 @@
 //!
 //! Allows users to communicate with children through the mailboxes.
 use crate::broadcast::Sender;
-use crate::child_ref::ChildRef;
 use crate::context::BastionId;
 use crate::dispatcher::DispatcherType;
 use crate::envelope::Envelope;
 use crate::message::{BastionMessage, Message};
 use crate::path::BastionPath;
 use crate::system::SYSTEM;
+use crate::{child_ref::ChildRef, distributor::Distributor};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -22,6 +22,7 @@ pub struct ChildrenRef {
     path: Arc<BastionPath>,
     children: Vec<ChildRef>,
     dispatchers: Vec<DispatcherType>,
+    distributors: Vec<Distributor>,
 }
 
 impl ChildrenRef {
@@ -31,6 +32,7 @@ impl ChildrenRef {
         path: Arc<BastionPath>,
         children: Vec<ChildRef>,
         dispatchers: Vec<DispatcherType>,
+        distributors: Vec<Distributor>,
     ) -> Self {
         ChildrenRef {
             id,
@@ -38,6 +40,7 @@ impl ChildrenRef {
             path,
             children,
             dispatchers,
+            distributors,
         }
     }
 
@@ -114,6 +117,40 @@ impl ChildrenRef {
     /// ```
     pub fn dispatchers(&self) -> &Vec<DispatcherType> {
         &self.dispatchers
+    }
+
+    /// Returns a list of distributors that can be used for
+    /// communication with other actors in the same group(s).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// #
+    /// # let children_ref = Bastion::children(|children| children).unwrap();
+    /// let distributors = children_ref.distributors();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn distributors(&self) -> &Vec<Distributor> {
+        &self.distributors
     }
 
     /// Returns a list of [`ChildRef`] referencing the elements

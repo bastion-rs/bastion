@@ -30,7 +30,8 @@ tokio-runtime = ["tokio"]
 
 [dependencies]
 bastion-utils = "0.3.2"
-lightproc = "0.3"
+# lightproc = "0.3"
+lightproc = { path = "../lightproc" }
 # bastion-utils = { path = "../bastion-utils" }
 
 crossbeam-utils = "0.8"

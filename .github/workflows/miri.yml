@@ -14,7 +14,7 @@ jobs:
       - name: Install
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-01-01
+          toolchain: nightly-2021-03-20
           override: true
       - uses: davidB/rust-cargo-make@v1
         with:
@@ -24,13 +24,4 @@ jobs:
           RUST_BACKTRACE: full
           RUST_LOG: 'trace'
         run: |
-          rustup component add miri
-          cargo miri setup
-          cargo clean
-          # Do some Bastion shake
-          cd src/bastion && \
-            MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-ignore-leaks" cargo miri test --features lever/nightly dispatcher && \
-            MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-ignore-leaks" cargo miri test --features lever/nightly path && \
-            MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-ignore-leaks" cargo miri test --features lever/nightly broadcast && \
-            MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-ignore-leaks" cargo miri test --features lever/nightly children_ref && \
-            cd -
+          tools/miri.sh

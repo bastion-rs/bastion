@@ -1,15 +1,63 @@
 //!
 //! Allows users to communicate with Child through the mailboxes.
-use crate::broadcast::Sender;
 use crate::context::BastionId;
 use crate::envelope::{Envelope, RefAddr};
-use crate::message::{Answer, BastionMessage, Message};
-use crate::path::BastionPath;
+use crate::{broadcast::Sender, message::Msg};
+use crate::{
+    distributor::Distributor,
+    message::{Answer, BastionMessage, Message},
+};
+use crate::{path::BastionPath, system::STRING_INTERNER};
+use futures::channel::mpsc::TrySendError;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use thiserror::Error;
 use tracing::{debug, trace};
+
+#[derive(Error, Debug)]
+/// `SendError`s occur when a message couldn't be dispatched through a distributor
+pub enum SendError {
+    #[error("couldn't send message. Channel Disconnected.")]
+    /// Channel has been closed before we could send a message
+    Disconnected(Msg),
+    #[error("couldn't send message. Channel is Full.")]
+    /// Channel is full, can't send a message
+    Full(Msg),
+    #[error("couldn't send a message I should have not sent. {0}")]
+    /// This error is returned when we try to send a message
+    /// that is not a BastionMessage::Message variant
+    Other(anyhow::Error),
+    #[error("No available Distributor matching {0}")]
+    /// The distributor we're trying to dispatch messages to is not registered in the system
+    NoDistributor(String),
+    #[error("Distributor has 0 Recipients")]
+    /// The distributor we're trying to dispatch messages to has no recipients
+    EmptyRecipient,
+}
+
+impl From<TrySendError<Envelope>> for SendError {
+    fn from(tse: TrySendError<Envelope>) -> Self {
+        let is_disconnected = tse.is_disconnected();
+        match tse.into_inner().msg {
+            BastionMessage::Message(msg) => {
+                if is_disconnected {
+                    Self::Disconnected(msg)
+                } else {
+                    Self::Full(msg)
+                }
+            }
+            other => Self::Other(anyhow::anyhow!("{:?}", other)),
+        }
+    }
+}
+
+impl From<Distributor> for SendError {
+    fn from(distributor: Distributor) -> Self {
+        Self::NoDistributor(STRING_INTERNER.resolve(distributor.interned()).to_string())
+    }
+}
 
 #[derive(Debug, Clone)]
 /// A "reference" to an element of a children group, allowing to
@@ -215,6 +263,75 @@ impl ChildRef {
         self.send(env).map_err(|env| env.into_msg().unwrap())
     }
 
+    /// Try to send a message to the child this `ChildRef` is referencing.
+    /// This message is intended to be used outside of Bastion context when
+    /// there is no way for receiver to identify message sender
+    ///
+    /// This method returns `()` if it succeeded, or a `SendError`(../child_ref/enum.SendError.html)
+    /// otherwise.
+    ///
+    /// # Argument
+    ///
+    /// * `msg` - The message to send.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    ///     # Bastion::init();
+    /// // The message that will be "told"...
+    /// const TELL_MSG: &'static str = "A message containing data (tell).";
+    ///
+    ///     # let children_ref =
+    /// // Create a new child...
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message "told"...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str => {
+    ///                     assert_eq!(msg, TELL_MSG);
+    ///                     // Handle the message...
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "tells" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///
+    ///     # let child_ref = &children_ref.elems()[0];
+    /// // Later, the message is "told" to the child...
+    /// child_ref.try_tell_anonymously(TELL_MSG).expect("Couldn't send the message.");
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn try_tell_anonymously<M: Message>(&self, msg: M) -> Result<(), SendError> {
+        debug!("ChildRef({}): Try Telling message: {:?}", self.id(), msg);
+        let msg = BastionMessage::tell(msg);
+        let env = Envelope::from_dead_letters(msg);
+        self.try_send(env).map_err(Into::into)
+    }
+
     /// Sends a message to the child this `ChildRef` is referencing,
     /// allowing it to answer.
     /// This message is intended to be used outside of Bastion context when
@@ -302,7 +419,6 @@ impl ChildRef {
     ///     # Bastion::block_until_stopped();
     /// # }
     /// ```
-    ///
     pub fn ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, M> {
         debug!("ChildRef({}): Asking message: {:?}", self.id(), msg);
         let (msg, answer) = BastionMessage::ask(msg, self.addr());
@@ -311,6 +427,100 @@ impl ChildRef {
         self.send(env).map_err(|env| env.into_msg().unwrap())?;
 
         Ok(answer)
+    }
+
+    /// Try to send a message to the child this `ChildRef` is referencing,
+    /// allowing it to answer.
+    /// This message is intended to be used outside of Bastion context when
+    /// there is no way for receiver to identify message sender
+    ///
+    /// This method returns [`Answer`](../message/struct.Answer.html) if it succeeded, or a `SendError`(../child_ref/enum.SendError.html)
+    /// otherwise.
+    ///
+    /// # Argument
+    ///
+    /// * `msg` - The message to send.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    ///     # Bastion::init();
+    /// // The message that will be "asked"...
+    /// const ASK_MSG: &'static str = "A message containing data (ask).";
+    /// // The message the will be "answered"...
+    /// const ANSWER_MSG: &'static str = "A message containing data (answer).";
+    ///
+    ///     # let children_ref =
+    /// // Create a new child...
+    /// Bastion::children(|children| {
+    ///     children.with_exec(|ctx: BastionContext| {
+    ///         async move {
+    ///             // ...which will receive the message asked...
+    ///             msg! { ctx.recv().await?,
+    ///                 msg: &'static str =!> {
+    ///                     assert_eq!(msg, ASK_MSG);
+    ///                     // Handle the message...
+    ///
+    ///                     // ...and eventually answer to it...
+    ///                     answer!(ctx, ANSWER_MSG);
+    ///                 };
+    ///                 // This won't happen because this example
+    ///                 // only "asks" a `&'static str`...
+    ///                 _: _ => ();
+    ///             }
+    ///
+    ///             Ok(())
+    ///         }
+    ///     })
+    /// }).expect("Couldn't create the children group.");
+    ///
+    ///     # Bastion::children(|children| {
+    ///         # children.with_exec(move |ctx: BastionContext| {
+    ///             # let child_ref = children_ref.elems()[0].clone();
+    ///             # async move {
+    /// // Later, the message is "asked" to the child...
+    /// let answer: Answer = child_ref.try_ask_anonymously(ASK_MSG).expect("Couldn't send the message.");
+    ///
+    /// // ...and the child's answer is received...
+    /// msg! { answer.await.expect("Couldn't receive the answer."),
+    ///     msg: &'static str => {
+    ///         assert_eq!(msg, ANSWER_MSG);
+    ///         // Handle the answer...
+    ///     };
+    ///     // This won't happen because this example
+    ///     // only answers a `&'static str`...
+    ///     _: _ => ();
+    /// }
+    ///                 #
+    ///                 # Ok(())
+    ///             # }
+    ///         # })
+    ///     # }).unwrap();
+    ///     #
+    ///     # Bastion::start();
+    ///     # Bastion::stop();
+    ///     # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn try_ask_anonymously<M: Message>(&self, msg: M) -> Result<Answer, SendError> {
+        debug!("ChildRef({}): Try Asking message: {:?}", self.id(), msg);
+        let (msg, answer) = BastionMessage::ask(msg, self.addr());
+        let env = Envelope::from_dead_letters(msg);
+        self.try_send(env).map(|_| answer)
     }
 
     /// Sends a message to the child this `ChildRef` is referencing
@@ -423,6 +633,11 @@ impl ChildRef {
         self.sender
             .unbounded_send(env)
             .map_err(|err| err.into_inner())
+    }
+
+    pub(crate) fn try_send(&self, env: Envelope) -> Result<(), SendError> {
+        trace!("ChildRef({}): Sending message: {:?}", self.id(), env);
+        self.sender.unbounded_send(env).map_err(Into::into)
     }
 
     pub(crate) fn sender(&self) -> &Sender {

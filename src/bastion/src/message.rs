@@ -1063,7 +1063,7 @@ impl<O> MessageHandler<O> {
     /// specific type.
     pub fn on_tell<T, F>(self, f: F) -> MessageHandler<O>
     where
-        T: 'static,
+        T: Debug + 'static,
         F: FnOnce(T, RefAddr) -> O,
     {
         match self.try_into_tell::<T>() {
@@ -1081,6 +1081,7 @@ impl<O> MessageHandler<O> {
     }
 
     fn try_into_question<T: 'static>(self) -> Result<(T, AnswerSender), MessageHandler<O>> {
+        debug!("try_into_question with type {}", std::any::type_name::<T>());
         match self.state.take_message() {
             Ok(SignedMessage {
                 msg:
@@ -1102,6 +1103,10 @@ impl<O> MessageHandler<O> {
     fn try_into_broadcast<T: Send + Sync + 'static>(
         self,
     ) -> Result<(Arc<T>, RefAddr), MessageHandler<O>> {
+        debug!(
+            "try_into_broadcast with type {}",
+            std::any::type_name::<T>()
+        );
         match self.state.take_message() {
             Ok(SignedMessage {
                 msg: Msg(MsgInner::Broadcast(msg)),
@@ -1116,7 +1121,8 @@ impl<O> MessageHandler<O> {
         }
     }
 
-    fn try_into_tell<T: 'static>(self) -> Result<(T, RefAddr), MessageHandler<O>> {
+    fn try_into_tell<T: Debug + 'static>(self) -> Result<(T, RefAddr), MessageHandler<O>> {
+        debug!("try_into_tell with type {}", std::any::type_name::<T>());
         match self.state.take_message() {
             Ok(SignedMessage {
                 msg: Msg(MsgInner::Tell(msg)),
@@ -1125,7 +1131,6 @@ impl<O> MessageHandler<O> {
                 let msg: Box<dyn Any> = msg;
                 Ok((*msg.downcast::<T>().unwrap(), sign))
             }
-
             Ok(anything) => Err(MessageHandler::new(anything)),
             Err(output) => Err(MessageHandler::matched(output)),
         }

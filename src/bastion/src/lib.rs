@@ -89,6 +89,8 @@ pub mod supervisor;
 
 pub mod errors;
 
+pub mod distributor;
+
 distributed_api! {
     // pub mod dist_messages;
     pub mod distributed;
@@ -108,6 +110,7 @@ pub mod prelude {
         BroadcastTarget, DefaultDispatcherHandler, Dispatcher, DispatcherHandler, DispatcherMap,
         DispatcherType, NotificationType,
     };
+    pub use crate::distributor::Distributor;
     pub use crate::envelope::{RefAddr, SignedMessage};
     pub use crate::errors::*;
     #[cfg(not(target_os = "windows"))]

@@ -15,7 +15,7 @@ jobs:
       - name: Install
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-01-01
+          toolchain: nightly-2021-03-20
           override: true
       - uses: davidB/rust-cargo-make@v1
         with:

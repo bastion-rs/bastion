@@ -249,19 +249,8 @@ impl fmt::Display for BastionPath {
 impl fmt::Debug for BastionPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.this {
-            Some(this @ BastionPathElement::Supervisor(_)) => write!(
-                f,
-                "/{}",
-                self.parent_chain
-                    .iter()
-                    .map(|id| BastionPathElement::Supervisor(id.clone()))
-                    .chain(vec![this.clone()])
-                    .map(|el| format!("{:?}", el))
-                    .collect::<Vec<String>>()
-                    .join("/")
-            ),
-            // TODO: combine with the pattern above when or-patterns become stable
-            Some(this @ BastionPathElement::Children(_)) => write!(
+            Some(this @ BastionPathElement::Supervisor(_))
+            | Some(this @ BastionPathElement::Children(_)) => write!(
                 f,
                 "/{}",
                 self.parent_chain

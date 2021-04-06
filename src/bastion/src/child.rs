@@ -125,12 +125,14 @@ impl Child {
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
         self.remove_from_dispatchers();
+        let _ = self.remove_from_distributors();
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
         self.remove_from_dispatchers();
+        let _ = self.remove_from_distributors();
 
         let parent = self.bcast.parent().clone().into_children().unwrap();
         let path = self.bcast.path().clone();
@@ -305,6 +307,10 @@ impl Child {
             error!("couldn't add actor to the registry: {}", e);
             return;
         };
+        if let Err(e) = self.register_to_distributors() {
+            error!("couldn't add actor to the distributors: {}", e);
+            return;
+        };
 
         loop {
             #[cfg(feature = "scaling")]
@@ -396,6 +402,35 @@ impl Child {
             // FIXME: Pass the module name explicitly?
             let module_name = module_path!().to_string();
             global_dispatcher.register(used_dispatchers, &child_ref, module_name)?;
+        }
+        Ok(())
+    }
+
+    /// Adds the actor into each distributor declared in the parent node.
+    fn register_to_distributors(&self) -> AnyResult<()> {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let distributors = parent.distributors();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            distributors
+                .iter()
+                .map(|&distributor| {
+                    global_dispatcher.register_recipient(distributor, child_ref.clone())
+                })
+                .collect::<AnyResult<Vec<_>>>()?;
+        }
+        Ok(())
+    }
+
+    /// Cleanup the actor's record from each declared distributor.
+    fn remove_from_distributors(&self) -> AnyResult<()> {
+        if let Some(parent) = self.bcast.parent().clone().into_children() {
+            let child_ref = self.child_ref.clone();
+            let distributors = parent.distributors();
+
+            let global_dispatcher = SYSTEM.dispatcher();
+            global_dispatcher.remove_recipient(distributors, child_ref)?;
         }
         Ok(())
     }
