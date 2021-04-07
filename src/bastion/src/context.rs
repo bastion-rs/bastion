@@ -949,7 +949,7 @@ mod context_tests {
         run!(async { Delay::new(std::time::Duration::from_millis(2)).await });
 
         // The child panicked, but we should still be able to send things to it
-        assert!(children.broadcast("test recv timeout").is_ok());
+        children.broadcast("test recv timeout").unwrap();
     }
 
     fn run_test<T>(test: T) -> ()

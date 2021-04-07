@@ -356,3 +356,51 @@ impl Distributor {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod distributor_tests {
+    use crate::prelude::*;
+
+    #[test]
+    fn test_distributor() {
+        Bastion::init();
+        Bastion::supervisor(|supervisor| {
+            supervisor.children(|children| {
+                children
+                    .with_redundancy(1)
+                    .with_distributor(Distributor::named("my distributor"))
+                    .with_exec(|ctx: BastionContext| async move {
+                        loop {
+                            run!(async {
+                                let _: Option<SignedMessage> = ctx.try_recv().await;
+                            });
+                        }
+                    })
+            })
+        })
+        .unwrap();
+
+        Bastion::start();
+
+        let distributor = Distributor::named("my distributor");
+
+        let _: Answer = distributor
+            .ask_one("hello?")
+            .expect("couldn't send question");
+
+        let _: Vec<Answer> = distributor
+            .ask_everyone("hello?".to_string())
+            .expect("couldn't send question");
+
+        let _: () = distributor
+            .tell_one("hello!")
+            .expect("couldn't tell message");
+
+        let _: Vec<()> = distributor
+            .tell_everyone("hello!".to_string())
+            .expect("couldn't tell message to everyone");
+
+        Bastion::stop();
+        Bastion::block_until_stopped();
+    }
+}
