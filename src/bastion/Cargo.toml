@@ -51,8 +51,9 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [dependencies]
 bastion-executor = { git = "https://github.com/bastion-rs/bastion.git" }
-lightproc = "0.3"
 # bastion-executor = { path = "../bastion-executor" }
+lightproc =  { git = "https://github.com/bastion-rs/bastion.git" }
+# lightproc = "0.3"
 # lightproc = { path = "../lightproc" }
 
 lever = "0.1"
