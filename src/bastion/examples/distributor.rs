@@ -119,7 +119,7 @@ async fn main() -> AnyResult<()> {
     Bastion::start();
 
     // Wait a bit until everyone is ready
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let staff = Distributor::named("staff");
     let enthusiasts = Distributor::named("enthusiasts");
@@ -128,10 +128,10 @@ async fn main() -> AnyResult<()> {
     // Enthusiast -> Ask one of the staff members "when is the conference going to happen ?"
     let reply: Result<String, SendError> = staff
         .request("when is the next conference going to happen?")
-        .recv()
+        .await
         .expect("couldn't receive reply");
 
-    tracing::warn!("{:?}", reply); // Ok("Next month!")
+    tracing::error!("{:?}", reply); // Ok("Next month!")
 
     // "hey conference <awesomeconference> is going to happen. will you be there?"
     // Broadcast / Question -> if people reply with YES => fill the 3rd group
@@ -140,23 +140,25 @@ async fn main() -> AnyResult<()> {
         .expect("couldn't ask everyone");
 
     for answer in answers.into_iter() {
-        MessageHandler::new(answer.await.expect("couldn't receive reply"))
-            .on_tell(|rsvp: RSVP, _| {
-                if rsvp.attends {
-                    tracing::info!("{:?} will be there! :)", rsvp.child_ref.id());
-                    attendees
-                        .subscribe(rsvp.child_ref)
-                        .expect("couldn't subscribe attendee");
-                } else {
-                    tracing::error!("{:?} won't make it :(", rsvp.child_ref.id());
-                }
-            })
-            .on_fallback(|unknown, _sender_addr| {
-                tracing::error!(
-                    "distributor_test: uh oh, I received a message I didn't understand\n {:?}",
-                    unknown
-                );
-            });
+        run!(async move {
+            MessageHandler::new(answer.await.expect("couldn't receive reply"))
+                .on_tell(|rsvp: RSVP, _| {
+                    if rsvp.attends {
+                        tracing::info!("{:?} will be there! :)", rsvp.child_ref.id());
+                        attendees
+                            .subscribe(rsvp.child_ref)
+                            .expect("couldn't subscribe attendee");
+                    } else {
+                        tracing::error!("{:?} won't make it :(", rsvp.child_ref.id());
+                    }
+                })
+                .on_fallback(|unknown, _sender_addr| {
+                    tracing::error!(
+                        "distributor_test: uh oh, I received a message I didn't understand\n {:?}",
+                        unknown
+                    );
+                });
+        });
     }
 
     // Ok now that attendees have subscribed, let's send information around!
@@ -173,6 +175,7 @@ async fn main() -> AnyResult<()> {
     tracing::error!("total number of attendees: {}", total_sent.len());
 
     tracing::info!("the conference is running!");
+
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // An attendee sends a thank you note to one staff member (and not bother everyone)
@@ -180,7 +183,6 @@ async fn main() -> AnyResult<()> {
         .tell_one("the conference was amazing thank you so much!")
         .context("couldn't thank the staff members :(")?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     // And we're done!
     Bastion::stop();
 
