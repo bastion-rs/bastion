@@ -1,14 +1,16 @@
 //! `Distributor` is a mechanism that allows you to send messages to children.
 
 use crate::{
-    child_ref::SendError,
-    message::{Answer, Message},
-    prelude::ChildRef,
+    message::{Answer, Message, MessageHandler},
+    prelude::{ChildRef, SendError},
     system::{STRING_INTERNER, SYSTEM},
 };
 use anyhow::Result as AnyResult;
 use lasso::Spur;
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::mpsc::{channel, Receiver},
+};
 
 // Copy is fine here because we're working
 // with interned strings here
@@ -37,10 +39,101 @@ impl Distributor {
     }
 
     /// Ask a question to a recipient attached to the `Distributor`
+    /// and wait for a reply.
+    ///
+    /// This can be achieved manually using a `MessageHandler` and `ask_one`.
+    /// Ask a question to a recipient attached to the `Distributor`
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// # Bastion::start();
+    /// # Bastion::supervisor(|supervisor| {
+    /// #    supervisor.children(|children| {
+    /// // attach a named distributor to the children
+    /// children
+    /// #        .with_redundancy(1)
+    ///     .with_distributor(Distributor::named("my distributor"))
+    ///     .with_exec(|ctx: BastionContext| {
+    ///        async move {
+    ///            loop {
+    ///                // The message handler needs an `on_question` section
+    ///                // that matches the `question` you're going to send,
+    ///                // and that will reply with the Type the request expects.
+    ///                // In our example, we ask a `&str` question, and expect a `bool` reply.                    
+    ///                MessageHandler::new(ctx.recv().await?)
+    ///                    .on_question(|message: &str, sender| {
+    ///                        if message == "is it raining today?" {
+    ///                            sender.reply(true).unwrap();
+    ///                        }
+    ///                    });
+    ///            }
+    ///            Ok(())
+    ///        }
+    ///     })
+    /// #   })
+    /// # });
+    ///
+    /// let distributor = Distributor::named("my distributor");
+    ///
+    /// let reply: Result<bool, SendError> = distributor
+    ///    .request("is it raining today?")
+    ///    .recv()
+    ///    .expect("couldn't receive reply"); // Ok(true)
+    ///
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn request<R: Message>(&self, question: impl Message) -> Receiver<Result<R, SendError>> {
+        let (sender, receiver) = channel();
+        match SYSTEM.dispatcher().ask(*self, question) {
+            Ok(response) => {
+                spawn!(async move {
+                    if let Ok(message) = response.await {
+                        let message_to_send = MessageHandler::new(message)
+                            .on_tell(|reply: R, _| Ok(reply))
+                            .on_fallback(|_, _| {
+                                Err(SendError::Other(anyhow::anyhow!(
+                                    "received a message with the wrong type"
+                                )))
+                            });
+                        let _ = sender.send(message_to_send);
+                    } else {
+                        let _ = sender.send(Err(SendError::Other(anyhow::anyhow!(
+                            "couldn't receive reply"
+                        ))));
+                    }
+                });
+            }
+            Err(error) => {
+                let _ = sender.send(Err(error));
+            }
+        };
+
+        receiver
+    }
+
+    /// Ask a question to a recipient attached to the `Distributor`
+    ///
+    /// # Example
+    ///
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -93,7 +186,7 @@ impl Distributor {
     /// Requires a `Message` that implements `Clone`. (it will be cloned and passed to each recipient)
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -145,7 +238,7 @@ impl Distributor {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -198,7 +291,7 @@ impl Distributor {
     /// Requires a `Message` that implements `Clone`. (it will be cloned and passed to each recipient)
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -248,7 +341,7 @@ impl Distributor {
 
     /// subscribe a `ChildRef` to the named `Distributor`
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -301,7 +394,7 @@ impl Distributor {
 
     /// unsubscribe a `ChildRef` to the named `Distributor`
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]

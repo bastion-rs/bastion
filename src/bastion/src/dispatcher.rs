@@ -3,8 +3,9 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child_ref::{ChildRef, SendError},
+    child_ref::ChildRef,
     message::{Answer, Message},
+    prelude::SendError,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;

@@ -80,7 +80,7 @@ struct ConferenceSchedule {
     misc: String,
 }
 
-/// cargo r --features=tokio-runtime distributor
+/// cargo r --features=tokio-runtime --example distributor
 #[tokio::main]
 async fn main() -> AnyResult<()> {
     let subscriber = tracing_subscriber::fmt()
@@ -119,22 +119,19 @@ async fn main() -> AnyResult<()> {
     Bastion::start();
 
     // Wait a bit until everyone is ready
-    // std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     let staff = Distributor::named("staff");
     let enthusiasts = Distributor::named("enthusiasts");
     let attendees = Distributor::named("attendees");
 
     // Enthusiast -> Ask one of the staff members "when is the conference going to happen ?"
-    let answer = staff.ask_one("when is the next conference going to happen?")?;
-    MessageHandler::new(
-        answer
-            .await
-            .expect("coulnd't find out when the next conference is going to happen :("),
-    )
-    .on_tell(|reply: String, _sender_addr| {
-        tracing::info!("received a reply to my message:\n{}", reply);
-    });
+    let reply: Result<String, SendError> = staff
+        .request("when is the next conference going to happen?")
+        .recv()
+        .expect("couldn't receive reply");
+
+    tracing::warn!("{:?}", reply); // Ok("Next month!")
 
     // "hey conference <awesomeconference> is going to happen. will you be there?"
     // Broadcast / Question -> if people reply with YES => fill the 3rd group
@@ -198,9 +195,7 @@ async fn organize_the_event(ctx: BastionContext) -> Result<(), ()> {
         MessageHandler::new(ctx.recv().await?)
             .on_question(|message: &str, sender| {
                 tracing::info!("received a question: \n{}", message);
-                sender
-                    .reply("uh i think it will be next month!".to_string())
-                    .unwrap();
+                sender.reply("Next month!".to_string()).unwrap();
             })
             .on_tell(|message: &str, _| {
                 tracing::info!("received a message: \n{}", message);

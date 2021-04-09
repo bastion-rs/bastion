@@ -2,62 +2,14 @@
 //! Allows users to communicate with Child through the mailboxes.
 use crate::context::BastionId;
 use crate::envelope::{Envelope, RefAddr};
-use crate::{broadcast::Sender, message::Msg};
-use crate::{
-    distributor::Distributor,
-    message::{Answer, BastionMessage, Message},
-};
-use crate::{path::BastionPath, system::STRING_INTERNER};
-use futures::channel::mpsc::TrySendError;
+use crate::message::{Answer, BastionMessage, Message};
+use crate::path::BastionPath;
+use crate::{broadcast::Sender, prelude::SendError};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use thiserror::Error;
 use tracing::{debug, trace};
-
-#[derive(Error, Debug)]
-/// `SendError`s occur when a message couldn't be dispatched through a distributor
-pub enum SendError {
-    #[error("couldn't send message. Channel Disconnected.")]
-    /// Channel has been closed before we could send a message
-    Disconnected(Msg),
-    #[error("couldn't send message. Channel is Full.")]
-    /// Channel is full, can't send a message
-    Full(Msg),
-    #[error("couldn't send a message I should have not sent. {0}")]
-    /// This error is returned when we try to send a message
-    /// that is not a BastionMessage::Message variant
-    Other(anyhow::Error),
-    #[error("No available Distributor matching {0}")]
-    /// The distributor we're trying to dispatch messages to is not registered in the system
-    NoDistributor(String),
-    #[error("Distributor has 0 Recipients")]
-    /// The distributor we're trying to dispatch messages to has no recipients
-    EmptyRecipient,
-}
-
-impl From<TrySendError<Envelope>> for SendError {
-    fn from(tse: TrySendError<Envelope>) -> Self {
-        let is_disconnected = tse.is_disconnected();
-        match tse.into_inner().msg {
-            BastionMessage::Message(msg) => {
-                if is_disconnected {
-                    Self::Disconnected(msg)
-                } else {
-                    Self::Full(msg)
-                }
-            }
-            other => Self::Other(anyhow::anyhow!("{:?}", other)),
-        }
-    }
-}
-
-impl From<Distributor> for SendError {
-    fn from(distributor: Distributor) -> Self {
-        Self::NoDistributor(STRING_INTERNER.resolve(distributor.interned()).to_string())
-    }
-}
 
 #[derive(Debug, Clone)]
 /// A "reference" to an element of a children group, allowing to
