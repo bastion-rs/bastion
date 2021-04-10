@@ -81,8 +81,18 @@ struct ConferenceSchedule {
 }
 
 /// cargo r --features=tokio-runtime --example distributor
+#[cfg(feature = "tokio-runtime")]
 #[tokio::main]
 async fn main() -> AnyResult<()> {
+    run()
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+fn main() -> AnyResult<()> {
+    run()
+}
+
+fn run() -> AnyResult<()> {
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .finish();
@@ -119,17 +129,19 @@ async fn main() -> AnyResult<()> {
     Bastion::start();
 
     // Wait a bit until everyone is ready
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    sleep(std::time::Duration::from_secs(5));
 
     let staff = Distributor::named("staff");
     let enthusiasts = Distributor::named("enthusiasts");
     let attendees = Distributor::named("attendees");
 
     // Enthusiast -> Ask one of the staff members "when is the conference going to happen ?"
-    let reply: Result<String, SendError> = staff
-        .request("when is the next conference going to happen?")
-        .await
-        .expect("couldn't receive reply");
+    let reply: Result<String, SendError> = run!(async {
+        staff
+            .request("when is the next conference going to happen?")
+            .await
+            .expect("couldn't receive reply")
+    });
 
     tracing::error!("{:?}", reply); // Ok("Next month!")
 
@@ -176,7 +188,8 @@ async fn main() -> AnyResult<()> {
 
     tracing::info!("the conference is running!");
 
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    // Let's wait until the conference is over 8D
+    sleep(std::time::Duration::from_secs(5));
 
     // An attendee sends a thank you note to one staff member (and not bother everyone)
     staff
@@ -239,4 +252,16 @@ async fn be_interested_in_the_conference(ctx: BastionContext) -> Result<(), ()> 
                     .unwrap();
             });
     }
+}
+
+#[cfg(feature = "tokio-runtime")]
+fn sleep(duration: std::time::Duration) {
+    run!(async {
+        tokio::time::sleep(duration).await;
+    });
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+fn sleep(duration: std::time::Duration) {
+    std::thread::sleep(duration);
 }
