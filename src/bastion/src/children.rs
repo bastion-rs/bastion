@@ -468,6 +468,8 @@ impl Children {
     /// ```
     /// [`RecipientHandler`]: crate::dispatcher::RecipientHandler
     pub fn with_distributor(mut self, distributor: Distributor) -> Self {
+        // Try to register the distributor as soon as we're aware of it
+        let _ = SYSTEM.dispatcher().register_distributor(&distributor);
         self.distributors.push(distributor);
         self
     }

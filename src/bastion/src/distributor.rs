@@ -261,8 +261,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -314,8 +312,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -366,8 +362,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -419,8 +413,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -468,8 +460,6 @@ impl Distributor {
     /// # }).unwrap();
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     /// #
     /// let child_ref = children.elems()[0].clone();
     ///
@@ -483,8 +473,7 @@ impl Distributor {
     /// # }
     /// ```
     pub fn subscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
-        let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.register_recipient(*self, child_ref)
+        SYSTEM.dispatcher().register_recipient(self, child_ref)
     }
 
     /// unsubscribe a `ChildRef` to the named `Distributor`
@@ -521,8 +510,6 @@ impl Distributor {
     /// # }).unwrap();
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     /// #
     /// let child_ref = children.elems()[0].clone();
     ///
@@ -542,5 +529,191 @@ impl Distributor {
 
     pub(crate) fn interned(&self) -> &Spur {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod distributor_tests {
+    use crate::prelude::*;
+    use futures_timer::Delay;
+
+    #[cfg(feature = "tokio-runtime")]
+    #[tokio::test]
+    async fn distributor_tests() {
+        run().await;
+    }
+
+    #[cfg(not(feature = "tokio-runtime"))]
+    #[test]
+    fn distributors_tests() {
+        run!(run());
+    }
+
+    async fn run() {
+        setup();
+
+        // Wait until all children are registered
+        Delay::new(std::time::Duration::from_secs(5)).await;
+
+        test_tell().await;
+        test_ask().await;
+        test_request().await;
+        test_subscribe().await;
+
+        // We don't wanna block until stopped here
+        // since our children are loop {} ing for ever waiting for messages
+    }
+
+    async fn test_tell() {
+        let test_distributor = Distributor::named("test distributor");
+
+        test_distributor
+            .tell_one("don't panic and carry a towel")
+            .unwrap();
+
+        let sent = test_distributor
+            .tell_everyone("so long, and thanks for all the fish")
+            .unwrap();
+
+        assert_eq!(
+            5,
+            sent.len(),
+            "test distributor is supposed to have 5 children"
+        );
+    }
+
+    async fn test_ask() {
+        let test_distributor = Distributor::named("test distributor");
+
+        let question: String =
+            "What is the answer to life, the universe and everything?".to_string();
+
+        let answer = test_distributor.ask_one(question.clone()).unwrap();
+
+        MessageHandler::new(answer.await.unwrap())
+            .on_tell(|answer: u8, _| {
+                assert_eq!(42, answer);
+            })
+            .on_fallback(|unknown, _sender_addr| {
+                panic!("unknown message\n {:?}", unknown);
+            });
+
+        let answers = test_distributor.ask_everyone(question.clone()).unwrap();
+        assert_eq!(
+            5,
+            answers.len(),
+            "test distributor is supposed to have 5 children"
+        );
+
+        let meanings = futures::future::join_all(answers.into_iter().map(|answer| async {
+            MessageHandler::new(answer.await.unwrap())
+                .on_tell(|answer: u8, _| {
+                    assert_eq!(42, answer);
+                    answer
+                })
+                .on_fallback(|unknown, _sender_addr| {
+                    panic!("unknown message\n {:?}", unknown);
+                })
+        }))
+        .await;
+
+        assert_eq!(
+            42 * 5,
+            meanings.iter().sum::<u8>(),
+            "5 children returning 42 should sum to 42 * 5"
+        );
+
+        let sent = test_distributor
+            .tell_everyone("so long, and thanks for all the fish")
+            .unwrap();
+        assert_eq!(
+            5,
+            sent.len(),
+            "test distributor is supposed to have 5 children"
+        );
+    }
+
+    async fn test_request() {
+        let test_distributor = Distributor::named("test distributor");
+
+        let question: String =
+            "What is the answer to life, the universe and everything?".to_string();
+
+        let answer: u8 = test_distributor
+            .request(question.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(42, answer);
+
+        let answer_sync: u8 = test_distributor
+            .request_sync(question)
+            .recv()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(42, answer_sync);
+    }
+
+    async fn test_subscribe() {
+        let temp_distributor = Distributor::named("temp distributor");
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to an empty distributor"
+        );
+
+        let one_child: ChildRef = Distributor::named("test distributor")
+            .request(())
+            .await
+            .unwrap()
+            .unwrap();
+
+        temp_distributor.subscribe(one_child.clone()).unwrap();
+
+        temp_distributor
+            .tell_one("hello!")
+            .expect("should be able to send message a distributor that has a subscriber");
+
+        temp_distributor.unsubscribe(one_child).unwrap();
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to a distributor who's sole subscriber unsubscribed"
+    );
+    }
+
+    fn setup() {
+        Bastion::init();
+        Bastion::start();
+        Bastion::supervisor(|supervisor| {
+            supervisor.children(|children| {
+                children
+                    .with_redundancy(5)
+                    .with_distributor(Distributor::named("test distributor"))
+                    .with_exec(|ctx| async move {
+                        loop {
+                            let child_ref = ctx.current().clone();
+                            MessageHandler::new(ctx.recv().await?)
+                                .on_question(|question: String, sender| {
+                                    if question == "What is the answer to life, the universe and everything?".to_string() {
+                                        let _ = sender.reply(42_u8);
+                                    } else {
+                                        panic!("wrong question {}", question);
+                                    }
+                                })
+                                // send your child ref
+                                .on_question(|_: (), sender| {
+                                    let _ = sender.reply(child_ref);
+                                })
+                                .on_tell(|_: &str, _| {})
+                                .on_fallback(|unknown, _sender_addr| {
+                                    panic!("unknown message\n {:?}", unknown);
+                                });
+                        }
+                    })
+            })
+        })
+        .unwrap();
     }
 }

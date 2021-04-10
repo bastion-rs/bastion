@@ -416,7 +416,7 @@ impl Child {
             distributors
                 .iter()
                 .map(|&distributor| {
-                    global_dispatcher.register_recipient(distributor, child_ref.clone())
+                    global_dispatcher.register_recipient(&distributor, child_ref.clone())
                 })
                 .collect::<AnyResult<Vec<_>>>()?;
         }
