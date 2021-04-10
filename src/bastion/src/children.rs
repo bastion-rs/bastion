@@ -1159,6 +1159,16 @@ impl Children {
         Ok(())
     }
 
+    /// Registers all declared local distributors in the global dispatcher.
+    pub(crate) fn register_distributors(&self) -> AnyResult<()> {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for distributor in self.distributors.iter() {
+            global_dispatcher.register_distributor(distributor)?;
+        }
+        Ok(())
+    }
+
     /// Removes all declared local distributors from the global dispatcher.
     pub(crate) fn remove_distributors(&self) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();

@@ -562,6 +562,26 @@ impl GlobalDispatcher {
         Ok(())
     }
 
+    /// Adds distributor to the global registry.
+    pub(crate) fn register_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
+        let is_registered = self.distributors.contains_key(distributor);
+
+        if is_registered {
+            debug!(
+                "The distributor with the '{:?}' name already registered in the cluster.",
+                distributor
+            );
+            return Ok(());
+        }
+
+        let instance = distributor.clone();
+        self.distributors.insert(
+            instance,
+            Arc::new(Box::new(DefaultRecipientHandler::default())),
+        )?;
+        Ok(())
+    }
+
     /// Removes distributor from the global registry.
     pub(crate) fn remove_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
         self.distributors.remove(distributor)?;
