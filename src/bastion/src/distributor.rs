@@ -542,8 +542,24 @@ mod distributor_tests {
     use futures::channel::mpsc::channel;
     use futures::{SinkExt, StreamExt};
 
+    const TEST_DISTRIBUTOR: &str = "test distributor";
+    const SUBSCRIBE_TEST_DISTRIBUTOR: &str = "subscribe test";
+
+    #[cfg(feature = "tokio-runtime")]
+    #[tokio::test]
+    async fn test_tokio_distributor() {
+        blocking!({
+            run_tests();
+        });
+    }
+
+    #[cfg(not(feature = "tokio-runtime"))]
     #[test]
     fn distributor_tests() {
+        run_tests();
+    }
+
+    fn run_tests() {
         setup();
 
         test_tell();
@@ -561,7 +577,7 @@ mod distributor_tests {
         );
 
         let one_child: ChildRef = run!(async {
-            Distributor::named("test distributor")
+            Distributor::named(SUBSCRIBE_TEST_DISTRIBUTOR)
                 .request(())
                 .await
                 .unwrap()
@@ -582,7 +598,7 @@ mod distributor_tests {
     }
 
     fn test_tell() {
-        let test_distributor = Distributor::named("test distributor");
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
 
         test_distributor
             .tell_one("don't panic and carry a towel")
@@ -600,7 +616,7 @@ mod distributor_tests {
     }
 
     fn test_ask() {
-        let test_distributor = Distributor::named("test distributor");
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
 
         let question: String =
             "What is the answer to life, the universe and everything?".to_string();
@@ -644,7 +660,7 @@ mod distributor_tests {
     }
 
     fn test_request() {
-        let test_distributor = Distributor::named("test distributor");
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
 
         let question: String =
             "What is the answer to life, the universe and everything?".to_string();
@@ -679,56 +695,48 @@ mod distributor_tests {
         Bastion::supervisor(|supervisor| {
             let test_ready = sender.clone();
             let subscribe_test_ready = sender.clone();
-            supervisor.children(|children| {
-                children
-                    .with_redundancy(NUM_CHILDREN)
-                    .with_distributor(Distributor::named("test distributor"))
-                    .with_callbacks(Callbacks::new().with_after_start(move || {
-                        let mut test_ready = test_ready.clone();
-                        spawn!(async move {
-                            test_ready.send(()).await
-                        });
-                    }))
-                    .with_exec(|ctx| async move {
-                        loop {
-                            let child_ref = ctx.current().clone();
-                            MessageHandler::new(ctx.recv().await?)
-                                .on_question(|question: String, sender| {
-                                    if question == "What is the answer to life, the universe and everything?".to_string() {
+            supervisor
+                .children(|children| {
+                    children
+                        .with_redundancy(NUM_CHILDREN)
+                        .with_distributor(Distributor::named(TEST_DISTRIBUTOR))
+                        .with_callbacks(Callbacks::new().with_after_start(move || {
+                            let mut test_ready = test_ready.clone();
+                            spawn!(async move { test_ready.send(()).await });
+                        }))
+                        .with_exec(|ctx| async move {
+                            loop {
+                                let child_ref = ctx.current().clone();
+                                MessageHandler::new(ctx.recv().await?)
+                                    .on_question(|_: String, sender| {
                                         let _ = sender.reply(42_u8);
-                                    } else {
-                                        panic!("wrong question {}", question);
-                                    }
-                                })
-                                // send your child ref
-                                .on_question(|_: (), sender| {
-                                    let _ = sender.reply(child_ref);
-                                })
-                                .on_tell(|_: &str, _| {});
-                        }
-                    })
+                                    })
+                                    // send your child ref
+                                    .on_question(|_: (), sender| {
+                                        let _ = sender.reply(child_ref);
+                                    });
+                            }
+                        })
                     // Subscribe / unsubscribe tests
-            }).children(|children| {
-                children
-                    .with_distributor(Distributor::named("subscribe test"))
-                    .with_callbacks(Callbacks::new().with_after_start(move || {
-                        let mut subscribe_test_ready = subscribe_test_ready.clone();
-                        spawn!(async move { subscribe_test_ready.send(()).await });
-                    }))
-                    .with_exec(|ctx| async move {
-                        loop {
-                            let child_ref = ctx.current().clone();
-                            MessageHandler::new(ctx.recv().await?)
-                                .on_question(|_: (), sender| {
-                                    let _ = sender.reply(child_ref);
-                                })
-                                .on_tell(|_: &str, _| {})
-                                .on_fallback(|unknown, _sender_addr| {
-                                    panic!("unknown message\n {:?}", unknown);
-                                });
-                        }
-                    })
-            })
+                })
+                .children(|children| {
+                    children
+                        .with_distributor(Distributor::named(SUBSCRIBE_TEST_DISTRIBUTOR))
+                        .with_callbacks(Callbacks::new().with_after_start(move || {
+                            let mut subscribe_test_ready = subscribe_test_ready.clone();
+                            spawn!(async move { subscribe_test_ready.send(()).await });
+                        }))
+                        .with_exec(|ctx| async move {
+                            loop {
+                                let child_ref = ctx.current().clone();
+                                MessageHandler::new(ctx.recv().await?).on_question(
+                                    |_: (), sender| {
+                                        let _ = sender.reply(child_ref);
+                                    },
+                                );
+                            }
+                        })
+                })
         })
         .unwrap();
 

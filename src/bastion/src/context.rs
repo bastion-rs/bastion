@@ -856,9 +856,6 @@ mod context_tests {
         test_try_recv_fail();
         test_try_recv_timeout();
         test_try_recv_timeout_fail();
-
-        Bastion::stop();
-        Bastion::block_until_stopped();
     }
 
     fn test_recv() {
