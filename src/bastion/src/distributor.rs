@@ -105,10 +105,11 @@ impl Distributor {
         question: impl Message,
     ) -> oneshot::Receiver<Result<R, SendError>> {
         let (sender, receiver) = oneshot::channel();
-        match SYSTEM.dispatcher().ask(*self, question) {
-            Ok(response) => {
-                spawn!(async move {
-                    if let Ok(message) = response.await {
+        let s = *self;
+        spawn!(async move {
+            match SYSTEM.dispatcher().ask(s, question) {
+                Ok(response) => match response.await {
+                    Ok(message) => {
                         let message_to_send = MessageHandler::new(message)
                             .on_tell(|reply: R, _| Ok(reply))
                             .on_fallback(|_, _| {
@@ -117,17 +118,19 @@ impl Distributor {
                                 )))
                             });
                         let _ = sender.send(message_to_send);
-                    } else {
+                    }
+                    Err(e) => {
                         let _ = sender.send(Err(SendError::Other(anyhow::anyhow!(
-                            "couldn't receive reply"
+                            "couldn't receive reply: {:?}",
+                            e
                         ))));
                     }
-                });
-            }
-            Err(error) => {
-                let _ = sender.send(Err(error));
-            }
-        };
+                },
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                }
+            };
+        });
 
         receiver
     }
@@ -197,9 +200,10 @@ impl Distributor {
         question: impl Message,
     ) -> Receiver<Result<R, SendError>> {
         let (sender, receiver) = channel();
-        match SYSTEM.dispatcher().ask(*self, question) {
-            Ok(response) => {
-                spawn!(async move {
+        let s = *self;
+        spawn!(async move {
+            match SYSTEM.dispatcher().ask(s, question) {
+                Ok(response) => {
                     if let Ok(message) = response.await {
                         let message_to_send = MessageHandler::new(message)
                             .on_tell(|reply: R, _| Ok(reply))
@@ -214,12 +218,12 @@ impl Distributor {
                             "couldn't receive reply"
                         ))));
                     }
-                });
-            }
-            Err(error) => {
-                let _ = sender.send(Err(error));
-            }
-        };
+                }
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                }
+            };
+        });
 
         receiver
     }
@@ -541,16 +545,16 @@ mod distributor_tests {
     #[cfg(feature = "tokio-runtime")]
     #[tokio::test]
     async fn subscribe_tests() {
-        run_subscribe_tests().await;
+        run_subscribe_tests();
     }
 
     #[cfg(not(feature = "tokio-runtime"))]
     #[test]
     fn subscribe_tests() {
-        run!(run_subscribe_tests());
+        run_subscribe_tests();
     }
 
-    async fn run_subscribe_tests() {
+    fn run_subscribe_tests() {
         Bastion::init();
         Bastion::start();
 
@@ -563,10 +567,7 @@ mod distributor_tests {
                 children
                     .with_callbacks(Callbacks::new().with_after_start(move || {
                         let mut sender = sender.clone();
-                        spawn!(async move {
-                            use futures::SinkExt;
-                            sender.send(()).await
-                        });
+                        spawn!(async move { sender.send(()).await });
                     }))
                     .with_exec(|ctx| async move {
                         loop {
@@ -586,7 +587,9 @@ mod distributor_tests {
         .unwrap();
 
         // Wait until the child has spawned
-        receiver.take(1).collect::<Vec<_>>().await;
+        run!(async {
+            receiver.take(1).collect::<Vec<_>>().await;
+        });
 
         let temp_distributor = Distributor::named("temp distributor");
 
@@ -595,12 +598,13 @@ mod distributor_tests {
             "should not be able to send message to an empty distributor"
         );
 
-        let one_child: ChildRef = Distributor::named("test distributor")
-            .request(())
-            .await
-            .unwrap()
-            .unwrap();
-
+        let one_child: ChildRef = run!(async {
+            Distributor::named("test distributor")
+                .request(())
+                .await
+                .unwrap()
+                .unwrap()
+        });
         temp_distributor.subscribe(one_child.clone()).unwrap();
 
         temp_distributor
@@ -613,36 +617,29 @@ mod distributor_tests {
             temp_distributor.tell_one("hello!").is_err(),
             "should not be able to send message to a distributor who's sole subscriber unsubscribed"
         );
-
-        Bastion::stop();
-        Bastion::block_until_stopped();
     }
 
     #[cfg(feature = "tokio-runtime")]
     #[tokio::test]
     async fn distributor_tests() {
-        run_distributor_tests().await;
+        run_distributor_tests();
     }
 
     #[cfg(not(feature = "tokio-runtime"))]
     #[test]
     fn distributors_tests() {
-        run!(run_distributor_tests());
+        run_distributor_tests();
     }
 
-    async fn run_distributor_tests() {
-        setup().await;
+    fn run_distributor_tests() {
+        setup();
 
-        test_tell().await;
-        test_ask().await;
-        test_request().await;
-
-        Bastion::stop();
-        // We don't wanna block until stopped here
-        // since our children are loop {} ing for ever waiting for messages
+        test_tell();
+        test_ask();
+        test_request();
     }
 
-    async fn test_tell() {
+    fn test_tell() {
         let test_distributor = Distributor::named("test distributor");
 
         test_distributor
@@ -660,60 +657,64 @@ mod distributor_tests {
         );
     }
 
-    async fn test_ask() {
+    fn test_ask() {
         let test_distributor = Distributor::named("test distributor");
 
         let question: String =
             "What is the answer to life, the universe and everything?".to_string();
 
-        let answer = test_distributor.ask_one(question.clone()).unwrap();
-
-        MessageHandler::new(answer.await.unwrap())
-            .on_tell(|answer: u8, _| {
-                assert_eq!(42, answer);
-            })
-            .on_fallback(|unknown, _sender_addr| {
-                panic!("unknown message\n {:?}", unknown);
-            });
-
-        let answers = test_distributor.ask_everyone(question.clone()).unwrap();
-        assert_eq!(
-            5,
-            answers.len(),
-            "test distributor is supposed to have 5 children"
-        );
-
-        let meanings = futures::future::join_all(answers.into_iter().map(|answer| async {
+        run!(async {
+            let answer = test_distributor.ask_one(question.clone()).unwrap();
             MessageHandler::new(answer.await.unwrap())
                 .on_tell(|answer: u8, _| {
                     assert_eq!(42, answer);
-                    answer
                 })
                 .on_fallback(|unknown, _sender_addr| {
                     panic!("unknown message\n {:?}", unknown);
-                })
-        }))
-        .await;
+                });
+        });
 
-        assert_eq!(
-            42 * 5,
-            meanings.iter().sum::<u8>(),
-            "5 children returning 42 should sum to 42 * 5"
-        );
+        run!(async {
+            let answers = test_distributor.ask_everyone(question.clone()).unwrap();
+            assert_eq!(
+                5,
+                answers.len(),
+                "test distributor is supposed to have 5 children"
+            );
+            let meanings = futures::future::join_all(answers.into_iter().map(|answer| async {
+                MessageHandler::new(answer.await.unwrap())
+                    .on_tell(|answer: u8, _| {
+                        assert_eq!(42, answer);
+                        answer
+                    })
+                    .on_fallback(|unknown, _sender_addr| {
+                        panic!("unknown message\n {:?}", unknown);
+                    })
+            }))
+            .await;
+
+            assert_eq!(
+                42 * 5,
+                meanings.iter().sum::<u8>(),
+                "5 children returning 42 should sum to 42 * 5"
+            );
+        });
     }
 
-    async fn test_request() {
+    fn test_request() {
         let test_distributor = Distributor::named("test distributor");
 
         let question: String =
             "What is the answer to life, the universe and everything?".to_string();
 
-        let answer: u8 = test_distributor
-            .request(question.clone())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(42, answer);
+        run!(async {
+            let answer: u8 = test_distributor
+                .request(question.clone())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(42, answer);
+        });
 
         let answer_sync: u8 = test_distributor
             .request_sync(question)
@@ -724,7 +725,7 @@ mod distributor_tests {
         assert_eq!(42, answer_sync);
     }
 
-    async fn setup() {
+    fn setup() {
         Bastion::init();
         Bastion::start();
 
@@ -759,10 +760,7 @@ mod distributor_tests {
                                 .on_question(|_: (), sender| {
                                     let _ = sender.reply(child_ref);
                                 })
-                                .on_tell(|_: &str, _| {})
-                                .on_fallback(|unknown, _sender_addr| {
-                                    panic!("unknown message\n {:?}", unknown);
-                                });
+                                .on_tell(|_: &str, _| {});
                         }
                     })
             })
@@ -770,6 +768,8 @@ mod distributor_tests {
         .unwrap();
 
         // Wait until the children have spawned
-        receiver.take(NUM_CHILDREN).collect::<Vec<_>>().await;
+        run!(async {
+            receiver.take(NUM_CHILDREN).collect::<Vec<_>>().await;
+        });
     }
 }
