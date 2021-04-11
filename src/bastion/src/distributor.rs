@@ -542,55 +542,17 @@ mod distributor_tests {
     use futures::channel::mpsc::channel;
     use futures::{SinkExt, StreamExt};
 
-    #[cfg(feature = "tokio-runtime")]
-    #[tokio::test]
-    async fn subscribe_tests() {
-        run_subscribe_tests();
-    }
-
-    #[cfg(not(feature = "tokio-runtime"))]
     #[test]
-    fn subscribe_tests() {
-        run_subscribe_tests();
+    fn distributor_tests() {
+        setup();
+
+        test_tell();
+        test_ask();
+        test_request();
+        test_subscribe();
     }
 
-    fn run_subscribe_tests() {
-        Bastion::init();
-        Bastion::start();
-
-        // This channel and the use of callbacks will allow us to know when all of the children are spawned.
-        let (sender, receiver) = channel(1);
-
-        let sender = sender;
-        Bastion::supervisor(|supervisor| {
-            supervisor.children(|children| {
-                children
-                    .with_callbacks(Callbacks::new().with_after_start(move || {
-                        let mut sender = sender.clone();
-                        spawn!(async move { sender.send(()).await });
-                    }))
-                    .with_exec(|ctx| async move {
-                        loop {
-                            let child_ref = ctx.current().clone();
-                            MessageHandler::new(ctx.recv().await?)
-                                .on_question(|_: (), sender| {
-                                    let _ = sender.reply(child_ref);
-                                })
-                                .on_tell(|_: &str, _| {})
-                                .on_fallback(|unknown, _sender_addr| {
-                                    panic!("unknown message\n {:?}", unknown);
-                                });
-                        }
-                    })
-            })
-        })
-        .unwrap();
-
-        // Wait until the child has spawned
-        run!(async {
-            receiver.take(1).collect::<Vec<_>>().await;
-        });
-
+    fn test_subscribe() {
         let temp_distributor = Distributor::named("temp distributor");
 
         assert!(
@@ -617,26 +579,6 @@ mod distributor_tests {
             temp_distributor.tell_one("hello!").is_err(),
             "should not be able to send message to a distributor who's sole subscriber unsubscribed"
         );
-    }
-
-    #[cfg(feature = "tokio-runtime")]
-    #[tokio::test]
-    async fn distributor_tests() {
-        run_distributor_tests();
-    }
-
-    #[cfg(not(feature = "tokio-runtime"))]
-    #[test]
-    fn distributors_tests() {
-        run_distributor_tests();
-    }
-
-    fn run_distributor_tests() {
-        setup();
-
-        test_tell();
-        test_ask();
-        test_request();
     }
 
     fn test_tell() {
@@ -735,14 +677,16 @@ mod distributor_tests {
         let (sender, receiver) = channel(NUM_CHILDREN);
 
         Bastion::supervisor(|supervisor| {
+            let test_ready = sender.clone();
+            let subscribe_test_ready = sender.clone();
             supervisor.children(|children| {
                 children
                     .with_redundancy(NUM_CHILDREN)
                     .with_distributor(Distributor::named("test distributor"))
                     .with_callbacks(Callbacks::new().with_after_start(move || {
-                        let mut sender = sender.clone();
+                        let mut test_ready = test_ready.clone();
                         spawn!(async move {
-                            sender.send(()).await
+                            test_ready.send(()).await
                         });
                     }))
                     .with_exec(|ctx| async move {
@@ -763,13 +707,36 @@ mod distributor_tests {
                                 .on_tell(|_: &str, _| {});
                         }
                     })
+                    // Subscribe / unsubscribe tests
+            }).children(|children| {
+                children
+                    .with_distributor(Distributor::named("subscribe test"))
+                    .with_callbacks(Callbacks::new().with_after_start(move || {
+                        let mut subscribe_test_ready = subscribe_test_ready.clone();
+                        spawn!(async move { subscribe_test_ready.send(()).await });
+                    }))
+                    .with_exec(|ctx| async move {
+                        loop {
+                            let child_ref = ctx.current().clone();
+                            MessageHandler::new(ctx.recv().await?)
+                                .on_question(|_: (), sender| {
+                                    let _ = sender.reply(child_ref);
+                                })
+                                .on_tell(|_: &str, _| {})
+                                .on_fallback(|unknown, _sender_addr| {
+                                    panic!("unknown message\n {:?}", unknown);
+                                });
+                        }
+                    })
             })
         })
         .unwrap();
 
         // Wait until the children have spawned
         run!(async {
-            receiver.take(NUM_CHILDREN).collect::<Vec<_>>().await;
+            // NUM_CHILDREN for the test distributor group,
+            // 1 for the subscribe test group
+            receiver.take(NUM_CHILDREN + 1).collect::<Vec<_>>().await;
         });
     }
 }
