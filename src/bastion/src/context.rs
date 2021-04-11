@@ -917,7 +917,7 @@ mod context_tests {
         let children =
         Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
-                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(1)).await.expect("recv_timeout failed"),
+                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(5)).await.expect("recv_timeout failed"),
                     ref msg: &'static str => {
                         assert_eq!(msg, &"test recv timeout");
                     };

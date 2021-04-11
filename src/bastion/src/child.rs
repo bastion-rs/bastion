@@ -283,6 +283,7 @@ impl Child {
             CallbackType::BeforeRestart => self.callbacks.before_restart(),
             CallbackType::AfterRestart => self.callbacks.after_restart(),
             CallbackType::AfterStop => self.callbacks.after_stop(),
+            CallbackType::AfterStart => self.callbacks.after_start(),
         }
     }
 
@@ -311,6 +312,8 @@ impl Child {
             error!("couldn't add actor to the distributors: {}", e);
             return;
         };
+
+        self.callbacks.after_start();
 
         loop {
             #[cfg(feature = "scaling")]

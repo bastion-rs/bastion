@@ -535,31 +535,109 @@ impl Distributor {
 #[cfg(test)]
 mod distributor_tests {
     use crate::prelude::*;
-    use futures_timer::Delay;
+    use futures::channel::mpsc::channel;
+    use futures::{SinkExt, StreamExt};
+
+    #[cfg(feature = "tokio-runtime")]
+    #[tokio::test]
+    async fn subscribe_tests() {
+        run_subscribe_tests().await;
+    }
+
+    #[cfg(not(feature = "tokio-runtime"))]
+    #[test]
+    fn subscribe_tests() {
+        run!(run_subscribe_tests());
+    }
+
+    async fn run_subscribe_tests() {
+        Bastion::init();
+        Bastion::start();
+
+        // This channel and the use of callbacks will allow us to know when all of the children are spawned.
+        let (sender, receiver) = channel(1);
+
+        let sender = sender;
+        Bastion::supervisor(|supervisor| {
+            supervisor.children(|children| {
+                children
+                    .with_callbacks(Callbacks::new().with_after_start(move || {
+                        let mut sender = sender.clone();
+                        spawn!(async move {
+                            use futures::SinkExt;
+                            sender.send(()).await
+                        });
+                    }))
+                    .with_exec(|ctx| async move {
+                        loop {
+                            let child_ref = ctx.current().clone();
+                            MessageHandler::new(ctx.recv().await?)
+                                .on_question(|_: (), sender| {
+                                    let _ = sender.reply(child_ref);
+                                })
+                                .on_tell(|_: &str, _| {})
+                                .on_fallback(|unknown, _sender_addr| {
+                                    panic!("unknown message\n {:?}", unknown);
+                                });
+                        }
+                    })
+            })
+        })
+        .unwrap();
+
+        // Wait until the child has spawned
+        receiver.take(1).collect::<Vec<_>>().await;
+
+        let temp_distributor = Distributor::named("temp distributor");
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to an empty distributor"
+        );
+
+        let one_child: ChildRef = Distributor::named("test distributor")
+            .request(())
+            .await
+            .unwrap()
+            .unwrap();
+
+        temp_distributor.subscribe(one_child.clone()).unwrap();
+
+        temp_distributor
+            .tell_one("hello!")
+            .expect("should be able to send message a distributor that has a subscriber");
+
+        temp_distributor.unsubscribe(one_child).unwrap();
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to a distributor who's sole subscriber unsubscribed"
+        );
+
+        Bastion::stop();
+        Bastion::block_until_stopped();
+    }
 
     #[cfg(feature = "tokio-runtime")]
     #[tokio::test]
     async fn distributor_tests() {
-        run().await;
+        run_distributor_tests().await;
     }
 
     #[cfg(not(feature = "tokio-runtime"))]
     #[test]
     fn distributors_tests() {
-        run!(run());
+        run!(run_distributor_tests());
     }
 
-    async fn run() {
-        setup();
-
-        // Wait until all children are registered
-        Delay::new(std::time::Duration::from_secs(5)).await;
+    async fn run_distributor_tests() {
+        setup().await;
 
         test_tell().await;
         test_ask().await;
         test_request().await;
-        test_subscribe().await;
 
+        Bastion::stop();
         // We don't wanna block until stopped here
         // since our children are loop {} ing for ever waiting for messages
     }
@@ -622,15 +700,6 @@ mod distributor_tests {
             meanings.iter().sum::<u8>(),
             "5 children returning 42 should sum to 42 * 5"
         );
-
-        let sent = test_distributor
-            .tell_everyone("so long, and thanks for all the fish")
-            .unwrap();
-        assert_eq!(
-            5,
-            sent.len(),
-            "test distributor is supposed to have 5 children"
-        );
     }
 
     async fn test_request() {
@@ -655,42 +724,26 @@ mod distributor_tests {
         assert_eq!(42, answer_sync);
     }
 
-    async fn test_subscribe() {
-        let temp_distributor = Distributor::named("temp distributor");
-
-        assert!(
-            temp_distributor.tell_one("hello!").is_err(),
-            "should not be able to send message to an empty distributor"
-        );
-
-        let one_child: ChildRef = Distributor::named("test distributor")
-            .request(())
-            .await
-            .unwrap()
-            .unwrap();
-
-        temp_distributor.subscribe(one_child.clone()).unwrap();
-
-        temp_distributor
-            .tell_one("hello!")
-            .expect("should be able to send message a distributor that has a subscriber");
-
-        temp_distributor.unsubscribe(one_child).unwrap();
-
-        assert!(
-            temp_distributor.tell_one("hello!").is_err(),
-            "should not be able to send message to a distributor who's sole subscriber unsubscribed"
-    );
-    }
-
-    fn setup() {
+    async fn setup() {
         Bastion::init();
         Bastion::start();
+
+        const NUM_CHILDREN: usize = 5;
+
+        // This channel and the use of callbacks will allow us to know when all of the children are spawned.
+        let (sender, receiver) = channel(NUM_CHILDREN);
+
         Bastion::supervisor(|supervisor| {
             supervisor.children(|children| {
                 children
-                    .with_redundancy(5)
+                    .with_redundancy(NUM_CHILDREN)
                     .with_distributor(Distributor::named("test distributor"))
+                    .with_callbacks(Callbacks::new().with_after_start(move || {
+                        let mut sender = sender.clone();
+                        spawn!(async move {
+                            sender.send(()).await
+                        });
+                    }))
                     .with_exec(|ctx| async move {
                         loop {
                             let child_ref = ctx.current().clone();
@@ -715,5 +768,8 @@ mod distributor_tests {
             })
         })
         .unwrap();
+
+        // Wait until the children have spawned
+        receiver.take(NUM_CHILDREN).collect::<Vec<_>>().await;
     }
 }
