@@ -1,0 +1,25 @@
+[package]
+name = "lightproc"
+version = "0.3.6-alpha.0"
+description = "Lightweight process abstraction for Rust"
+authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
+keywords = ["fault-tolerant", "runtime", "actor", "system", "lightweight-process"]
+categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+readme = "README.md"
+license = "Apache-2.0/MIT"
+edition = "2018"
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+crossbeam-utils = "0.8"
+pin-utils = "0.1.0"
+
+[dev-dependencies]
+crossbeam = "0.8"
+futures-executor = "0.3"
+lazy_static = "1.4.0"

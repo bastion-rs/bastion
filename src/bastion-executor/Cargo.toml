@@ -1,0 +1,65 @@
+[package]
+name = "bastion-executor"
+# Steps to release to crates.io:
+# - Remove path dependencies
+# - Update CHANGELOG.md.
+#   - npm install -g auto-changelog && auto-changelog at the root
+# - Create "v0.x.y" git tag at the root of the project.
+version = "0.4.1"
+description = "Cache affine NUMA-aware executor for Rust"
+authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
+keywords = ["fault-tolerant", "runtime", "actor", "system"]
+categories = ["concurrency", "asynchronous"]
+homepage = "https://github.com/bastion-rs/bastion"
+repository = "https://github.com/bastion-rs/bastion"
+documentation = "https://docs.rs/bastion"
+readme = "README.md"
+license = "Apache-2.0/MIT"
+edition = "2018"
+exclude = [
+	"scripts/*",
+]
+
+[badges]
+travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
+maintenance = { status = "actively-developed" }
+
+[features]
+unstable = []
+tokio-runtime = ["tokio"]
+
+[dependencies]
+bastion-utils = "0.3.2"
+# lightproc = "0.3"
+lightproc =  { git = "https://github.com/bastion-rs/bastion.git" }
+# lightproc = { path = "../lightproc" }
+# bastion-utils = { path = "../bastion-utils" }
+
+crossbeam-utils = "0.8"
+crossbeam-channel = "0.5"
+crossbeam-epoch = "0.9"
+lazy_static = "1.4"
+libc = "0.2"
+num_cpus = "1.13"
+pin-utils = "0.1.0"
+
+# Allocator
+arrayvec = { version = "0.5.1", features = ["array-sizes-129-255"]}
+futures-timer = "3.0.2"
+once_cell = "1.4.0"
+lever = "0.1"
+tracing = "0.1.19"
+crossbeam-queue = "0.3.0"
+
+# Feature tokio
+tokio = {version = "1.1", features = ["rt", "rt-multi-thread"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "^0.3.8", features = ["basetsd"] }
+
+[dev-dependencies]
+tokio = {version = "1.1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-test = "0.4.0"
+proptest = "^0.10"
+futures = "0.3.5"
+tracing-subscriber = "0.2.11"
