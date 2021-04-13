@@ -19,7 +19,7 @@ fn spawn_responders() -> ChildrenRef {
             msg! { ctx.recv().await?,
                 msg: &'static str =!> {
                     if msg == "Hello" {
-                            assert!(signature!().is_sender_identified(), false);
+                            assert!(signature!().is_sender_identified(), "sender is not identified");
                             answer!(ctx, "Goodbye").unwrap();
                     }
                 };

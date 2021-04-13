@@ -8,6 +8,7 @@ pub(crate) enum CallbackType {
     AfterStop,
     BeforeRestart,
     BeforeStart,
+    AfterStart,
 }
 
 #[derive(Default, Clone)]
@@ -22,12 +23,12 @@ pub(crate) enum CallbackType {
 /// # #[cfg(feature = "tokio-runtime")]
 /// # #[tokio::main]
 /// # async fn main() {
-/// #    run();    
+/// #    run();
 /// # }
 /// #
 /// # #[cfg(not(feature = "tokio-runtime"))]
 /// # fn main() {
-/// #    run();    
+/// #    run();
 /// # }
 /// #
 /// # fn run() {
@@ -60,6 +61,7 @@ pub(crate) enum CallbackType {
 /// [`Children`]: crate::children::Children
 pub struct Callbacks {
     before_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_start: Option<Arc<dyn Fn() + Send + Sync>>,
     before_restart: Option<Arc<dyn Fn() + Send + Sync>>,
     after_restart: Option<Arc<dyn Fn() + Send + Sync>>,
     after_stop: Option<Arc<dyn Fn() + Send + Sync>>,
@@ -77,12 +79,12 @@ impl Callbacks {
     /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # fn run() {
@@ -136,12 +138,12 @@ impl Callbacks {
     /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # fn run() {
@@ -191,6 +193,74 @@ impl Callbacks {
         self
     }
 
+    /// Sets the method that will get called right after the [`Supervisor`]
+    /// or [`Children`] is launched.
+    /// This method will be called after the child has subscribed to its distributors and dispatchers.
+    ///
+    /// Once the callback has run, the child has caught up it's message backlog,
+    /// and is waiting for new messages to process.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// #
+    /// # Bastion::supervisor(|supervisor| {
+    /// supervisor.children(|children| {
+    ///     let callbacks = Callbacks::new()
+    ///         .with_after_start(|| println!("Children group ready to process messages."));
+    ///
+    ///     children
+    ///         .with_exec(|ctx| {
+    ///             // -- Children group started.
+    ///             // with_after_start called
+    ///             async move {
+    ///                 // ...
+    ///
+    ///                 // This will stop the children group...
+    ///                 Ok(())
+    ///                 // Note that because the children group stopped by itself,
+    ///                 // if its supervisor restarts it, its `before_start` callback
+    ///                 // will get called and not `after_restart`.
+    ///             }
+    ///             // -- Children group stopped.
+    ///         })
+    ///         .with_callbacks(callbacks)
+    /// })
+    /// # }).unwrap();
+    /// #
+    /// # Bastion::start();
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    ///
+    /// [`Supervisor`]: crate::supervisor::Supervisor
+    /// [`Children`]: crate::children::Children
+    /// [`with_after_restart`]: Self::with_after_restart
+    pub fn with_after_start<C>(mut self, after_start: C) -> Self
+    where
+        C: Fn() + Send + Sync + 'static,
+    {
+        let after_start = Arc::new(after_start);
+        self.after_start = Some(after_start);
+        self
+    }
+
     /// Sets the method that will get called before the [`Supervisor`]
     /// or [`Children`] is reset if:
     /// - the supervisor of the supervised element using this callback
@@ -208,12 +278,12 @@ impl Callbacks {
     /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # fn run() {
@@ -282,12 +352,12 @@ impl Callbacks {
     /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # fn run() {
@@ -360,12 +430,12 @@ impl Callbacks {
     /// # #[cfg(feature = "tokio-runtime")]
     /// # #[tokio::main]
     /// # async fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # #[cfg(not(feature = "tokio-runtime"))]
     /// # fn main() {
-    /// #    run();    
+    /// #    run();
     /// # }
     /// #
     /// # fn run() {
@@ -490,6 +560,12 @@ impl Callbacks {
     pub(crate) fn before_start(&self) {
         if let Some(before_start) = &self.before_start {
             before_start()
+        }
+    }
+
+    pub(crate) fn after_start(&self) {
+        if let Some(after_start) = &self.after_start {
+            after_start()
         }
     }
 

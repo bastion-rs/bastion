@@ -1,14 +1,17 @@
 //! `Distributor` is a mechanism that allows you to send messages to children.
 
 use crate::{
-    child_ref::SendError,
-    message::{Answer, Message},
-    prelude::ChildRef,
+    message::{Answer, Message, MessageHandler},
+    prelude::{ChildRef, SendError},
     system::{STRING_INTERNER, SYSTEM},
 };
 use anyhow::Result as AnyResult;
+use futures::channel::oneshot;
 use lasso::Spur;
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::mpsc::{channel, Receiver},
+};
 
 // Copy is fine here because we're working
 // with interned strings here
@@ -37,10 +40,199 @@ impl Distributor {
     }
 
     /// Ask a question to a recipient attached to the `Distributor`
+    /// and wait for a reply.
+    ///
+    /// This can be achieved manually using a `MessageHandler` and `ask_one`.
+    /// Ask a question to a recipient attached to the `Distributor`
+    ///
+    ///
+    /// ```no_run
+    /// # use bastion::prelude::*;
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # async fn run() {
+    /// # Bastion::init();
+    /// # Bastion::start();
+    ///
+    /// # Bastion::supervisor(|supervisor| {
+    /// #    supervisor.children(|children| {
+    /// // attach a named distributor to the children
+    /// children
+    /// #        .with_redundancy(1)
+    ///     .with_distributor(Distributor::named("my distributor"))
+    ///     .with_exec(|ctx: BastionContext| {
+    ///        async move {
+    ///            loop {
+    ///                // The message handler needs an `on_question` section
+    ///                // that matches the `question` you're going to send,
+    ///                // and that will reply with the Type the request expects.
+    ///                // In our example, we ask a `&str` question, and expect a `bool` reply.                    
+    ///                MessageHandler::new(ctx.recv().await?)
+    ///                    .on_question(|message: &str, sender| {
+    ///                        if message == "is it raining today?" {
+    ///                            sender.reply(true).unwrap();
+    ///                        }
+    ///                    });
+    ///            }
+    ///            Ok(())
+    ///        }
+    ///     })
+    /// #   })
+    /// # });
+    ///
+    /// let distributor = Distributor::named("my distributor");
+    ///
+    /// let reply: Result<String, SendError> = distributor
+    ///     .request("is it raining today?")
+    ///     .await
+    ///     .expect("couldn't receive reply");
+    ///
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn request<R: Message>(
+        &self,
+        question: impl Message,
+    ) -> oneshot::Receiver<Result<R, SendError>> {
+        let (sender, receiver) = oneshot::channel();
+        let s = *self;
+        spawn!(async move {
+            match SYSTEM.dispatcher().ask(s, question) {
+                Ok(response) => match response.await {
+                    Ok(message) => {
+                        let message_to_send = MessageHandler::new(message)
+                            .on_tell(|reply: R, _| Ok(reply))
+                            .on_fallback(|_, _| {
+                                Err(SendError::Other(anyhow::anyhow!(
+                                    "received a message with the wrong type"
+                                )))
+                            });
+                        let _ = sender.send(message_to_send);
+                    }
+                    Err(e) => {
+                        let _ = sender.send(Err(SendError::Other(anyhow::anyhow!(
+                            "couldn't receive reply: {:?}",
+                            e
+                        ))));
+                    }
+                },
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                }
+            };
+        });
+
+        receiver
+    }
+
+    /// Ask a question to a recipient attached to the `Distributor`
+    /// and wait for a reply.
+    ///
+    /// this is the sync variant of the `request` function, backed by a futures::channel::oneshot
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use bastion::prelude::*;
+    /// #
+    /// # #[cfg(feature = "tokio-runtime")]
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "tokio-runtime"))]
+    /// # fn main() {
+    /// #    run();    
+    /// # }
+    /// #
+    /// # fn run() {
+    /// # Bastion::init();
+    /// # Bastion::start();
+    /// # Bastion::supervisor(|supervisor| {
+    /// #    supervisor.children(|children| {
+    /// // attach a named distributor to the children
+    /// children
+    /// #        .with_redundancy(1)
+    ///     .with_distributor(Distributor::named("my distributor"))
+    ///     .with_exec(|ctx: BastionContext| {
+    ///        async move {
+    ///            loop {
+    ///                // The message handler needs an `on_question` section
+    ///                // that matches the `question` you're going to send,
+    ///                // and that will reply with the Type the request expects.
+    ///                // In our example, we ask a `&str` question, and expect a `bool` reply.                    
+    ///                MessageHandler::new(ctx.recv().await?)
+    ///                    .on_question(|message: &str, sender| {
+    ///                        if message == "is it raining today?" {
+    ///                            sender.reply(true).unwrap();
+    ///                        }
+    ///                    });
+    ///            }
+    ///            Ok(())
+    ///        }
+    ///     })
+    /// #   })
+    /// # });
+    ///
+    /// let distributor = Distributor::named("my distributor");
+    ///
+    /// let reply: Result<bool, SendError> = distributor
+    ///    .request_sync("is it raining today?")
+    ///    .recv()
+    ///    .expect("couldn't receive reply"); // Ok(true)
+    ///
+    /// # Bastion::stop();
+    /// # Bastion::block_until_stopped();
+    /// # }
+    /// ```
+    pub fn request_sync<R: Message>(
+        &self,
+        question: impl Message,
+    ) -> Receiver<Result<R, SendError>> {
+        let (sender, receiver) = channel();
+        let s = *self;
+        spawn!(async move {
+            match SYSTEM.dispatcher().ask(s, question) {
+                Ok(response) => {
+                    if let Ok(message) = response.await {
+                        let message_to_send = MessageHandler::new(message)
+                            .on_tell(|reply: R, _| Ok(reply))
+                            .on_fallback(|_, _| {
+                                Err(SendError::Other(anyhow::anyhow!(
+                                    "received a message with the wrong type"
+                                )))
+                            });
+                        let _ = sender.send(message_to_send);
+                    } else {
+                        let _ = sender.send(Err(SendError::Other(anyhow::anyhow!(
+                            "couldn't receive reply"
+                        ))));
+                    }
+                }
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                }
+            };
+        });
+
+        receiver
+    }
+
+    /// Ask a question to a recipient attached to the `Distributor`
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -73,8 +265,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -93,7 +283,7 @@ impl Distributor {
     /// Requires a `Message` that implements `Clone`. (it will be cloned and passed to each recipient)
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -126,8 +316,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -145,7 +333,7 @@ impl Distributor {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -178,8 +366,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -198,7 +384,7 @@ impl Distributor {
     /// Requires a `Message` that implements `Clone`. (it will be cloned and passed to each recipient)
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -231,8 +417,6 @@ impl Distributor {
     /// # });
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     ///
     /// let distributor = Distributor::named("my distributor");
     ///
@@ -248,7 +432,7 @@ impl Distributor {
 
     /// subscribe a `ChildRef` to the named `Distributor`
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -280,8 +464,6 @@ impl Distributor {
     /// # }).unwrap();
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     /// #
     /// let child_ref = children.elems()[0].clone();
     ///
@@ -295,13 +477,12 @@ impl Distributor {
     /// # }
     /// ```
     pub fn subscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
-        let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.register_recipient(*self, child_ref)
+        SYSTEM.dispatcher().register_recipient(self, child_ref)
     }
 
     /// unsubscribe a `ChildRef` to the named `Distributor`
     ///
-    /// ```rust
+    /// ```no_run
     /// # use bastion::prelude::*;
     /// #
     /// # #[cfg(feature = "tokio-runtime")]
@@ -333,8 +514,6 @@ impl Distributor {
     /// # }).unwrap();
     /// #
     /// # Bastion::start();
-    /// # // Wait until everyone is up
-    /// # std::thread::sleep(std::time::Duration::from_secs(1));
     /// #
     /// let child_ref = children.elems()[0].clone();
     ///
@@ -354,5 +533,218 @@ impl Distributor {
 
     pub(crate) fn interned(&self) -> &Spur {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod distributor_tests {
+    use crate::prelude::*;
+    use futures::channel::mpsc::channel;
+    use futures::{SinkExt, StreamExt};
+
+    const TEST_DISTRIBUTOR: &str = "test distributor";
+    const SUBSCRIBE_TEST_DISTRIBUTOR: &str = "subscribe test";
+
+    #[cfg(feature = "tokio-runtime")]
+    #[tokio::test]
+    async fn test_tokio_distributor() {
+        blocking!({
+            run_tests();
+        });
+    }
+
+    #[cfg(not(feature = "tokio-runtime"))]
+    #[test]
+    fn distributor_tests() {
+        run_tests();
+    }
+
+    fn run_tests() {
+        setup();
+
+        test_tell();
+        test_ask();
+        test_request();
+        test_subscribe();
+    }
+
+    fn test_subscribe() {
+        let temp_distributor = Distributor::named("temp distributor");
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to an empty distributor"
+        );
+
+        let one_child: ChildRef = run!(async {
+            Distributor::named(SUBSCRIBE_TEST_DISTRIBUTOR)
+                .request(())
+                .await
+                .unwrap()
+                .unwrap()
+        });
+        temp_distributor.subscribe(one_child.clone()).unwrap();
+
+        temp_distributor
+            .tell_one("hello!")
+            .expect("should be able to send message a distributor that has a subscriber");
+
+        temp_distributor.unsubscribe(one_child).unwrap();
+
+        assert!(
+            temp_distributor.tell_one("hello!").is_err(),
+            "should not be able to send message to a distributor who's sole subscriber unsubscribed"
+        );
+    }
+
+    fn test_tell() {
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
+
+        test_distributor
+            .tell_one("don't panic and carry a towel")
+            .unwrap();
+
+        let sent = test_distributor
+            .tell_everyone("so long, and thanks for all the fish")
+            .unwrap();
+
+        assert_eq!(
+            5,
+            sent.len(),
+            "test distributor is supposed to have 5 children"
+        );
+    }
+
+    fn test_ask() {
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
+
+        let question: String =
+            "What is the answer to life, the universe and everything?".to_string();
+
+        run!(async {
+            let answer = test_distributor.ask_one(question.clone()).unwrap();
+            MessageHandler::new(answer.await.unwrap())
+                .on_tell(|answer: u8, _| {
+                    assert_eq!(42, answer);
+                })
+                .on_fallback(|unknown, _sender_addr| {
+                    panic!("unknown message\n {:?}", unknown);
+                });
+        });
+
+        run!(async {
+            let answers = test_distributor.ask_everyone(question.clone()).unwrap();
+            assert_eq!(
+                5,
+                answers.len(),
+                "test distributor is supposed to have 5 children"
+            );
+            let meanings = futures::future::join_all(answers.into_iter().map(|answer| async {
+                MessageHandler::new(answer.await.unwrap())
+                    .on_tell(|answer: u8, _| {
+                        assert_eq!(42, answer);
+                        answer
+                    })
+                    .on_fallback(|unknown, _sender_addr| {
+                        panic!("unknown message\n {:?}", unknown);
+                    })
+            }))
+            .await;
+
+            assert_eq!(
+                42 * 5,
+                meanings.iter().sum::<u8>(),
+                "5 children returning 42 should sum to 42 * 5"
+            );
+        });
+    }
+
+    fn test_request() {
+        let test_distributor = Distributor::named(TEST_DISTRIBUTOR);
+
+        let question: String =
+            "What is the answer to life, the universe and everything?".to_string();
+
+        run!(async {
+            let answer: u8 = test_distributor
+                .request(question.clone())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(42, answer);
+        });
+
+        let answer_sync: u8 = test_distributor
+            .request_sync(question)
+            .recv()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(42, answer_sync);
+    }
+
+    fn setup() {
+        Bastion::init();
+        Bastion::start();
+
+        const NUM_CHILDREN: usize = 5;
+
+        // This channel and the use of callbacks will allow us to know when all of the children are spawned.
+        let (sender, receiver) = channel(NUM_CHILDREN);
+
+        Bastion::supervisor(|supervisor| {
+            let test_ready = sender.clone();
+            let subscribe_test_ready = sender.clone();
+            supervisor
+                .children(|children| {
+                    children
+                        .with_redundancy(NUM_CHILDREN)
+                        .with_distributor(Distributor::named(TEST_DISTRIBUTOR))
+                        .with_callbacks(Callbacks::new().with_after_start(move || {
+                            let mut test_ready = test_ready.clone();
+                            spawn!(async move { test_ready.send(()).await });
+                        }))
+                        .with_exec(|ctx| async move {
+                            loop {
+                                let child_ref = ctx.current().clone();
+                                MessageHandler::new(ctx.recv().await?)
+                                    .on_question(|_: String, sender| {
+                                        let _ = sender.reply(42_u8);
+                                    })
+                                    // send your child ref
+                                    .on_question(|_: (), sender| {
+                                        let _ = sender.reply(child_ref);
+                                    });
+                            }
+                        })
+                    // Subscribe / unsubscribe tests
+                })
+                .children(|children| {
+                    children
+                        .with_distributor(Distributor::named(SUBSCRIBE_TEST_DISTRIBUTOR))
+                        .with_callbacks(Callbacks::new().with_after_start(move || {
+                            let mut subscribe_test_ready = subscribe_test_ready.clone();
+                            spawn!(async move { subscribe_test_ready.send(()).await });
+                        }))
+                        .with_exec(|ctx| async move {
+                            loop {
+                                let child_ref = ctx.current().clone();
+                                MessageHandler::new(ctx.recv().await?).on_question(
+                                    |_: (), sender| {
+                                        let _ = sender.reply(child_ref);
+                                    },
+                                );
+                            }
+                        })
+                })
+        })
+        .unwrap();
+
+        // Wait until the children have spawned
+        run!(async {
+            // NUM_CHILDREN for the test distributor group,
+            // 1 for the subscribe test group
+            receiver.take(NUM_CHILDREN + 1).collect::<Vec<_>>().await;
+        });
     }
 }

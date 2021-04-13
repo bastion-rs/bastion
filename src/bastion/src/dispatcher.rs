@@ -3,17 +3,22 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child_ref::{ChildRef, SendError},
+    child_ref::ChildRef,
     message::{Answer, Message},
+    prelude::SendError,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
 use lever::prelude::*;
-use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
+use std::sync::RwLock;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
+};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
 };
 use tracing::{debug, trace};
 
@@ -345,7 +350,8 @@ impl Into<DispatcherType> for String {
 pub(crate) struct GlobalDispatcher {
     /// Storage for all registered group of actors.
     pub dispatchers: LOTable<DispatcherType, Arc<Box<Dispatcher>>>,
-    pub distributors: LOTable<Distributor, Arc<Box<(dyn RecipientHandler)>>>,
+    // TODO: switch to LOTable once lever implements write optimized granularity
+    pub distributors: Arc<RwLock<HashMap<Distributor, Box<(dyn RecipientHandler)>>>>,
 }
 
 impl GlobalDispatcher {
@@ -353,7 +359,12 @@ impl GlobalDispatcher {
     pub(crate) fn new() -> Self {
         GlobalDispatcher {
             dispatchers: LOTable::new(),
-            distributors: LOTable::new(),
+            distributors: Arc::new(RwLock::new(HashMap::new()))
+            // TODO: switch to LOTable once lever implements write optimized granularity
+            // distributors: LOTableBuilder::new()
+                //.with_concurrency(TransactionConcurrency::Optimistic)
+                //.with_isolation(TransactionIsolation::Serializable)
+                //.build(),
         }
     }
 
@@ -495,6 +506,13 @@ impl GlobalDispatcher {
 
     fn next(&self, distributor: Distributor) -> Result<Option<ChildRef>, SendError> {
         self.distributors
+            .read()
+            .map_err(|error| {
+                SendError::Other(anyhow::anyhow!(
+                    "couldn't get read lock on distributors {:?}",
+                    error
+                ))
+            })?
             .get(&distributor)
             .map(|recipient| recipient.next())
             .ok_or_else(|| SendError::from(distributor))
@@ -502,6 +520,13 @@ impl GlobalDispatcher {
 
     fn all(&self, distributor: Distributor) -> Result<Vec<ChildRef>, SendError> {
         self.distributors
+            .read()
+            .map_err(|error| {
+                SendError::Other(anyhow::anyhow!(
+                    "couldn't get read lock on distributors {:?}",
+                    error
+                ))
+            })?
             .get(&distributor)
             .map(|recipient| recipient.all())
             .ok_or_else(|| SendError::from(distributor))
@@ -534,17 +559,22 @@ impl GlobalDispatcher {
     /// Appends the information about actor to the recipients.
     pub(crate) fn register_recipient(
         &self,
-        distributor: Distributor,
+        distributor: &Distributor,
         child_ref: ChildRef,
     ) -> AnyResult<()> {
-        if let Some(recipient) = self.distributors.get(&distributor) {
-            recipient.register(child_ref);
+        let mut distributors = self.distributors.write().map_err(|error| {
+            anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
+        })?;
+        if let Some(recipients) = distributors.get(&distributor) {
+            recipients.register(child_ref);
         } else {
-            let actors = DefaultRecipientHandler::default();
-            actors.register(child_ref);
-            self.distributors
-                .insert(distributor, Arc::new(Box::new(actors)))?;
-        }
+            let recipients = DefaultRecipientHandler::default();
+            recipients.register(child_ref);
+            distributors.insert(
+                distributor.clone(),
+                Box::new(recipients) as Box<(dyn RecipientHandler)>,
+            );
+        };
         Ok(())
     }
 
@@ -553,17 +583,42 @@ impl GlobalDispatcher {
         distributor_list: &[Distributor],
         child_ref: ChildRef,
     ) -> AnyResult<()> {
+        let distributors = self.distributors.write().map_err(|error| {
+            anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
+        })?;
         distributor_list.iter().for_each(|distributor| {
-            if let Some(recipient) = self.distributors.get(distributor) {
-                recipient.remove(&child_ref);
-            }
+            distributors
+                .get(&distributor)
+                .map(|recipients| recipients.remove(&child_ref));
         });
+        Ok(())
+    }
+
+    /// Adds distributor to the global registry.
+    pub(crate) fn register_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
+        let mut distributors = self.distributors.write().map_err(|error| {
+            anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
+        })?;
+        if distributors.contains_key(&distributor) {
+            debug!(
+                "The distributor with the '{:?}' name already registered in the cluster.",
+                distributor
+            );
+        } else {
+            distributors.insert(
+                distributor.clone(),
+                Box::new(DefaultRecipientHandler::default()),
+            );
+        }
         Ok(())
     }
 
     /// Removes distributor from the global registry.
     pub(crate) fn remove_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
-        self.distributors.remove(distributor)?;
+        let mut distributors = self.distributors.write().map_err(|error| {
+            anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
+        })?;
+        distributors.remove(distributor);
         Ok(())
     }
 }

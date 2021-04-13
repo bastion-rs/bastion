@@ -851,14 +851,11 @@ mod context_tests {
         Bastion::init();
         Bastion::start();
 
-        run_test(test_recv);
-        run_test(test_try_recv);
-        run_test(test_try_recv_fail);
-        run_test(test_try_recv_timeout);
-        run_test(test_try_recv_timeout_fail);
-
-        Bastion::stop();
-        Bastion::block_until_stopped();
+        test_recv();
+        test_try_recv();
+        test_try_recv_fail();
+        test_try_recv_timeout();
+        test_try_recv_timeout_fail();
     }
 
     fn test_recv() {
@@ -917,7 +914,7 @@ mod context_tests {
         let children =
         Bastion::children(|children| {
             children.with_exec(|ctx: BastionContext| async move {
-                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(1)).await.expect("recv_timeout failed"),
+                msg! { ctx.try_recv_timeout(std::time::Duration::from_millis(5)).await.expect("recv_timeout failed"),
                     ref msg: &'static str => {
                         assert_eq!(msg, &"test recv timeout");
                     };
@@ -949,15 +946,6 @@ mod context_tests {
         run!(async { Delay::new(std::time::Duration::from_millis(2)).await });
 
         // The child panicked, but we should still be able to send things to it
-        assert!(children.broadcast("test recv timeout").is_ok());
-    }
-
-    fn run_test<T>(test: T) -> ()
-    where
-        T: FnOnce() -> () + panic::UnwindSafe,
-    {
-        let result = panic::catch_unwind(|| test());
-
-        assert!(result.is_ok())
+        children.broadcast("test recv timeout").unwrap();
     }
 }

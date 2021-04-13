@@ -468,6 +468,8 @@ impl Children {
     /// ```
     /// [`RecipientHandler`]: crate::dispatcher::RecipientHandler
     pub fn with_distributor(mut self, distributor: Distributor) -> Self {
+        // Try to register the distributor as soon as we're aware of it
+        let _ = SYSTEM.dispatcher().register_distributor(&distributor);
         self.distributors.push(distributor);
         self
     }
@@ -1155,6 +1157,16 @@ impl Children {
 
         for dispatcher in self.dispatchers.iter() {
             global_dispatcher.remove_dispatcher(dispatcher)?;
+        }
+        Ok(())
+    }
+
+    /// Registers all declared local distributors in the global dispatcher.
+    pub(crate) fn register_distributors(&self) -> AnyResult<()> {
+        let global_dispatcher = SYSTEM.dispatcher();
+
+        for distributor in self.distributors.iter() {
+            global_dispatcher.register_distributor(distributor)?;
         }
         Ok(())
     }

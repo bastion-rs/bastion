@@ -80,9 +80,19 @@ struct ConferenceSchedule {
     misc: String,
 }
 
-/// cargo r --features=tokio-runtime distributor
+/// cargo r --features=tokio-runtime --example distributor
+#[cfg(feature = "tokio-runtime")]
 #[tokio::main]
 async fn main() -> AnyResult<()> {
+    run()
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+fn main() -> AnyResult<()> {
+    run()
+}
+
+fn run() -> AnyResult<()> {
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .finish();
@@ -119,22 +129,21 @@ async fn main() -> AnyResult<()> {
     Bastion::start();
 
     // Wait a bit until everyone is ready
-    // std::thread::sleep(std::time::Duration::from_secs(1));
+    sleep(std::time::Duration::from_secs(5));
 
     let staff = Distributor::named("staff");
     let enthusiasts = Distributor::named("enthusiasts");
     let attendees = Distributor::named("attendees");
 
     // Enthusiast -> Ask one of the staff members "when is the conference going to happen ?"
-    let answer = staff.ask_one("when is the next conference going to happen?")?;
-    MessageHandler::new(
-        answer
+    let reply: Result<String, SendError> = run!(async {
+        staff
+            .request("when is the next conference going to happen?")
             .await
-            .expect("coulnd't find out when the next conference is going to happen :("),
-    )
-    .on_tell(|reply: String, _sender_addr| {
-        tracing::info!("received a reply to my message:\n{}", reply);
+            .expect("couldn't receive reply")
     });
+
+    tracing::error!("{:?}", reply); // Ok("Next month!")
 
     // "hey conference <awesomeconference> is going to happen. will you be there?"
     // Broadcast / Question -> if people reply with YES => fill the 3rd group
@@ -143,23 +152,25 @@ async fn main() -> AnyResult<()> {
         .expect("couldn't ask everyone");
 
     for answer in answers.into_iter() {
-        MessageHandler::new(answer.await.expect("couldn't receive reply"))
-            .on_tell(|rsvp: RSVP, _| {
-                if rsvp.attends {
-                    tracing::info!("{:?} will be there! :)", rsvp.child_ref.id());
-                    attendees
-                        .subscribe(rsvp.child_ref)
-                        .expect("couldn't subscribe attendee");
-                } else {
-                    tracing::error!("{:?} won't make it :(", rsvp.child_ref.id());
-                }
-            })
-            .on_fallback(|unknown, _sender_addr| {
-                tracing::error!(
-                    "distributor_test: uh oh, I received a message I didn't understand\n {:?}",
-                    unknown
-                );
-            });
+        run!(async move {
+            MessageHandler::new(answer.await.expect("couldn't receive reply"))
+                .on_tell(|rsvp: RSVP, _| {
+                    if rsvp.attends {
+                        tracing::info!("{:?} will be there! :)", rsvp.child_ref.id());
+                        attendees
+                            .subscribe(rsvp.child_ref)
+                            .expect("couldn't subscribe attendee");
+                    } else {
+                        tracing::error!("{:?} won't make it :(", rsvp.child_ref.id());
+                    }
+                })
+                .on_fallback(|unknown, _sender_addr| {
+                    tracing::error!(
+                        "distributor_test: uh oh, I received a message I didn't understand\n {:?}",
+                        unknown
+                    );
+                });
+        });
     }
 
     // Ok now that attendees have subscribed, let's send information around!
@@ -176,14 +187,15 @@ async fn main() -> AnyResult<()> {
     tracing::error!("total number of attendees: {}", total_sent.len());
 
     tracing::info!("the conference is running!");
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // Let's wait until the conference is over 8D
+    sleep(std::time::Duration::from_secs(5));
 
     // An attendee sends a thank you note to one staff member (and not bother everyone)
     staff
         .tell_one("the conference was amazing thank you so much!")
         .context("couldn't thank the staff members :(")?;
 
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     // And we're done!
     Bastion::stop();
 
@@ -198,9 +210,7 @@ async fn organize_the_event(ctx: BastionContext) -> Result<(), ()> {
         MessageHandler::new(ctx.recv().await?)
             .on_question(|message: &str, sender| {
                 tracing::info!("received a question: \n{}", message);
-                sender
-                    .reply("uh i think it will be next month!".to_string())
-                    .unwrap();
+                sender.reply("Next month!".to_string()).unwrap();
             })
             .on_tell(|message: &str, _| {
                 tracing::info!("received a message: \n{}", message);
@@ -242,4 +252,16 @@ async fn be_interested_in_the_conference(ctx: BastionContext) -> Result<(), ()> 
                     .unwrap();
             });
     }
+}
+
+#[cfg(feature = "tokio-runtime")]
+fn sleep(duration: std::time::Duration) {
+    run!(async {
+        tokio::time::sleep(duration).await;
+    });
+}
+
+#[cfg(not(feature = "tokio-runtime"))]
+fn sleep(duration: std::time::Duration) {
+    std::thread::sleep(duration);
 }

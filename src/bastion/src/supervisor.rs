@@ -647,10 +647,18 @@ impl Supervisor {
         let children = Children::new(bcast);
         let mut children = init(children);
         debug!("Children({}): Initialized.", children.id());
+
         // FIXME: children group elems launched without the group itself being launched
         if let Err(e) = children.register_dispatchers() {
             warn!("couldn't register all dispatchers into the registry: {}", e);
         };
+        if let Err(e) = children.register_distributors() {
+            warn!(
+                "couldn't register all distributors into the registry: {}",
+                e
+            );
+        };
+
         children.launch_elems();
 
         debug!(
