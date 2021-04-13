@@ -19,7 +19,7 @@ pub struct GlobalState {
 
 #[derive(Debug, Clone)]
 /// A container for user-defined types.
-struct GlobalDataContainer(Arc<AtomicBox<Box<dyn Any>>>);
+struct GlobalDataContainer(Arc<dyn Any + Send + Sync>);
 
 impl GlobalState {
     /// Returns a new instance of global state.
@@ -40,10 +40,10 @@ impl GlobalState {
     }
 
     /// Returns the requested data type to the caller.
-    pub fn read<'a, T: Send + Sync + 'static>(&mut self) -> Option<&'a T> {
+    pub fn read<T: Send + Sync + 'static>(&mut self) -> Option<Arc<T>> {
         self.table
-            .get(&TypeId::of::<T>())
-            .and_then(|container| container.read::<T>())
+            .get(&TypeId::of::<Arc<T>>())
+            .and_then(|gdc| gdc.read())
     }
 
     /// Checks the given values is storing in the global state.
@@ -65,9 +65,8 @@ impl GlobalDataContainer {
         GlobalDataContainer(Arc::new(AtomicBox::new(Box::new(value))))
     }
 
-    pub fn read<'a, T: Send + Sync + 'static>(&self) -> Option<&'a T> {
-        let inner = self.0.get();
-        inner.downcast_ref::<T>()
+    pub fn read<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.0.downcast_ref::<Arc<T>>().map(Arc::clone)
     }
 }
 
