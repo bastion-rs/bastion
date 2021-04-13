@@ -25,7 +25,7 @@ pub trait SmpStats {
     /// Stores the load of the given queue.
     fn store_load(&self, affinity: usize, load: usize);
     /// returns tuple of queue id and load ordered from highest load to lowest.
-    fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]>;
+    fn get_sorted_load(&self) -> ArrayVec<(usize, usize), MAX_CORE>;
     /// mean of the all smp queue load.
     fn mean(&self) -> usize;
     /// update the smp mean.
@@ -166,8 +166,8 @@ impl SmpStats for Stats {
         self.smp_load[affinity].store(load, Ordering::SeqCst);
     }
 
-    fn get_sorted_load(&self) -> ArrayVec<[(usize, usize); MAX_CORE]> {
-        let mut sorted_load = ArrayVec::<[(usize, usize); MAX_CORE]>::new();
+    fn get_sorted_load(&self) -> ArrayVec<(usize, usize), MAX_CORE> {
+        let mut sorted_load = ArrayVec::new();
 
         for (core, load) in self.smp_load.iter().enumerate() {
             let load = load.load(Ordering::SeqCst);

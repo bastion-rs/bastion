@@ -86,7 +86,7 @@ nuclei = "0.1"
 
 [dev-dependencies]
 env_logger = "0.8"
-proptest = "0.10"
+proptest = "1.0"
 snap = "1.0"
 # prime_numbers example
 bastion-utils = { version = "0.3.2", path = "../bastion-utils" }
