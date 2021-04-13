@@ -45,20 +45,16 @@ impl GlobalState {
     }
 
     /// Invokes a function with the requested data type.
-    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&mut self, f: F) -> Option<&T>
+    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&mut self, f: F)
     where
         F: Fn(Option<&T>) -> Option<T>,
     {
-        self.table
-            .replace_with(&TypeId::of::<T>(), |maybe_as_any| {
-                let maybe_output = f(maybe_as_any.and_then(|v| (*v).downcast_ref::<T>()));
-
-                dbg!(&maybe_output);
-
-                let maybe_as_any = maybe_output.map(|t| Arc::new(t) as Arc<dyn Any + Send + Sync>);
-                maybe_as_any
-            })
-            .and_then(|as_any| as_any.downcast_ref::<T>())
+        self.table.replace_with(&TypeId::of::<T>(), |maybe_as_any| {
+            match f(maybe_as_any.and_then(|v| (*v).downcast_ref::<T>())) {
+                Some(output) => Some(Arc::new(output) as Arc<dyn Any + Send + Sync>),
+                None => None,
+            }
+        });
     }
 
     /// Checks the given values is storing in the global state.
@@ -172,7 +168,7 @@ mod tests {
             bar: 43,
         };
 
-        let actual_updated = instance.write::<Hello, _>(|maybe_to_update| {
+        instance.write::<Hello, _>(|maybe_to_update| {
             let to_update = maybe_to_update.unwrap();
 
             let updated = Hello {
@@ -183,11 +179,9 @@ mod tests {
             Some(updated)
         });
 
-        assert_eq!(&expected_updated, &*actual_updated.unwrap());
-
         instance.read(|updated: Option<&Hello>| {
             let updated = updated.unwrap();
-            assert_eq!(&expected_updated, updated);
+            assert_eq!(updated, &expected_updated);
         });
     }
 }
