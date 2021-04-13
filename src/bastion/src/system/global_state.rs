@@ -14,12 +14,8 @@ use crate::error::{BastionError, Result};
 
 #[derive(Debug)]
 pub struct GlobalState {
-    table: LOTable<TypeId, GlobalDataContainer>,
+    table: LOTable<TypeId, Arc<dyn Any + Send + Sync>>,
 }
-
-#[derive(Debug, Clone)]
-/// A container for user-defined types.
-struct GlobalDataContainer(Arc<dyn Any + Send + Sync>);
 
 impl GlobalState {
     /// Returns a new instance of global state.
@@ -32,18 +28,37 @@ impl GlobalState {
     /// Inserts the given value in the global state. If the value
     /// exists, it will be overridden.
     pub fn insert<T: Send + Sync + 'static>(&mut self, value: T) -> bool {
-        let container = GlobalDataContainer::new(value);
         self.table
-            .insert(TypeId::of::<T>(), container)
+            .insert(
+                TypeId::of::<T>(),
+                Arc::new(value) as Arc<dyn Any + Send + Sync>,
+            )
             .ok()
             .is_some()
     }
 
-    /// Returns the requested data type to the caller.
-    pub fn read<T: Send + Sync + 'static>(&mut self) -> Option<Arc<T>> {
+    /// Invokes a function with the requested data type.
+    pub fn read<T: Send + Sync + 'static>(&mut self, f: impl FnOnce(Option<&T>)) {
         self.table
-            .get(&TypeId::of::<Arc<T>>())
-            .and_then(|gdc| gdc.read())
+            .get(&TypeId::of::<T>())
+            .map(|value| f(value.downcast_ref()));
+    }
+
+    /// Invokes a function with the requested data type.
+    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&mut self, f: F) -> Option<Arc<T>>
+    where
+        F: Fn(Option<Arc<T>>) -> Option<Arc<T>>,
+    {
+        self.table
+            .replace_with(&TypeId::of::<T>(), |maybe_as_any| {
+                dbg!((&*(maybe_as_any.unwrap())).type_id(), TypeId::of::<T>());
+                let maybe_as_t = maybe_as_any.and_then(|v| v.downcast_ref::<Arc<T>>());
+                let maybe_output = f(maybe_as_t.map(|arc_t| Arc::clone(&arc_t)));
+
+                let maybe_as_any = maybe_output.map(|t| Arc::new(t) as Arc<dyn Any + Send + Sync>);
+                maybe_as_any
+            })
+            .and_then(|as_any| as_any.downcast_ref::<Arc<T>>().map(|t| Arc::clone(&t)))
     }
 
     /// Checks the given values is storing in the global state.
@@ -57,16 +72,6 @@ impl GlobalState {
             Ok(entry) => entry.is_some(),
             Err(_) => false,
         }
-    }
-}
-
-impl GlobalDataContainer {
-    pub fn new<T: Send + Sync + 'static>(value: T) -> Self {
-        GlobalDataContainer(Arc::new(AtomicBox::new(Box::new(value))))
-    }
-
-    pub fn read<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
-        self.0.downcast_ref::<Arc<T>>().map(Arc::clone)
     }
 }
 
@@ -134,5 +139,54 @@ mod tests {
 
         let is_removed = instance.remove::<usize>();
         assert_eq!(is_removed, false);
+    }
+
+    #[test]
+    fn test_write_read() {
+        let mut instance = GlobalState::new();
+
+        #[derive(Debug, PartialEq, Clone)]
+        struct Hello {
+            foo: bool,
+            bar: usize,
+        }
+        use core::any::TypeId;
+        use std::sync::Arc;
+        dbg!(
+            TypeId::of::<Hello>(),
+            TypeId::of::<Arc<Hello>>(),
+            TypeId::of::<std::any::Any>(),
+            TypeId::of::<Option<Arc<Hello>>>(),
+        );
+
+        let expected = Hello { foo: true, bar: 42 };
+
+        instance.insert(expected.clone());
+
+        instance.read(|actual: Option<&Hello>| {
+            assert_eq!(&expected, actual.unwrap());
+        });
+
+        let expected_updated = Hello {
+            foo: false,
+            bar: 43,
+        };
+
+        let actual_updated = instance.write::<Hello, _>(|maybe_to_update| {
+            let to_update = maybe_to_update.unwrap();
+
+            let updated = Hello {
+                foo: false,
+                bar: 43,
+            };
+            Some(std::sync::Arc::new(updated))
+        });
+
+        assert_eq!(&expected_updated, &*actual_updated.unwrap());
+
+        instance.read(|updated: Option<&Hello>| {
+            let updated = updated.unwrap();
+            assert_eq!(&expected_updated, updated);
+        });
     }
 }
