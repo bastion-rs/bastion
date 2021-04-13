@@ -1,27 +1,32 @@
+use std::sync::Arc;
 /// This module contains implementation of the global state that
 /// available to all actors in runtime. To provide safety and avoid
 /// data races, the implementation is heavily relies on software
 /// transaction memory (or shortly STM) mechanisms to eliminate any
 /// potential data races and provide consistency across actors.
-use std::any::{Any, TypeId};
-use std::ops::Deref;
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::RwLock,
+};
+use std::{collections::hash_map::Entry, ops::Deref};
 
 use lever::sync::atomics::AtomicBox;
 use lever::table::lotable::LOTable;
+use lightproc::proc_state::AsAny;
+use std::collections::HashMap;
 
 use crate::error::{BastionError, Result};
 
 #[derive(Debug)]
 pub struct GlobalState {
-    table: LOTable<TypeId, Arc<dyn Any + Send + Sync>>,
+    table: Arc<RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>>, // todo: remove the arc<rwlock< once we figure it out
 }
 
 impl GlobalState {
     /// Returns a new instance of global state.
     pub(crate) fn new() -> Self {
         GlobalState {
-            table: LOTable::new(),
+            table: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -29,17 +34,20 @@ impl GlobalState {
     /// exists, it will be overridden.
     pub fn insert<T: Send + Sync + 'static>(&mut self, value: T) -> bool {
         self.table
+            .write()
+            .unwrap()
             .insert(
                 TypeId::of::<T>(),
                 Arc::new(value) as Arc<dyn Any + Send + Sync>,
             )
-            .ok()
             .is_some()
     }
 
     /// Invokes a function with the requested data type.
     pub fn read<T: Send + Sync + 'static>(&mut self, f: impl FnOnce(Option<&T>)) {
         self.table
+            .read()
+            .unwrap()
             .get(&TypeId::of::<T>())
             .map(|value| f(value.downcast_ref()));
     }
@@ -49,25 +57,34 @@ impl GlobalState {
     where
         F: Fn(Option<&T>) -> Option<T>,
     {
-        self.table.replace_with(&TypeId::of::<T>(), |maybe_as_any| {
-            match f(maybe_as_any.and_then(|v| (*v).downcast_ref::<T>())) {
-                Some(output) => Some(Arc::new(output) as Arc<dyn Any + Send + Sync>),
-                None => None,
-            }
-        });
+        let mut hm = self.table.write().unwrap();
+        let stuff_to_insert = match hm.entry(TypeId::of::<T>()) {
+            Entry::Occupied(data) => f(data.get().downcast_ref()),
+            Entry::Vacant(_) => f(None),
+        };
+
+        if let Some(stuff) = stuff_to_insert {
+            hm.insert(
+                TypeId::of::<T>(),
+                Arc::new(stuff) as Arc<dyn Any + Send + Sync>,
+            );
+        } else {
+            hm.remove(&TypeId::of::<T>());
+        };
     }
 
     /// Checks the given values is storing in the global state.
     pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
-        self.table.contains_key(&TypeId::of::<T>())
+        self.table.read().unwrap().contains_key(&TypeId::of::<T>())
     }
 
     /// Deletes the entry from the global state.
     pub fn remove<T: Send + Sync + 'static>(&mut self) -> bool {
-        match self.table.remove(&TypeId::of::<T>()) {
-            Ok(entry) => entry.is_some(),
-            Err(_) => false,
-        }
+        self.table
+            .write()
+            .unwrap()
+            .remove(&TypeId::of::<T>())
+            .is_some()
     }
 }
 
