@@ -146,14 +146,6 @@ mod tests {
             foo: bool,
             bar: usize,
         }
-        use core::any::TypeId;
-        use std::sync::Arc;
-        dbg!(
-            TypeId::of::<Hello>(),
-            TypeId::of::<Arc<Hello>>(),
-            TypeId::of::<std::any::Any>(),
-            TypeId::of::<Option<Arc<Hello>>>(),
-        );
 
         let expected = Hello { foo: true, bar: 42 };
 
