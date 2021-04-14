@@ -3,9 +3,9 @@
 //! and instruct Bastion how to send messages back to them
 
 use crate::broadcast::Sender;
+use crate::global_system::SYSTEM;
 use crate::message::{BastionMessage, Message, Msg};
 use crate::path::BastionPath;
-use crate::system::SYSTEM;
 use std::sync::Arc;
 
 #[derive(Debug)]

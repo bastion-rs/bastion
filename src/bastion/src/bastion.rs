@@ -4,10 +4,10 @@ use crate::children_ref::ChildrenRef;
 use crate::config::Config;
 use crate::context::{BastionContext, BastionId};
 use crate::envelope::Envelope;
+use crate::global_system::SYSTEM;
 use crate::message::{BastionMessage, Message};
 use crate::path::BastionPathElement;
 use crate::supervisor::{Supervisor, SupervisorRef};
-use crate::system::SYSTEM;
 
 use core::future::Future;
 use tracing::{debug, trace};

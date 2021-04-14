@@ -71,8 +71,7 @@ mod broadcast;
 mod callbacks;
 mod child;
 mod config;
-mod routing;
-mod system;
+mod global_system;
 
 pub mod child_ref;
 pub mod children;
@@ -83,10 +82,12 @@ pub mod envelope;
 pub mod executor;
 #[cfg(not(target_os = "windows"))]
 pub mod io;
+mod mailbox;
 pub mod message;
 pub mod path;
 #[cfg(feature = "scaling")]
 pub mod resizer;
+mod routing;
 pub mod supervisor;
 
 pub mod errors;

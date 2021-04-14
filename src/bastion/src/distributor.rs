@@ -1,9 +1,9 @@
 //! `Distributor` is a mechanism that allows you to send messages to children.
 
 use crate::{
+    global_system::{STRING_INTERNER, SYSTEM},
     message::{Answer, Message, MessageHandler},
     prelude::{ChildRef, SendError},
-    system::{STRING_INTERNER, SYSTEM},
 };
 use anyhow::Result as AnyResult;
 use futures::channel::oneshot;
