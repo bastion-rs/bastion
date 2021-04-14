@@ -4,44 +4,40 @@ use bastion::prelude::*;
 /// Prologue:
 /// The most classic of all examples and especially the essential hello, world!
 ///
-fn main() {
-    // We need bastion to run our program
-    Bastion::init();
-    Bastion::start();
-    // We are creating a group of children
-    let workers = Bastion::children(|children| {
-        // We are creating the function to exec
-        children.with_exec(|ctx: BastionContext| {
-            async move {
-                // We are defining a behavior when a msg is received
-                msg! {
-                    // We are waiting a msg
-                    ctx.recv().await?,
-                    // We are catching a msg
-                    msg: &'static str =!> {
-                        // Printing the incoming msg
-                        println!("{}", msg);
-                        // Sending the asnwer
-                        answer!(ctx, msg).expect("couldn't reply :(");
-                    };
-                    _: _ => ();
-                }
-                Ok(())
+async fn once_hello_world(ctx: BastionContext) -> Result<(), ()> {
+    MessageHandler::new(ctx.recv().await?)
+        .on_question(|question: &str, sender| {
+            if question == "hi!" {
+                sender
+                    .reply("hello, world!")
+                    .expect("Failed to reply to sender");
+            } else {
+                panic!("Expected string `hi!`, found `{}`", question);
             }
         })
+        .on_fallback(|v, addr| panic!("Wrong message from {:?}: got {:?}", addr, v));
+    Ok(())
+}
+
+fn main() {
+    Bastion::init();
+    Bastion::start();
+
+    Bastion::children(|children| {
+        children
+            .with_distributor(Distributor::named("say_hi"))
+            .with_exec(once_hello_world)
     })
     .expect("Couldn't create the children group.");
-    // We are creating the asker
-    let asker = async {
-        // We are getting the first (and only) worker
-        let answer = workers.elems()[0]
-            .ask_anonymously("hello, world!")
-            .expect("Couldn't send the message.");
-        // We are waiting for the asnwer
-        answer.await.expect("couldn't receive answer");
-    };
-    // We are running the asker in the current blocked thread
-    run!(asker);
-    // We are stopping bastion here
+
+    let say_hi = Distributor::named("say_hi");
+
+    run!(async {
+        let answer: Result<&str, SendError> =
+            say_hi.request("hi!").await.expect("Couldn't send request");
+
+        println!("{}", answer.expect("Couldn't receive answer"))
+    });
+
     Bastion::stop();
 }
