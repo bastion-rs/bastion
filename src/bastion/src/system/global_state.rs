@@ -15,7 +15,7 @@ use lever::table::lotable::LOTable;
 use lightproc::proc_state::AsAny;
 use std::collections::HashMap;
 
-use crate::error::{BastionError, Result};
+use crate::errors::{BastionError, BastionResult};
 
 #[derive(Debug)]
 pub struct GlobalState {
