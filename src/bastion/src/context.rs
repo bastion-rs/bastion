@@ -8,7 +8,7 @@ use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
-use crate::{prelude::ReceiveError, system::SYSTEM};
+use crate::{global_system::SYSTEM, prelude::ReceiveError};
 
 use crossbeam_queue::SegQueue;
 use futures::pending;

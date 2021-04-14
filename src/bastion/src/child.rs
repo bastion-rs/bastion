@@ -5,10 +5,10 @@ use crate::callbacks::{CallbackType, Callbacks};
 use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
+use crate::global_system::SYSTEM;
 use crate::message::BastionMessage;
 #[cfg(feature = "scaling")]
 use crate::resizer::ActorGroupStats;
-use crate::system::SYSTEM;
 use anyhow::Result as AnyResult;
 
 use bastion_executor::pool;

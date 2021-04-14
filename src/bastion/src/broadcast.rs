@@ -1,10 +1,10 @@
 use crate::children_ref::ChildrenRef;
 use crate::context::BastionId;
 use crate::envelope::Envelope;
+use crate::global_system::SYSTEM;
 use crate::message::BastionMessage;
 use crate::path::{BastionPath, BastionPathElement};
 use crate::supervisor::SupervisorRef;
-use crate::system::SYSTEM;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use fxhash::FxHashMap;

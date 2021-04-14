@@ -5,11 +5,12 @@
 //! More errors may happen in the future.
 
 use crate::envelope::Envelope;
-use crate::global_system::STRING_INTERNER;
 use crate::message::Msg;
+use crate::system::STRING_INTERNER;
 use crate::{distributor::Distributor, message::BastionMessage};
 use futures::channel::mpsc::TrySendError;
 use std::fmt::Debug;
+use std::result;
 use std::result;
 use std::time::Duration;
 use thiserror::Error;
@@ -80,4 +81,14 @@ impl From<Distributor> for SendError {
     fn from(distributor: Distributor) -> Self {
         Self::NoDistributor(STRING_INTERNER.resolve(distributor.interned()).to_string())
     }
+}
+
+#[derive(Error, Debug)]
+pub enum BastionError {
+    #[error("The message cannot be sent via the channel. Reason: {0}")]
+    ChanSend(String),
+    #[error("The message cannot be received from the channel. Reason: {0}")]
+    ChanRecv(String),
+    #[error("Before requesting a next message the previous message must be acked.")]
+    UnackedMessage,
 }

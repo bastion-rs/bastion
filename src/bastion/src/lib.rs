@@ -65,11 +65,13 @@ pub use self::config::Config;
 #[macro_use]
 mod macros;
 
+mod actor;
 mod bastion;
 mod broadcast;
 mod callbacks;
 mod child;
 mod config;
+mod global_system;
 mod system;
 
 pub mod child_ref;
@@ -81,10 +83,12 @@ pub mod envelope;
 pub mod executor;
 #[cfg(not(target_os = "windows"))]
 pub mod io;
+mod mailbox;
 pub mod message;
 pub mod path;
 #[cfg(feature = "scaling")]
 pub mod resizer;
+mod routing;
 pub mod supervisor;
 
 pub mod errors;

@@ -7,11 +7,11 @@ use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
+use crate::global_system::SYSTEM;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
 use crate::resizer::{ActorGroupStats, OptimalSizeExploringResizer, ScalingRule};
-use crate::system::SYSTEM;
 use crate::{
     broadcast::{Broadcast, Parent, Sender},
     distributor::Distributor,
