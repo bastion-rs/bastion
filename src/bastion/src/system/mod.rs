@@ -1,10 +1,8 @@
 mod global_state;
 mod node;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 use crate::system::node::Node;
 
-lazy_static! {
-    pub static ref SYSTEM: Node = Node::new();
-}
+pub static SYSTEM: Lazy<Node> = Lazy::new(Node::new);

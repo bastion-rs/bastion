@@ -1,73 +1,90 @@
+use std::sync::Arc;
 /// This module contains implementation of the global state that
 /// available to all actors in runtime. To provide safety and avoid
 /// data races, the implementation is heavily relies on software
 /// transaction memory (or shortly STM) mechanisms to eliminate any
 /// potential data races and provide consistency across actors.
-use std::any::{Any, TypeId};
-use std::ops::Deref;
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::RwLock,
+};
+use std::{collections::hash_map::Entry, ops::Deref};
 
 use lever::sync::atomics::AtomicBox;
 use lever::table::lotable::LOTable;
+use lightproc::proc_state::AsAny;
+use std::collections::HashMap;
 
 use crate::error::{BastionError, Result};
 
 #[derive(Debug)]
 pub struct GlobalState {
-    table: LOTable<TypeId, GlobalDataContainer>,
+    table: Arc<RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>>, // todo: remove the arc<rwlock< once we figure it out
 }
-
-#[derive(Debug, Clone)]
-/// A container for user-defined types.
-struct GlobalDataContainer(Arc<AtomicBox<Box<dyn Any>>>);
 
 impl GlobalState {
     /// Returns a new instance of global state.
     pub(crate) fn new() -> Self {
         GlobalState {
-            table: LOTable::new(),
+            table: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     /// Inserts the given value in the global state. If the value
     /// exists, it will be overridden.
     pub fn insert<T: Send + Sync + 'static>(&mut self, value: T) -> bool {
-        let container = GlobalDataContainer::new(value);
         self.table
-            .insert(TypeId::of::<T>(), container)
-            .ok()
+            .write()
+            .unwrap()
+            .insert(
+                TypeId::of::<T>(),
+                Arc::new(value) as Arc<dyn Any + Send + Sync>,
+            )
             .is_some()
     }
 
-    /// Returns the requested data type to the caller.
-    pub fn read<'a, T: Send + Sync + 'static>(&mut self) -> Option<&'a T> {
+    /// Invokes a function with the requested data type.
+    pub fn read<T: Send + Sync + 'static>(&mut self, f: impl FnOnce(Option<&T>)) {
         self.table
+            .read()
+            .unwrap()
             .get(&TypeId::of::<T>())
-            .and_then(|container| container.read::<T>())
+            .map(|value| f(value.downcast_ref()));
+    }
+
+    /// Invokes a function with the requested data type.
+    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&mut self, f: F)
+    where
+        F: Fn(Option<&T>) -> Option<T>,
+    {
+        let mut hm = self.table.write().unwrap();
+        let stuff_to_insert = match hm.entry(TypeId::of::<T>()) {
+            Entry::Occupied(data) => f(data.get().downcast_ref()),
+            Entry::Vacant(_) => f(None),
+        };
+
+        if let Some(stuff) = stuff_to_insert {
+            hm.insert(
+                TypeId::of::<T>(),
+                Arc::new(stuff) as Arc<dyn Any + Send + Sync>,
+            );
+        } else {
+            hm.remove(&TypeId::of::<T>());
+        };
     }
 
     /// Checks the given values is storing in the global state.
     pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
-        self.table.contains_key(&TypeId::of::<T>())
+        self.table.read().unwrap().contains_key(&TypeId::of::<T>())
     }
 
     /// Deletes the entry from the global state.
     pub fn remove<T: Send + Sync + 'static>(&mut self) -> bool {
-        match self.table.remove(&TypeId::of::<T>()) {
-            Ok(entry) => entry.is_some(),
-            Err(_) => false,
-        }
-    }
-}
-
-impl GlobalDataContainer {
-    pub fn new<T: Send + Sync + 'static>(value: T) -> Self {
-        GlobalDataContainer(Arc::new(AtomicBox::new(Box::new(value))))
-    }
-
-    pub fn read<'a, T: Send + Sync + 'static>(&self) -> Option<&'a T> {
-        let inner = self.0.get();
-        inner.downcast_ref::<T>()
+        self.table
+            .write()
+            .unwrap()
+            .remove(&TypeId::of::<T>())
+            .is_some()
     }
 }
 
@@ -135,5 +152,45 @@ mod tests {
 
         let is_removed = instance.remove::<usize>();
         assert_eq!(is_removed, false);
+    }
+
+    #[test]
+    fn test_write_read() {
+        let mut instance = GlobalState::new();
+
+        #[derive(Debug, PartialEq, Clone)]
+        struct Hello {
+            foo: bool,
+            bar: usize,
+        }
+
+        let expected = Hello { foo: true, bar: 42 };
+
+        instance.insert(expected.clone());
+
+        instance.read(|actual: Option<&Hello>| {
+            assert_eq!(&expected, actual.unwrap());
+        });
+
+        let expected_updated = Hello {
+            foo: false,
+            bar: 43,
+        };
+
+        instance.write::<Hello, _>(|maybe_to_update| {
+            let to_update = maybe_to_update.unwrap();
+
+            let updated = Hello {
+                foo: !to_update.foo,
+                bar: to_update.bar + 1,
+            };
+
+            Some(updated)
+        });
+
+        instance.read(|updated: Option<&Hello>| {
+            let updated = updated.unwrap();
+            assert_eq!(updated, &expected_updated);
+        });
     }
 }

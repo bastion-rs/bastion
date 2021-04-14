@@ -55,5 +55,6 @@ lever = "0.1.1-alpha.11"
 lightproc = "0.3.5"
 regex = "1.3.9"
 uuid = { version = "0.8", features = ["v4"] }
+once_cell = "1.7.2"
 
 [dev-dependencies]
