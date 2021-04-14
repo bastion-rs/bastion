@@ -10,8 +10,21 @@ use crate::system::STRING_INTERNER;
 use crate::{distributor::Distributor, message::BastionMessage};
 use futures::channel::mpsc::TrySendError;
 use std::fmt::Debug;
+use std::result;
 use std::time::Duration;
 use thiserror::Error;
+
+pub type BastionResult<T> = result::Result<T, BError>;
+
+// TODO [igni]: make it one bastionerror enum and merge everything
+
+#[derive(Debug)]
+pub enum BError {
+    Receive(ReceiveError),
+    ChanSend(String),
+    ChanRecv(String),
+    UnackedMessage,
+}
 
 #[derive(Debug)]
 /// These errors happen
