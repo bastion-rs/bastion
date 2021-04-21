@@ -61,6 +61,20 @@
 ///!         // We create the function to exec when each children is called
 ///!         .with_exec(move |ctx: BastionContext| async move { /* ... */ })
 ///! ```
+
+
+/*
+* cargo.toml:
+*
+* [dependencies]
+* anyhow = "1.0.40"
+* bastion = { git = "https://github.com/bastion-rs/bastion" }
+* rand = "0.8.3"
+* tracing = "0.1.25"
+* tracing-subscriber = "0.2.17"
+*
+*/
+
 use anyhow::{anyhow, Context, Result as AnyResult};
 use bastion::distributor::*;
 use bastion::prelude::*;
