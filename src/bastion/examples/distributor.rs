@@ -61,8 +61,6 @@
 ///!         // We create the function to exec when each children is called
 ///!         .with_exec(move |ctx: BastionContext| async move { /* ... */ })
 ///! ```
-
-
 /*
 * cargo.toml:
 *
@@ -74,7 +72,6 @@
 * tracing-subscriber = "0.2.17"
 *
 */
-
 use anyhow::{anyhow, Context, Result as AnyResult};
 use bastion::distributor::*;
 use bastion::prelude::*;

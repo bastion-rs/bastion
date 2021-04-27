@@ -613,12 +613,18 @@ impl GlobalDispatcher {
         Ok(())
     }
 
-    /// Removes distributor from the global registry.
+    /// Removes distributor from the global registry if it has no remaining recipients.
     pub(crate) fn remove_distributor(&self, distributor: &Distributor) -> AnyResult<()> {
         let mut distributors = self.distributors.write().map_err(|error| {
-            anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
+            anyhow::anyhow!("couldn't get write lock on distributors {:?}", error)
         })?;
-        distributors.remove(distributor);
+        if distributors
+            .get(&distributor)
+            .map(|recipient| recipient.all().is_empty())
+            .unwrap_or_default()
+        {
+            distributors.remove(distributor);
+        }
         Ok(())
     }
 }
@@ -918,5 +924,45 @@ mod tests {
         global_dispatcher.broadcast_message(BroadcastTarget::Group("".to_string()), &message);
         let handler_was_called = handler.was_called();
         assert_eq!(handler_was_called, true);
+    }
+
+    #[test]
+    fn test_global_dispatcher_removes_distributor_with_no_recipients() {
+        let global_dispatcher = GlobalDispatcher::new();
+        let distributor = Distributor::named("test-distributor");
+        global_dispatcher
+            .register_distributor(&distributor)
+            .unwrap();
+        assert!(!global_dispatcher.distributors.read().unwrap().is_empty());
+        global_dispatcher.remove_distributor(&distributor).unwrap();
+        assert!(global_dispatcher.distributors.read().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_global_dispatcher_keeps_distributor_with_recipients() {
+        let bastion_id = BastionId::new();
+        let (sender, _) = mpsc::unbounded();
+        let path = Arc::new(BastionPath::root());
+        let name = "test_name".to_string();
+        let child_ref = ChildRef::new(bastion_id, sender, name, path);
+
+        let global_dispatcher = GlobalDispatcher::new();
+        let distributor = Distributor::named("test-distributor");
+        global_dispatcher
+            .register_distributor(&distributor)
+            .unwrap();
+        global_dispatcher
+            .register_recipient(&distributor, child_ref.clone())
+            .unwrap();
+        global_dispatcher.remove_distributor(&distributor).unwrap();
+        // Should maintain the dispatcher because it still has a recipient.
+        assert!(!global_dispatcher.distributors.read().unwrap().is_empty());
+
+        global_dispatcher
+            .remove_recipient(&[distributor], child_ref)
+            .unwrap();
+        global_dispatcher.remove_distributor(&distributor).unwrap();
+        // Distributor is now removed because it has no remaining recipients.
+        assert!(global_dispatcher.distributors.read().unwrap().is_empty());
     }
 }
