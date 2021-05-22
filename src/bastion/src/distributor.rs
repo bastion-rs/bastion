@@ -797,7 +797,7 @@ mod distributor_tests {
         assert_eq!(42, answer_sync);
 
         run!(async {
-            let timeout = Duration::from_millis(10);
+            let timeout = Duration::from_millis(100);
             let answer_timeout: u8 = test_distributor
                 .request_timeout(question.clone(), timeout)
                 .await
