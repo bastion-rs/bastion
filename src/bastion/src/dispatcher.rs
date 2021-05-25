@@ -3,7 +3,6 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
-    child::Child,
     child_ref::ChildRef,
     message::{Answer, Message},
     prelude::SendError,
@@ -92,7 +91,7 @@ impl Future for RoundRobinHandler {
 
         let recipients = self.public_recipients();
         if !recipients.is_empty() {
-            return Poll::Ready(recipients);
+            Poll::Ready(recipients)
         } else {
             Poll::Pending
         }
