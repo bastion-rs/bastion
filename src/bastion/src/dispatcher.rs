@@ -3,14 +3,15 @@
 //! group of actors through the dispatchers that holds information about
 //! actors grouped together.
 use crate::{
+    child::Child,
     child_ref::ChildRef,
     message::{Answer, Message},
     prelude::SendError,
 };
 use crate::{distributor::Distributor, envelope::SignedMessage};
 use anyhow::Result as AnyResult;
+use futures::Future;
 use lever::prelude::*;
-use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -19,6 +20,10 @@ use std::sync::{
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
+};
+use std::{
+    hash::{Hash, Hasher},
+    task::Poll,
 };
 use tracing::{debug, trace};
 
@@ -71,6 +76,29 @@ pub trait Recipient {
 /// A `RecipientHandler` is a `Recipient` implementor, that can be stored in the dispatcher
 pub trait RecipientHandler: Recipient + Send + Sync + Debug {}
 
+impl Future for RoundRobinHandler {
+    type Output = Vec<ChildRef>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let recipients = self.public_recipients();
+        if !recipients.is_empty() {
+            return Poll::Ready(recipients);
+        }
+
+        self.waker.register(cx.waker());
+
+        let recipients = self.public_recipients();
+        if !recipients.is_empty() {
+            return Poll::Ready(recipients);
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
 impl RecipientHandler for RoundRobinHandler {}
 
 /// The default handler, which does round-robin.
@@ -101,6 +129,7 @@ pub type DefaultDispatcherHandler = RoundRobinHandler;
 pub struct RoundRobinHandler {
     index: AtomicUsize,
     recipients: RecipientMap,
+    waker: futures::task::AtomicWaker,
 }
 
 impl RoundRobinHandler {
@@ -115,6 +144,22 @@ impl RoundRobinHandler {
                 }
             })
             .collect()
+    }
+}
+
+impl RoundRobinHandler {
+    async fn poll_next(&mut self) -> ChildRef {
+        let index = self.index.fetch_add(1, Ordering::SeqCst);
+        let recipients = self.await;
+        // TODO [igni]: unwrap?!
+        recipients
+            .get(index % recipients.len())
+            .map(std::clone::Clone::clone)
+            .unwrap()
+    }
+
+    async fn poll_all(&mut self) -> Vec<ChildRef> {
+        self.await
     }
 }
 
@@ -137,6 +182,7 @@ impl Recipient for RoundRobinHandler {
 
     fn register(&self, actor: ChildRef) {
         let _ = self.recipients.insert(actor, ());
+        self.waker.wake();
     }
 
     fn remove(&self, actor: &ChildRef) {
