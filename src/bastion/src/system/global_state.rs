@@ -11,15 +11,13 @@ use lever::sync::atomics::AtomicBox;
 use lever::table::lotable::LOTable;
 
 use crate::error::{BastionError, Result};
+use std::borrow::Borrow;
 
 #[derive(Debug)]
 pub struct GlobalState {
-    table: LOTable<TypeId, GlobalDataContainer>,
+    //table: LOTable<TypeId, GlobalDataContainer>,
+    table: LOTable<TypeId, Arc<AtomicBox<Box<dyn Any + Send + Sync>>>>,
 }
-
-#[derive(Debug, Clone)]
-/// A container for user-defined types.
-struct GlobalDataContainer(Arc<AtomicBox<Box<dyn Any>>>);
 
 impl GlobalState {
     /// Returns a new instance of global state.
@@ -32,18 +30,36 @@ impl GlobalState {
     /// Inserts the given value in the global state. If the value
     /// exists, it will be overridden.
     pub fn insert<T: Send + Sync + 'static>(&mut self, value: T) -> bool {
-        let container = GlobalDataContainer::new(value);
         self.table
-            .insert(TypeId::of::<T>(), container)
+            .insert(TypeId::of::<T>(), Arc::new(AtomicBox::new(Box::new(value))))
             .ok()
             .is_some()
     }
 
     /// Returns the requested data type to the caller.
-    pub fn read<'a, T: Send + Sync + 'static>(&mut self) -> Option<&'a T> {
-        self.table
-            .get(&TypeId::of::<T>())
-            .and_then(|container| container.read::<T>())
+    pub fn read<T: Send + Sync + 'static>(&mut self, func: impl Fn(&T)) {
+        self.table.get(&TypeId::of::<T>()).map(|container| {
+            match container.get().downcast_ref::<T>() {
+                Some(value) => func(value),
+                None => {}
+            }
+        });
+    }
+
+    /// Applies a user-defined function that mutates inner data.
+    pub fn write<T: Send + Sync + 'static, F>(&mut self, mut func: F)
+    where
+        F: FnMut(&mut T) -> T,
+    {
+        self.table.get(&TypeId::of::<T>()).map(|container| {
+            match container.get().downcast_mut::<T>() {
+                Some(value) => container.replace_with(|_| {
+                    let updated_value = func(value);
+                    Box::new(updated_value)
+                }),
+                None => {}
+            }
+        });
     }
 
     /// Checks the given values is storing in the global state.
@@ -57,17 +73,6 @@ impl GlobalState {
             Ok(entry) => entry.is_some(),
             Err(_) => false,
         }
-    }
-}
-
-impl GlobalDataContainer {
-    pub fn new<T: Send + Sync + 'static>(value: T) -> Self {
-        GlobalDataContainer(Arc::new(AtomicBox::new(Box::new(value))))
-    }
-
-    pub fn read<'a, T: Send + Sync + 'static>(&self) -> Option<&'a T> {
-        let inner = self.0.get();
-        inner.downcast_ref::<T>()
     }
 }
 

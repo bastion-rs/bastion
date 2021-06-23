@@ -1,10 +1,8 @@
 use crate::routing::ActorPath;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
-lazy_static! {
-    static ref WILDCARD_REGEX: Regex = Regex::new(r"(\*/)").unwrap();
-}
+static WILDCARD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\*/)").unwrap());
 
 /// An enum for handling targeting messages to the certain
 /// actor, a group of actors, a namespace or a scope.
