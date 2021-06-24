@@ -47,18 +47,17 @@ impl GlobalState {
     }
 
     /// Applies a user-defined function that mutates inner data.
-    pub fn write<T: Send + Sync + 'static, F>(&mut self, mut func: F)
+    pub fn write<T: Send + Sync + 'static, F>(&mut self, func: F)
     where
-        F: FnMut(&mut T) -> T,
+        F: Fn(&T) -> T,
     {
         self.table.get(&TypeId::of::<T>()).map(|container| {
-            match container.get().downcast_mut::<T>() {
-                Some(value) => container.replace_with(|_| {
+            container.get().downcast_ref::<T>().map(|value| {
+                container.replace_with(|_| {
                     let updated_value = func(value);
                     Box::new(updated_value)
-                }),
-                None => {}
-            }
+                })
+            })
         });
     }
 
