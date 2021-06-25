@@ -15,7 +15,6 @@ use std::borrow::Borrow;
 
 #[derive(Debug)]
 pub struct GlobalState {
-    //table: LOTable<TypeId, GlobalDataContainer>,
     table: LOTable<TypeId, Arc<AtomicBox<Box<dyn Any + Send + Sync>>>>,
 }
 
@@ -104,6 +103,43 @@ mod tests {
         let second_insert_data = TestData { counter: 1 };
         instance.insert(second_insert_data.clone());
         assert_eq!(instance.contains::<TestData>(), true);
+    }
+
+    #[test]
+    fn test_read_and_write() {
+        let mut instance = GlobalState::new();
+
+        #[derive(Debug, PartialEq, Clone)]
+        struct Hello {
+            foo: bool,
+            bar: usize,
+        }
+
+        let expected = Hello { foo: true, bar: 42 };
+
+        instance.insert(expected.clone());
+
+        instance.read(|actual: &Hello| {
+            assert_eq!(&expected, actual);
+        });
+
+        let expected_updated = Hello {
+            foo: false,
+            bar: 43,
+        };
+
+        instance.write::<Hello, _>(|to_update| {
+            let updated = Hello {
+                foo: !to_update.foo,
+                bar: to_update.bar + 1,
+            };
+
+            updated
+        });
+
+        instance.read(|updated: &Hello| {
+            assert_eq!(updated, &expected_updated);
+        });
     }
 
     #[test]
