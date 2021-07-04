@@ -10,6 +10,4 @@ pub enum BastionError {
     ChanSend(String),
     #[error("The message cannot be received from the channel. Reason: {0}")]
     ChanRecv(String),
-    #[error("Before requesting a next message the previous message must be acked.")]
-    UnackedMessage,
 }
