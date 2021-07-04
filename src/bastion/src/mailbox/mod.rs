@@ -1,8 +1,6 @@
-mod envelope;
-mod state;
-
+pub mod envelope;
 pub mod message;
-pub mod traits;
+pub(crate) mod state;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -11,14 +9,14 @@ use async_channel::{unbounded, Receiver, Sender};
 
 use crate::error::{BastionError, Result};
 use crate::mailbox::envelope::Envelope;
+use crate::mailbox::message::Message;
 use crate::mailbox::state::MailboxState;
-use crate::mailbox::traits::TypedMessage;
 
 /// Struct that represents a message sender.
 #[derive(Clone)]
 pub struct MailboxTx<T>
 where
-    T: TypedMessage,
+    T: Message,
 {
     /// Indicated the transmitter part of the actor's channel
     /// which is using for passing messages.
@@ -30,7 +28,7 @@ where
 
 impl<T> MailboxTx<T>
 where
-    T: TypedMessage,
+    T: Message,
 {
     /// Return a new instance of MailboxTx that indicates sender.
     pub(crate) fn new(tx: Sender<Envelope<T>>) -> Self {
@@ -57,20 +55,14 @@ where
 #[derive(Clone)]
 pub struct Mailbox<T>
 where
-    T: TypedMessage,
+    T: Message,
 {
-    /// User guardian sender
-    user_tx: MailboxTx<T>,
-    /// User guardian receiver
-    user_rx: Receiver<Envelope<T>>,
+    /// Actor guardian sender
+    actor_tx: MailboxTx<T>,
+    /// Actor guardian receiver
+    actor_rx: Receiver<Envelope<T>>,
     /// System guardian receiver
     system_rx: Receiver<Envelope<T>>,
-    /// The current processing message, received from the
-    /// latest call to the user's queue
-    last_user_message: Option<Envelope<T>>,
-    /// The current processing message, received from the
-    /// latest call to the system's queue
-    last_system_message: Option<Envelope<T>>,
     /// Mailbox state machine
     state: Arc<MailboxState>,
 }
@@ -78,89 +70,51 @@ where
 // TODO: Add calls with recv with timeout
 impl<T> Mailbox<T>
 where
-    T: TypedMessage,
+    T: Message,
 {
     /// Creates a new mailbox for the actor.
     pub(crate) fn new(system_rx: Receiver<Envelope<T>>) -> Self {
-        let (tx, user_rx) = unbounded();
-        let user_tx = MailboxTx::new(tx);
-        let last_user_message = None;
-        let last_system_message = None;
+        let (tx, actor_rx) = unbounded();
+        let actor_tx = MailboxTx::new(tx);
         let state = Arc::new(MailboxState::new());
 
         Mailbox {
-            user_tx,
-            user_rx,
+            actor_tx,
+            actor_rx,
             system_rx,
-            last_user_message,
-            last_system_message,
             state,
         }
     }
 
-    /// Forced receive message from user queue
+    /// Forced receive message from the actor's queue.
     pub async fn recv(&mut self) -> Envelope<T> {
-        let message = self
-            .user_rx
+        self.actor_rx
             .recv()
             .await
             .map_err(|e| BastionError::ChanRecv(e.to_string()))
-            .unwrap();
-
-        self.last_user_message = Some(message);
-        self.last_user_message.clone().unwrap()
+            .unwrap()
     }
 
-    /// Try receiving message from user queue
+    /// Try receiving message from the actor's queue.
     pub async fn try_recv(&mut self) -> Result<Envelope<T>> {
-        if self.last_user_message.is_some() {
-            return Err(BastionError::UnackedMessage);
-        }
-
-        match self.user_rx.try_recv() {
-            Ok(message) => {
-                self.last_user_message = Some(message);
-                Ok(self.last_user_message.clone().unwrap())
-            }
-            Err(e) => Err(BastionError::ChanRecv(e.to_string())),
-        }
+        self.actor_rx
+            .try_recv()
+            .map_err(|e| BastionError::ChanRecv(e.to_string()))
     }
 
-    /// Forced receive message from system queue
+    /// Forced receive message from the internal system queue.
     pub async fn sys_recv(&mut self) -> Envelope<T> {
-        let message = self
-            .system_rx
+        self.system_rx
             .recv()
             .await
             .map_err(|e| BastionError::ChanRecv(e.to_string()))
-            .unwrap();
-
-        self.last_system_message = Some(message);
-        self.last_system_message.clone().unwrap()
+            .unwrap()
     }
 
-    /// Try receiving message from system queue
+    /// Try receiving message from the internal system queue.
     pub async fn try_sys_recv(&mut self) -> Result<Envelope<T>> {
-        if self.last_system_message.is_some() {
-            return Err(BastionError::UnackedMessage);
-        }
-
-        match self.system_rx.try_recv() {
-            Ok(message) => {
-                self.last_system_message = Some(message);
-                Ok(self.last_system_message.clone().unwrap())
-            }
-            Err(e) => Err(BastionError::ChanRecv(e.to_string())),
-        }
-    }
-
-    /// Returns the last retrieved message from the user channel
-    pub async fn get_last_user_message(&self) -> Option<Envelope<T>> {
-        self.last_user_message.clone()
-    }
-
-    /// Returns the last retrieved message from the system channel
-    pub async fn get_last_system_message(&self) -> Option<Envelope<T>> {
-        self.last_system_message.clone()
+        self.system_rx
+            .try_recv()
+            .map_err(|e| BastionError::ChanRecv(e.to_string()))
     }
 }

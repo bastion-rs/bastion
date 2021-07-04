@@ -4,14 +4,10 @@
 /// transaction memory (or shortly STM) mechanisms to eliminate any
 /// potential data races and provide consistency across actors.
 use std::any::{Any, TypeId};
-use std::ops::Deref;
 use std::sync::Arc;
 
 use lever::sync::atomics::AtomicBox;
 use lever::table::lotable::LOTable;
-
-use crate::error::{BastionError, Result};
-use std::borrow::Borrow;
 
 #[derive(Debug)]
 pub struct GlobalState {

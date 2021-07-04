@@ -39,12 +39,12 @@ impl Actor for Ping {
 
         while (pong_struct.counter != 3) {
             let message = ctx.recv().await?;
+            message.handle(ctx).await;
 
-            // Do something with the message ...
-
-            message.ack().await;
             self.send(message.path(), "pong", MessageType::Tell).await?;
             pong_struct.counter += 1;
+
+            message.ack().await;
         }
 
         System::stop();
