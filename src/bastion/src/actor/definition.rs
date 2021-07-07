@@ -1,4 +1,5 @@
 use std::fmt::{self, Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -98,6 +99,19 @@ impl Debug for Definition {
         fmt.debug_struct("Definition")
             .field("scope", &self.scope)
             .finish()
+    }
+}
+
+impl Eq for Definition {}
+impl PartialEq for Definition {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Hash for Definition {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
     }
 }
 
