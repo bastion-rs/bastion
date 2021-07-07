@@ -1,6 +1,8 @@
 use std::fmt::{self, Debug, Formatter};
 use std::sync::Arc;
 
+use uuid::Uuid;
+
 use crate::actor::traits::Actor;
 use crate::routing::path::{ActorPath, Scope};
 
@@ -8,6 +10,8 @@ type CustomActorNameFn = dyn Fn() -> String + Send + 'static;
 
 /// A structure that holds configuration of the Bastion actor.
 pub struct Definition {
+    /// A unique definition name;
+    name: String,
     /// A struct that implements actor's behaviour
     actor: Option<Arc<dyn Actor>>,
     /// Defines a used scope for instantiating actors.
@@ -21,17 +25,25 @@ pub struct Definition {
 impl Definition {
     /// Returns a new instance of the actor's definition.
     pub fn new() -> Self {
+        let name = Uuid::new_v4().to_string();
         let scope = Scope::User;
         let actor_name_fn = None;
         let redundancy = 1;
         let actor = None;
 
         Definition {
+            name,
             actor,
             scope,
             actor_name_fn,
             redundancy,
         }
+    }
+
+    /// Overrides the definition's name. The passed value must be unique.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = name.to_string();
+        self
     }
 
     /// Sets the actor to schedule.
@@ -105,6 +117,16 @@ mod tests {
 
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_none(), true);
+        assert_eq!(instance.redundancy, 1);
+    }
+
+    #[test]
+    fn test_definition_with_custom_name() {
+        let instance = Definition::new().name("test_name");
+
+        assert_eq!(instance.name, "test_name");
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_some(), false);
         assert_eq!(instance.redundancy, 1);
     }
 

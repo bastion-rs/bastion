@@ -72,7 +72,7 @@ where
 }
 
 #[cfg(test)]
-mod message_target_tests {
+mod envelope_tests {
     use crate::mailbox::envelope::Envelope;
     use crate::mailbox::message::{Message, MessageType};
 
