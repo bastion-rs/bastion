@@ -20,7 +20,7 @@ pub struct Context {
     /// Path to the actor in the system
     path: Arc<ActorPath>,
     /// Mailbox of the actor
-    mailbox: Mailbox<Box<dyn Message>>,
+    mailbox: Mailbox,
     /// Local storage for actor's data
     local_state: LocalState,
     /// Current execution state of the actor
@@ -28,7 +28,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub(crate) fn new(path: ActorPath) -> (Self, Sender<Envelope<impl Message>>) {
+    pub(crate) fn new(path: ActorPath) -> (Self, Sender<Envelope>) {
         let (system_tx, system_rx) = unbounded();
 
         let path = Arc::new(path);

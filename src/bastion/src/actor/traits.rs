@@ -5,6 +5,9 @@ use crate::error::Result;
 
 #[async_trait]
 pub trait Actor: Sync {
+    fn new() -> Self
+    where
+        Self: Sized;
     async fn on_init(&self, _ctx: &mut Context) {}
     async fn on_sync(&self, _ctx: &mut Context) {}
     async fn on_stopped(&self, _ctx: &mut Context) {}

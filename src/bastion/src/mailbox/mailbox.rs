@@ -10,30 +10,24 @@ use crate::mailbox::state::MailboxState;
 
 /// Struct that represents a message sender.
 #[derive(Clone)]
-pub struct MailboxTx<T>
-where
-    T: Message,
-{
+pub struct MailboxTx {
     /// Indicated the transmitter part of the actor's channel
     /// which is using for passing messages.
-    tx: Sender<Envelope<T>>,
+    tx: Sender<Envelope>,
     /// A field for checks that the message has been delivered to
     /// the specific actor.
     scheduled: Arc<AtomicBool>,
 }
 
-impl<T> MailboxTx<T>
-where
-    T: Message,
-{
+impl MailboxTx {
     /// Return a new instance of MailboxTx that indicates sender.
-    pub(crate) fn new(tx: Sender<Envelope<T>>) -> Self {
+    pub(crate) fn new(tx: Sender<Envelope>) -> Self {
         let scheduled = Arc::new(AtomicBool::new(false));
         MailboxTx { tx, scheduled }
     }
 
     /// Send the message to the actor by the channel.
-    pub fn try_send(&self, msg: Envelope<T>) -> Result<()> {
+    pub fn try_send(&self, msg: Envelope) -> Result<()> {
         self.tx
             .try_send(msg)
             .map_err(|e| BastionError::ChanSend(e.to_string()))
@@ -49,27 +43,21 @@ where
 /// by a user, to guarantee that the message won't be lost if something
 /// happens wrong.
 #[derive(Clone)]
-pub struct Mailbox<T>
-where
-    T: Message,
-{
+pub struct Mailbox {
     /// Actor guardian sender
-    actor_tx: MailboxTx<T>,
+    actor_tx: MailboxTx,
     /// Actor guardian receiver
-    actor_rx: Receiver<Envelope<T>>,
+    actor_rx: Receiver<Envelope>,
     /// System guardian receiver
-    system_rx: Receiver<Envelope<T>>,
+    system_rx: Receiver<Envelope>,
     /// Mailbox state machine
     state: Arc<MailboxState>,
 }
 
 // TODO: Add calls with recv with timeout
-impl<T> Mailbox<T>
-where
-    T: Message,
-{
+impl Mailbox {
     /// Creates a new mailbox for the actor.
-    pub(crate) fn new(system_rx: Receiver<Envelope<T>>) -> Self {
+    pub(crate) fn new(system_rx: Receiver<Envelope>) -> Self {
         let (tx, actor_rx) = unbounded();
         let actor_tx = MailboxTx::new(tx);
         let state = Arc::new(MailboxState::new());
@@ -83,7 +71,7 @@ where
     }
 
     /// Forced receive message from the actor's queue.
-    pub async fn recv(&mut self) -> Envelope<T> {
+    pub async fn recv(&mut self) -> Envelope {
         self.actor_rx
             .recv()
             .await
@@ -92,14 +80,14 @@ where
     }
 
     /// Try receiving message from the actor's queue.
-    pub async fn try_recv(&mut self) -> Result<Envelope<T>> {
+    pub async fn try_recv(&mut self) -> Result<Envelope> {
         self.actor_rx
             .try_recv()
             .map_err(|e| BastionError::ChanRecv(e.to_string()))
     }
 
     /// Forced receive message from the internal system queue.
-    pub async fn sys_recv(&mut self) -> Envelope<T> {
+    pub async fn sys_recv(&mut self) -> Envelope {
         self.system_rx
             .recv()
             .await
@@ -108,7 +96,7 @@ where
     }
 
     /// Try receiving message from the internal system queue.
-    pub async fn try_sys_recv(&mut self) -> Result<Envelope<T>> {
+    pub async fn try_sys_recv(&mut self) -> Result<Envelope> {
         self.system_rx
             .try_recv()
             .map_err(|e| BastionError::ChanRecv(e.to_string()))

@@ -1,33 +1,33 @@
-use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
+use std::sync::Arc;
+
+use async_mutex::Mutex;
 
 use crate::actor::actor_ref::ActorRef;
 use crate::mailbox::message::{Message, MessageType};
 
 /// Struct that represents an incoming message in the actor's mailbox.
 #[derive(Clone)]
-pub struct Envelope<T>
-where
-    T: Message,
-{
+pub struct Envelope {
     /// The sending side of a channel. In actor's world
     /// represented is a message sender. Can be used
     /// for acking message when it possible.
     sender: Option<ActorRef>,
     /// An actual data sent by the channel
-    message: RefCell<Option<T>>,
+    message: Arc<Mutex<Option<Box<dyn Message>>>>,
     /// Message type that helps to figure out how to deliver message
     /// and how to ack it after the processing.
     message_type: MessageType,
 }
 
-impl<T> Envelope<T>
-where
-    T: Message,
-{
+impl Envelope {
     /// Create a message with the given sender and inner data.
-    pub fn new(sender: Option<ActorRef>, data: T, message_type: MessageType) -> Self {
-        let message = RefCell::new(Some(data));
+    pub fn new(
+        sender: Option<ActorRef>,
+        data: Box<dyn Message>,
+        message_type: MessageType,
+    ) -> Self {
+        let message = Arc::new(Mutex::new(Some(data)));
 
         Envelope {
             sender,
@@ -44,8 +44,9 @@ where
 
     /// Extracts the message data and returns it to the caller. Each further
     /// method call will return `None`.
-    pub fn read(&self) -> Option<T> {
-        self.message.replace(None)
+    pub async fn read(&self) -> Option<Box<dyn Message>> {
+        let mut guard = self.message.lock().await;
+        guard.take()
     }
 
     // TODO: Return a boolean flag once operation has finished?
@@ -59,10 +60,7 @@ where
     }
 }
 
-impl<T> Debug for Envelope<T>
-where
-    T: Message,
-{
+impl Debug for Envelope {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         fmt.debug_struct("Message")
             .field("message", &self.message)
