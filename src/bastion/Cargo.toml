@@ -58,3 +58,4 @@ regex = "1.5.4"
 uuid = { version = "0.8.2", features = ["v4"] }
 
 [dev-dependencies]
+tokio-test = "0.4.2"

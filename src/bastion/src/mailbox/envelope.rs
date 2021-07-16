@@ -85,19 +85,19 @@ mod envelope_tests {
 
     #[test]
     fn test_message_read() {
-        let message_data = FakeMessage::new();
+        let message_data = Box::new(FakeMessage::new());
         let instance = Envelope::new(None, message_data, MessageType::Tell);
 
-        let expected_data = instance.read();
+        let expected_data = tokio_test::block_on(instance.read());
         assert_eq!(expected_data.is_some(), true);
 
-        let another_read_attempt_data = instance.read();
+        let another_read_attempt_data = tokio_test::block_on(instance.read());
         assert_eq!(another_read_attempt_data.is_none(), true);
     }
 
     #[test]
     fn test_match_against_ask_message_type() {
-        let message_data = FakeMessage::new();
+        let message_data = Box::new(FakeMessage::new());
         let instance = Envelope::new(None, message_data, MessageType::Ask);
 
         assert_eq!(instance.message_type, MessageType::Ask);
@@ -105,7 +105,7 @@ mod envelope_tests {
 
     #[test]
     fn test_match_against_broadcast_message_type() {
-        let message_data = FakeMessage::new();
+        let message_data = Box::new(FakeMessage::new());
         let instance = Envelope::new(None, message_data, MessageType::Broadcast);
 
         assert_eq!(instance.message_type, MessageType::Broadcast);
@@ -113,7 +113,7 @@ mod envelope_tests {
 
     #[test]
     fn test_match_against_tell_message_type() {
-        let message_data = FakeMessage::new();
+        let message_data = Box::new(FakeMessage::new());
         let instance = Envelope::new(None, message_data, MessageType::Tell);
 
         assert_eq!(instance.message_type, MessageType::Tell);
