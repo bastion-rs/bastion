@@ -118,10 +118,10 @@ impl Hash for Definition {
 #[cfg(test)]
 mod tests {
     use crate::actor::context::Context;
-    use crate::actor::definition::Definition;
     use crate::actor::traits::Actor;
     use crate::error::Result;
     use crate::routing::path::Scope;
+    use crate::system::definition::Definition;
 
     use async_trait::async_trait;
 
