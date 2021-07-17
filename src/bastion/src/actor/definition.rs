@@ -117,8 +117,25 @@ impl Hash for Definition {
 
 #[cfg(test)]
 mod tests {
+    use crate::actor::context::Context;
     use crate::actor::definition::Definition;
+    use crate::actor::traits::Actor;
+    use crate::error::Result;
     use crate::routing::path::Scope;
+
+    use async_trait::async_trait;
+
+    #[derive(Debug)]
+    struct FakeActor {
+        counter: u32,
+    }
+
+    #[async_trait]
+    impl Actor for FakeActor {
+        async fn handler(&mut self, ctx: &mut Context) -> Result<()> {
+            Ok(())
+        }
+    }
 
     fn fake_actor_name() -> String {
         let index = 1;
@@ -129,6 +146,16 @@ mod tests {
     fn test_default_definition() {
         let instance = Definition::new();
 
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_none(), true);
+        assert_eq!(instance.redundancy, 1);
+    }
+
+    #[test]
+    fn test_definition_with_custom_actor() {
+        let instance = Definition::new().actor(FakeActor { counter: 0 });
+
+        assert_eq!(instance.actor.is_some(), true);
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_none(), true);
         assert_eq!(instance.redundancy, 1);

@@ -1,19 +1,18 @@
+use std::fmt::Debug;
+
 use async_trait::async_trait;
 
 use crate::actor::context::Context;
 use crate::error::Result;
 
 #[async_trait]
-pub trait Actor: Sync {
-    fn new() -> Self
-    where
-        Self: Sized;
-    async fn on_init(&self, _ctx: &mut Context) {}
-    async fn on_sync(&self, _ctx: &mut Context) {}
-    async fn on_stopped(&self, _ctx: &mut Context) {}
-    async fn on_terminated(&self, _ctx: &mut Context) {}
-    async fn on_failed(&self, _ctx: &mut Context) {}
-    async fn on_finished(&self, _ctx: &mut Context) {}
-    async fn on_deinit(&self, _ctx: &mut Context) {}
-    async fn handler(&self, ctx: &mut Context) -> Result<()>;
+pub trait Actor: 'static {
+    async fn on_init(&mut self, _ctx: &mut Context) {}
+    async fn on_sync(&mut self, _ctx: &mut Context) {}
+    async fn on_stopped(&mut self, _ctx: &mut Context) {}
+    async fn on_terminated(&mut self, _ctx: &mut Context) {}
+    async fn on_failed(&mut self, _ctx: &mut Context) {}
+    async fn on_finished(&mut self, _ctx: &mut Context) {}
+    async fn on_deinit(&mut self, _ctx: &mut Context) {}
+    async fn handler(&mut self, ctx: &mut Context) -> Result<()>;
 }
