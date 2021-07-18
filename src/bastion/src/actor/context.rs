@@ -5,8 +5,8 @@ use flume::{unbounded, Sender};
 use crate::actor::local_state::LocalState;
 use crate::actor::state::ActorState;
 use crate::mailbox::envelope::Envelope;
+use crate::mailbox::mailbox::{Mailbox, MailboxSize};
 use crate::mailbox::message::Message;
-use crate::mailbox::Mailbox;
 use crate::routing::path::ActorPath;
 
 /// A structure that defines actor's state, mailbox with  
@@ -28,11 +28,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub(crate) fn new(path: ActorPath) -> (Self, Sender<Envelope>) {
+    pub(crate) fn new(path: ActorPath, mailbox_size: MailboxSize) -> (Self, Sender<Envelope>) {
         let (system_tx, system_rx) = unbounded();
 
         let path = Arc::new(path);
-        let mailbox = Mailbox::new(system_rx);
+        let mailbox = Mailbox::new(mailbox_size, system_rx);
         let local_state = LocalState::new();
         let internal_state = ActorState::new();
 

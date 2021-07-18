@@ -5,6 +5,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::actor::traits::Actor;
+use crate::mailbox::MailboxSize;
 use crate::routing::path::{ActorPath, Scope};
 
 type CustomActorNameFn = dyn Fn() -> String + Send + 'static;
@@ -21,6 +22,8 @@ pub struct Definition {
     actor_name_fn: Option<Arc<CustomActorNameFn>>,
     /// Defines how much actors must be instantiated in the beginning.
     redundancy: usize,
+    /// Defines the boundaries of the actor's mailbox.
+    mailbox_size: MailboxSize,
 }
 
 impl Definition {
@@ -31,6 +34,7 @@ impl Definition {
         let actor_name_fn = None;
         let redundancy = 1;
         let actor = None;
+        let mailbox_size = MailboxSize::Unlimited;
 
         Definition {
             name,
@@ -38,6 +42,7 @@ impl Definition {
             scope,
             actor_name_fn,
             redundancy,
+            mailbox_size,
         }
     }
 
@@ -78,6 +83,12 @@ impl Definition {
             false => redundancy,
         };
 
+        self
+    }
+
+    /// Overrides a default channel size for the actor's mailbox.
+    pub fn mailbox_size(mut self, custom_mailbox_size: MailboxSize) -> Self {
+        self.mailbox_size = custom_mailbox_size;
         self
     }
 

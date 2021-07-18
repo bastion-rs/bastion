@@ -1,12 +1,21 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use flume::{unbounded, Receiver, Sender, TryRecvError};
+use flume::{bounded, unbounded, Receiver, Sender, TryRecvError};
 
 use crate::error::{BastionError, Result};
 use crate::mailbox::envelope::Envelope;
 use crate::mailbox::message::Message;
 use crate::mailbox::state::MailboxState;
+
+/// An enum that defines the mailbox boundaries.
+pub enum MailboxSize {
+    /// Store only max N messages. Any other incoming messages
+    /// that can't be put in the mailbox will be ignored.
+    Limited(usize),
+    /// No limits for messages. Default value.
+    Unlimited,
+}
 
 /// Struct that represents a message sender.
 #[derive(Clone)]
@@ -57,8 +66,11 @@ pub struct Mailbox {
 // TODO: Add calls with recv with timeout
 impl Mailbox {
     /// Creates a new mailbox for the actor.
-    pub(crate) fn new(system_rx: Receiver<Envelope>) -> Self {
-        let (tx, actor_rx) = unbounded();
+    pub(crate) fn new(mailbox_size: MailboxSize, system_rx: Receiver<Envelope>) -> Self {
+        let (tx, actor_rx) = match mailbox_size {
+            MailboxSize::Limited(limit) => bounded(limit),
+            MailboxSize::Unlimited => unbounded(),
+        };
         let actor_tx = MailboxTx::new(tx);
         let state = Arc::new(MailboxState::new());
 
@@ -111,19 +123,19 @@ impl Mailbox {
 }
 
 #[cfg(test)]
-mod envelope_tests {
+mod mailbox_tests {
     use flume::unbounded;
     use tokio_test::block_on;
 
     use crate::error::Result;
     use crate::mailbox::envelope::Envelope;
+    use crate::mailbox::mailbox::{Mailbox, MailboxSize};
     use crate::mailbox::message::{Message, MessageType};
-    use crate::mailbox::Mailbox;
 
     #[test]
     fn test_recv() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
         let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
 
         tokio_test::block_on(instance.actor_tx.tx.send_async(envelope));
@@ -140,7 +152,7 @@ mod envelope_tests {
     #[test]
     fn test_try_recv() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
         let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
 
         tokio_test::block_on(instance.actor_tx.tx.send_async(envelope));
@@ -157,7 +169,7 @@ mod envelope_tests {
     #[test]
     fn test_try_recv_returns_error_on_empty_channel() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
 
         let result = tokio_test::block_on(instance.try_sys_recv()).ok();
         assert_eq!(result.is_none(), true);
@@ -166,7 +178,7 @@ mod envelope_tests {
     #[test]
     fn test_sys_recv() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
         let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
 
         tokio_test::block_on(system_tx.send_async(envelope));
@@ -183,7 +195,7 @@ mod envelope_tests {
     #[test]
     fn test_try_sys_recv() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
         let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
 
         tokio_test::block_on(system_tx.send_async(envelope));
@@ -200,7 +212,7 @@ mod envelope_tests {
     #[test]
     fn test_try_sys_recv_returns_error_on_empty_channel() {
         let (system_tx, system_rx) = unbounded();
-        let mut instance = Mailbox::new(system_rx);
+        let mut instance = Mailbox::new(MailboxSize::Unlimited, system_rx);
 
         let result = tokio_test::block_on(instance.try_sys_recv()).ok();
         assert_eq!(result.is_none(), true);
