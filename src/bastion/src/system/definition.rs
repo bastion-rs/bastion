@@ -131,6 +131,7 @@ mod tests {
     use crate::actor::context::Context;
     use crate::actor::traits::Actor;
     use crate::error::Result;
+    use crate::mailbox::MailboxSize;
     use crate::routing::path::Scope;
     use crate::system::definition::Definition;
 
@@ -160,6 +161,7 @@ mod tests {
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_none(), true);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
     }
 
     #[test]
@@ -170,6 +172,7 @@ mod tests {
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_none(), true);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
     }
 
     #[test]
@@ -180,6 +183,7 @@ mod tests {
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_some(), false);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
     }
 
     #[test]
@@ -189,6 +193,7 @@ mod tests {
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_some(), true);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
 
         let actor_path = instance.generate_actor_path();
         assert_eq!(actor_path.to_string(), "bastion://node/user/Actor_1");
@@ -206,6 +211,7 @@ mod tests {
         assert_eq!(instance.scope, Scope::User);
         assert_eq!(instance.actor_name_fn.is_some(), true);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
 
         let actor_path = instance.generate_actor_path();
         assert_eq!(actor_path.to_string(), "bastion://node/user/Actor_1");
@@ -226,9 +232,30 @@ mod tests {
         assert_eq!(instance.scope, Scope::Temporary);
         assert_eq!(instance.actor_name_fn.is_some(), true);
         assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
 
         let actor_path = instance.generate_actor_path();
         assert_eq!(actor_path.to_string(), "bastion://node/temporary/Actor_1");
         assert_eq!(actor_path.is_temporary_scope(), true);
+    }
+
+    #[test]
+    fn test_definition_with_custom_redundancy() {
+        let instance = Definition::new().redundancy(5);
+
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_none(), true);
+        assert_eq!(instance.redundancy, 5);
+        assert_eq!(instance.mailbox_size, MailboxSize::Unlimited);
+    }
+
+    #[test]
+    fn test_definition_with_custom_mailbox_size() {
+        let instance = Definition::new().mailbox_size(MailboxSize::Limited(5));
+
+        assert_eq!(instance.scope, Scope::User);
+        assert_eq!(instance.actor_name_fn.is_none(), true);
+        assert_eq!(instance.redundancy, 1);
+        assert_eq!(instance.mailbox_size, MailboxSize::Limited(5));
     }
 }

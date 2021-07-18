@@ -9,6 +9,7 @@ use crate::mailbox::message::Message;
 use crate::mailbox::state::MailboxState;
 
 /// An enum that defines the mailbox boundaries.
+#[derive(Debug, Eq, PartialEq)]
 pub enum MailboxSize {
     /// Store only max N messages. Any other incoming messages
     /// that can't be put in the mailbox will be ignored.
