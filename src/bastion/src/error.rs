@@ -10,4 +10,6 @@ pub enum BastionError {
     ChanSend(String),
     #[error("The message cannot be received from the channel. Reason: {0}")]
     ChanRecv(String),
+    #[error("The actors channel is empty.")]
+    EmptyChannel,
 }

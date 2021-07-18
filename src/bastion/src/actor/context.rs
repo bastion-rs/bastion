@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use async_channel::{unbounded, Sender};
+use flume::{unbounded, Sender};
 
 use crate::actor::local_state::LocalState;
 use crate::actor::state::ActorState;

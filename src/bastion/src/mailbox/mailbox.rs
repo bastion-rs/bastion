@@ -1,7 +1,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use async_channel::{unbounded, Receiver, Sender};
+use flume::{unbounded, Receiver, Sender, TryRecvError};
 
 use crate::error::{BastionError, Result};
 use crate::mailbox::envelope::Envelope;
@@ -70,10 +70,15 @@ impl Mailbox {
         }
     }
 
+    /// Returns an actor sender to the caller.
+    pub(crate) fn get_actor_rx(&self) -> Sender<Envelope> {
+        self.actor_tx.tx.clone()
+    }
+
     /// Forced receive message from the actor's queue.
     pub async fn recv(&mut self) -> Envelope {
         self.actor_rx
-            .recv()
+            .recv_async()
             .await
             .map_err(|e| BastionError::ChanRecv(e.to_string()))
             .unwrap()
@@ -81,15 +86,16 @@ impl Mailbox {
 
     /// Try receiving message from the actor's queue.
     pub async fn try_recv(&mut self) -> Result<Envelope> {
-        self.actor_rx
-            .try_recv()
-            .map_err(|e| BastionError::ChanRecv(e.to_string()))
+        self.actor_rx.try_recv().map_err(|e| match e {
+            TryRecvError::Empty => BastionError::EmptyChannel,
+            _ => BastionError::ChanRecv(e.to_string()),
+        })
     }
 
     /// Forced receive message from the internal system queue.
     pub async fn sys_recv(&mut self) -> Envelope {
         self.system_rx
-            .recv()
+            .recv_async()
             .await
             .map_err(|e| BastionError::ChanRecv(e.to_string()))
             .unwrap()
@@ -97,8 +103,106 @@ impl Mailbox {
 
     /// Try receiving message from the internal system queue.
     pub async fn try_sys_recv(&mut self) -> Result<Envelope> {
-        self.system_rx
-            .try_recv()
-            .map_err(|e| BastionError::ChanRecv(e.to_string()))
+        self.system_rx.try_recv().map_err(|e| match e {
+            TryRecvError::Empty => BastionError::EmptyChannel,
+            _ => BastionError::ChanRecv(e.to_string()),
+        })
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    use flume::unbounded;
+    use tokio_test::block_on;
+
+    use crate::error::Result;
+    use crate::mailbox::envelope::Envelope;
+    use crate::mailbox::message::{Message, MessageType};
+    use crate::mailbox::Mailbox;
+
+    #[test]
+    fn test_recv() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+        let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
+
+        tokio_test::block_on(instance.actor_tx.tx.send_async(envelope));
+        let incoming_env = tokio_test::block_on(instance.recv());
+        let actor_ref = incoming_env.sender();
+        let message = tokio_test::block_on(incoming_env.read());
+        let message_type = incoming_env.message_type();
+
+        assert_eq!(actor_ref.is_none(), true);
+        assert_eq!(message.is_some(), true);
+        assert_eq!(message_type, MessageType::Tell);
+    }
+
+    #[test]
+    fn test_try_recv() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+        let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
+
+        tokio_test::block_on(instance.actor_tx.tx.send_async(envelope));
+        let incoming_env = tokio_test::block_on(instance.try_recv()).unwrap();
+        let actor_ref = incoming_env.sender();
+        let message = tokio_test::block_on(incoming_env.read());
+        let message_type = incoming_env.message_type();
+
+        assert_eq!(actor_ref.is_none(), true);
+        assert_eq!(message.is_some(), true);
+        assert_eq!(message_type, MessageType::Tell);
+    }
+
+    #[test]
+    fn test_try_recv_returns_error_on_empty_channel() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+
+        let result = tokio_test::block_on(instance.try_sys_recv()).ok();
+        assert_eq!(result.is_none(), true);
+    }
+
+    #[test]
+    fn test_sys_recv() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+        let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
+
+        tokio_test::block_on(system_tx.send_async(envelope));
+        let incoming_env = tokio_test::block_on(instance.sys_recv());
+        let actor_ref = incoming_env.sender();
+        let message = tokio_test::block_on(incoming_env.read());
+        let message_type = incoming_env.message_type();
+
+        assert_eq!(actor_ref.is_none(), true);
+        assert_eq!(message.is_some(), true);
+        assert_eq!(message_type, MessageType::Tell);
+    }
+
+    #[test]
+    fn test_try_sys_recv() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+        let envelope = Envelope::new(None, Box::new(1), MessageType::Tell);
+
+        tokio_test::block_on(system_tx.send_async(envelope));
+        let incoming_env = tokio_test::block_on(instance.try_sys_recv()).unwrap();
+        let actor_ref = incoming_env.sender();
+        let message = tokio_test::block_on(incoming_env.read());
+        let message_type = incoming_env.message_type();
+
+        assert_eq!(actor_ref.is_none(), true);
+        assert_eq!(message.is_some(), true);
+        assert_eq!(message_type, MessageType::Tell);
+    }
+
+    #[test]
+    fn test_try_sys_recv_returns_error_on_empty_channel() {
+        let (system_tx, system_rx) = unbounded();
+        let mut instance = Mailbox::new(system_rx);
+
+        let result = tokio_test::block_on(instance.try_sys_recv()).ok();
+        assert_eq!(result.is_none(), true);
     }
 }

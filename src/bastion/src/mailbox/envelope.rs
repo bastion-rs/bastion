@@ -36,6 +36,11 @@ impl Envelope {
         }
     }
 
+    /// Returns a reference to the sender (if was declared).
+    pub fn sender(&self) -> Option<ActorRef> {
+        self.sender.clone()
+    }
+
     /// Returns a message type. Can be use for pattern matching and filtering
     /// incoming message from other actors.
     pub fn message_type(&self) -> MessageType {
