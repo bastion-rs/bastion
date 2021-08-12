@@ -581,7 +581,7 @@ impl GlobalDispatcher {
     pub(crate) fn remove_recipient(
         &self,
         distributor_list: &[Distributor],
-        child_ref: ChildRef,
+        child_ref: &ChildRef,
     ) -> AnyResult<()> {
         let distributors = self.distributors.write().map_err(|error| {
             anyhow::anyhow!("couldn't get read lock on distributors {:?}", error)
@@ -589,7 +589,7 @@ impl GlobalDispatcher {
         distributor_list.iter().for_each(|distributor| {
             distributors
                 .get(&distributor)
-                .map(|recipients| recipients.remove(&child_ref));
+                .map(|recipients| recipients.remove(child_ref));
         });
         Ok(())
     }
@@ -959,7 +959,7 @@ mod tests {
         assert!(!global_dispatcher.distributors.read().unwrap().is_empty());
 
         global_dispatcher
-            .remove_recipient(&[distributor], child_ref)
+            .remove_recipient(&[distributor], &child_ref)
             .unwrap();
         global_dispatcher.remove_distributor(&distributor).unwrap();
         // Distributor is now removed because it has no remaining recipients.

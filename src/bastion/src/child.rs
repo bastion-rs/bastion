@@ -6,6 +6,7 @@ use crate::child_ref::ChildRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::envelope::Envelope;
 use crate::message::BastionMessage;
+use crate::prelude::ChildrenRef;
 #[cfg(feature = "scaling")]
 use crate::resizer::ActorGroupStats;
 use crate::system::SYSTEM;
@@ -105,9 +106,13 @@ impl Child {
             warn!("Child({}): Panicked.", id);
 
             if let Some(parent) = &parent_inner {
-                let used_dispatchers = parent.dispatchers();
-                let global_dispatcher = SYSTEM.dispatcher();
-                global_dispatcher.remove(used_dispatchers, &child_ref_inner);
+                Self::remove_from_dispatchers(parent, &child_ref_inner);
+                let _ = Self::remove_from_distributors(parent, &child_ref_inner).map_err(|_| {
+                    warn!(
+                        "Child({}): couldn't remove child from parent distributors.",
+                        id
+                    )
+                });
             }
 
             let id = id.clone();
@@ -124,17 +129,20 @@ impl Child {
 
     fn stopped(&mut self) {
         debug!("Child({}): Stopped.", self.id());
-        self.remove_from_dispatchers();
-        let _ = self.remove_from_distributors();
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+
+        Self::remove_from_dispatchers(&parent, &self.child_ref);
+        let _ = Self::remove_from_distributors(&parent, &self.child_ref);
         self.bcast.stopped();
     }
 
     fn faulted(&mut self) {
         debug!("Child({}): Faulted.", self.id());
-        self.remove_from_dispatchers();
-        let _ = self.remove_from_distributors();
-
         let parent = self.bcast.parent().clone().into_children().unwrap();
+
+        Self::remove_from_dispatchers(&parent, &self.child_ref);
+        let _ = Self::remove_from_distributors(&parent, &self.child_ref);
+
         let path = self.bcast.path().clone();
         let sender = self.bcast.sender().clone();
 
@@ -304,11 +312,13 @@ impl Child {
 
     async fn run(mut self) {
         debug!("Child({}): Launched.", self.id());
-        if let Err(e) = self.register_in_dispatchers() {
+        let parent = self.bcast.parent().clone().into_children().unwrap();
+
+        if let Err(e) = Self::register_in_dispatchers(&parent, &self.child_ref) {
             error!("couldn't add actor to the registry: {}", e);
             return;
         };
-        if let Err(e) = self.register_to_distributors() {
+        if let Err(e) = Self::register_to_distributors(&parent, &self.child_ref) {
             error!("couldn't add actor to the distributors: {}", e);
             return;
         };
@@ -396,57 +406,43 @@ impl Child {
     }
 
     /// Adds the actor into each registry declared in the parent node.
-    fn register_in_dispatchers(&self) -> AnyResult<()> {
-        if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref.clone();
-            let used_dispatchers = parent.dispatchers();
+    fn register_in_dispatchers(parent: &ChildrenRef, child_ref: &ChildRef) -> AnyResult<()> {
+        let used_dispatchers = parent.dispatchers();
 
-            let global_dispatcher = SYSTEM.dispatcher();
-            // FIXME: Pass the module name explicitly?
-            let module_name = module_path!().to_string();
-            global_dispatcher.register(used_dispatchers, &child_ref, module_name)?;
-        }
-        Ok(())
+        let global_dispatcher = SYSTEM.dispatcher();
+        // FIXME: Pass the module name explicitly?
+        let module_name = module_path!().to_string();
+        global_dispatcher.register(used_dispatchers, &child_ref, module_name)
     }
 
     /// Adds the actor into each distributor declared in the parent node.
-    fn register_to_distributors(&self) -> AnyResult<()> {
-        if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref.clone();
-            let distributors = parent.distributors();
+    fn register_to_distributors(parent: &ChildrenRef, child_ref: &ChildRef) -> AnyResult<()> {
+        let distributors = parent.distributors();
 
-            let global_dispatcher = SYSTEM.dispatcher();
-            distributors
-                .iter()
-                .map(|&distributor| {
-                    global_dispatcher.register_recipient(&distributor, child_ref.clone())
-                })
-                .collect::<AnyResult<Vec<_>>>()?;
-        }
+        let global_dispatcher = SYSTEM.dispatcher();
+        distributors
+            .iter()
+            .map(|&distributor| {
+                global_dispatcher.register_recipient(&distributor, child_ref.clone())
+            })
+            .collect::<AnyResult<Vec<_>>>()?;
+
         Ok(())
     }
 
     /// Cleanup the actor's record from each declared distributor.
-    fn remove_from_distributors(&self) -> AnyResult<()> {
-        if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref.clone();
-            let distributors = parent.distributors();
-
-            let global_dispatcher = SYSTEM.dispatcher();
-            global_dispatcher.remove_recipient(distributors, child_ref)?;
-        }
+    fn remove_from_distributors(parent: &ChildrenRef, child_ref: &ChildRef) -> AnyResult<()> {
+        let distributors = parent.distributors();
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.remove_recipient(distributors, &child_ref)?;
         Ok(())
     }
 
     /// Cleanup the actor's record from each declared dispatcher.
-    fn remove_from_dispatchers(&self) {
-        if let Some(parent) = self.bcast.parent().clone().into_children() {
-            let child_ref = self.child_ref.clone();
-            let used_dispatchers = parent.dispatchers();
-
-            let global_dispatcher = SYSTEM.dispatcher();
-            global_dispatcher.remove(used_dispatchers, &child_ref);
-        }
+    fn remove_from_dispatchers(parent: &ChildrenRef, child_ref: &ChildRef) {
+        let used_dispatchers = parent.dispatchers();
+        let global_dispatcher = SYSTEM.dispatcher();
+        global_dispatcher.remove(used_dispatchers, &child_ref);
     }
 
     #[cfg(feature = "scaling")]
