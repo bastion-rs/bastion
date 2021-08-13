@@ -528,7 +528,7 @@ impl Distributor {
     /// ```
     pub fn unsubscribe(&self, child_ref: ChildRef) -> AnyResult<()> {
         let global_dispatcher = SYSTEM.dispatcher();
-        global_dispatcher.remove_recipient(&vec![*self], child_ref)
+        global_dispatcher.remove_recipient(&vec![*self], &child_ref)
     }
 
     pub(crate) fn interned(&self) -> &Spur {
