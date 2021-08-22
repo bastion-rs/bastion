@@ -14,10 +14,7 @@ use lever::sync::atomics::AtomicBox;
 use lever::table::lotable::LOTable;
 use lightproc::proc_state::AsAny;
 use std::collections::HashMap;
-
-use crate::error::{BastionError, Result};
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalState {
     table: Arc<RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>>, // todo: remove the arc<rwlock< once we figure it out
 }
@@ -90,7 +87,7 @@ impl GlobalState {
 
 #[cfg(test)]
 mod tests {
-    use crate::system::global_state::GlobalState;
+    use crate::global_state::GlobalState;
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct TestData {

@@ -3,6 +3,7 @@ use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, NIL_ID};
 use crate::dispatcher::GlobalDispatcher;
 use crate::envelope::Envelope;
+use crate::global_state::GlobalState;
 use crate::message::{BastionMessage, Deployment};
 use crate::path::{BastionPath, BastionPathElement};
 use crate::supervisor::{Supervisor, SupervisorRef};
@@ -33,6 +34,7 @@ pub(crate) struct GlobalSystem {
     running: Mutex<bool>,
     stopping_cvar: Condvar,
     dispatcher: GlobalDispatcher,
+    state: GlobalState,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,7 @@ impl GlobalSystem {
         supervisor: SupervisorRef,
         dead_letters: ChildrenRef,
         handle: RecoverableHandle<()>,
+        state: GlobalState,
     ) -> Self {
         let handle = Some(handle);
         let handle = Arc::new(AsyncMutex::new(handle));
@@ -70,6 +73,7 @@ impl GlobalSystem {
             running,
             stopping_cvar,
             dispatcher,
+            state,
         }
     }
 
@@ -95,6 +99,10 @@ impl GlobalSystem {
 
     pub(crate) fn dispatcher(&self) -> &GlobalDispatcher {
         &self.dispatcher
+    }
+
+    pub(crate) fn state(&self) -> GlobalState {
+        self.state.clone()
     }
 
     pub(crate) fn notify_stopped(&self) {
@@ -156,7 +164,13 @@ impl System {
         let dead_letters_ref =
             Self::spawn_dead_letters(&supervisor_ref).expect("Can't spawn dead letters");
 
-        GlobalSystem::new(sender, supervisor_ref, dead_letters_ref, handle)
+        GlobalSystem::new(
+            sender,
+            supervisor_ref,
+            dead_letters_ref,
+            handle,
+            GlobalState::new(),
+        )
     }
 
     fn stack(&self) -> ProcStack {

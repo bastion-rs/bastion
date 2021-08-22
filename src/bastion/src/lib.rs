@@ -79,6 +79,8 @@ pub mod context;
 pub mod dispatcher;
 pub mod envelope;
 pub mod executor;
+pub mod global_state;
+
 #[cfg(not(target_os = "windows"))]
 pub mod io;
 pub mod message;
