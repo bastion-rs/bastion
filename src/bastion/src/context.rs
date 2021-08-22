@@ -6,6 +6,7 @@ use crate::child_ref::ChildRef;
 use crate::children_ref::ChildrenRef;
 use crate::dispatcher::{BroadcastTarget, DispatcherType, NotificationType};
 use crate::envelope::{Envelope, RefAddr, SignedMessage};
+use crate::global_state::GlobalState;
 use crate::message::{Answer, BastionMessage, Message, Msg};
 use crate::supervisor::SupervisorRef;
 use crate::{prelude::ReceiveError, system::SYSTEM};
@@ -815,6 +816,10 @@ impl ContextState {
     #[cfg(feature = "scaling")]
     pub(crate) fn mailbox_size(&self) -> u32 {
         self.messages.len() as _
+    }
+
+    pub fn state(&self) -> GlobalState {
+        SYSTEM.state()
     }
 }
 
