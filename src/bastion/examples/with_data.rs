@@ -6,11 +6,12 @@ async fn child_task(ctx: BastionContext) -> Result<(), ()> {
     loop {
         MessageHandler::new(ctx.recv().await?)
             .on_tell(|_: DummyMessage, _| {
-                ctx.read_data(|child_usize: Option<&usize>| {
-                    let child_usize = child_usize.unwrap();
-
-                    println!("My state says my usize is `{}`", child_usize);
-                })
+                ctx.write_data(|value| {
+                    value.map(|v: &usize| {
+                        println!("My counter is at `{}`. Let's increment it!", v);
+                        v + 1
+                    })
+                });
             })
             .on_fallback(|_, _| panic!("Unhandled message"));
     }
@@ -19,6 +20,10 @@ async fn child_task(ctx: BastionContext) -> Result<(), ()> {
 #[derive(Debug)]
 struct DummyMessage;
 
+// $ cargo r --example with_data
+// My counter is at `42`. Let's increment it!
+// My counter is at `43`. Let's increment it!
+// My counter is at `44`. Let's increment it!
 fn main() {
     env_logger::init();
 
@@ -30,6 +35,8 @@ fn main() {
 
     let child = &children.elems()[0];
 
+    child.tell_anonymously(DummyMessage).unwrap();
+    child.tell_anonymously(DummyMessage).unwrap();
     child.tell_anonymously(DummyMessage).unwrap();
 
     thread::sleep(Duration::from_secs(1));

@@ -778,6 +778,14 @@ impl BastionContext {
     pub fn read_data<T: Send + Sync + 'static, O>(&self, f: impl FnOnce(Option<&T>) -> O) -> O {
         self.state.data.read(|t| f(t))
     }
+
+    // TODO(scrabsha): add doc, document same type collision
+    pub fn write_data<T: std::fmt::Debug + Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(Option<&T>) -> Option<T>,
+    ) {
+        self.state.data.write(f)
+    }
 }
 
 impl ContextState {

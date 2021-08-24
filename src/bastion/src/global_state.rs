@@ -54,9 +54,9 @@ impl GlobalState {
     }
 
     /// Invokes a function with the requested data type.
-    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&mut self, f: F)
+    pub fn write<T: std::fmt::Debug + Send + Sync + 'static, F>(&self, f: F)
     where
-        F: Fn(Option<&T>) -> Option<T>,
+        F: FnOnce(Option<&T>) -> Option<T>,
     {
         let mut hm = self.table.write().unwrap();
         let stuff_to_insert = match hm.entry(TypeId::of::<T>()) {
