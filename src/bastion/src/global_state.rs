@@ -41,12 +41,16 @@ impl GlobalState {
     }
 
     /// Invokes a function with the requested data type.
-    pub fn read<T: Send + Sync + 'static>(&mut self, f: impl FnOnce(Option<&T>)) {
-        self.table
-            .read()
-            .unwrap()
-            .get(&TypeId::of::<T>())
-            .map(|value| f(value.downcast_ref()));
+    pub fn read<T: Send + Sync + 'static, O>(&self, f: impl FnOnce(Option<&T>) -> O) -> O {
+        let table = self.table.read().unwrap();
+
+        let data = table.get(&TypeId::of::<T>()).map(|value| {
+            // This call to unwrap is fine because we always insert data of
+            // type T in the slot of TypeId::of<T>.
+            value.downcast_ref().unwrap()
+        });
+
+        f(data)
     }
 
     /// Invokes a function with the requested data type.
