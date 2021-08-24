@@ -7,6 +7,7 @@ use crate::children_ref::ChildrenRef;
 use crate::context::{BastionContext, BastionId, ContextState};
 use crate::dispatcher::Dispatcher;
 use crate::envelope::Envelope;
+use crate::global_state::GlobalState;
 use crate::message::BastionMessage;
 use crate::path::BastionPathElement;
 #[cfg(feature = "scaling")]
@@ -123,6 +124,8 @@ pub struct Children {
     // Children instance. For example for heartsbeat checks, collecting
     // stats, etc.
     helper_actors: FxHashMap<BastionId, (Sender, RecoverableHandle<()>)>,
+
+    globals: GlobalState,
 }
 
 impl Children {
@@ -141,6 +144,7 @@ impl Children {
         let resizer = Box::new(OptimalSizeExploringResizer::default());
         let hearbeat_tick = Duration::from_secs(60);
         let helper_actors = FxHashMap::default();
+        let global_state = GlobalState::new();
 
         Children {
             bcast,
@@ -157,6 +161,7 @@ impl Children {
             resizer,
             hearbeat_tick,
             helper_actors,
+            globals: global_state,
         }
     }
 
@@ -641,6 +646,12 @@ impl Children {
         self
     }
 
+    // TODO(scrabsha): add doc
+    pub fn with_data<T: Send + Sync + 'static>(mut self, data: T) -> Self {
+        self.globals.insert(data);
+        self
+    }
+
     /// Returns executable code for the actor that will trigger heartbeat
     fn get_heartbeat_fut(&self) -> Init {
         let interval = self.hearbeat_tick;
@@ -805,7 +816,7 @@ impl Children {
 
         debug!("Children({}): Restarting Child({}).", self.id(), bcast.id());
         let callbacks = self.callbacks.clone();
-        let state = Arc::new(Box::pin(ContextState::new()));
+        let state = Arc::new(Box::pin(ContextState::with_globals(self.globals.clone())));
         let child = Child::new(exec, callbacks, bcast, state, child_ref);
         debug!(
             "Children({}): Launching faulted Child({}).",
@@ -1049,7 +1060,7 @@ impl Children {
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
         #[allow(unused_mut)]
-        let mut state = ContextState::new();
+        let mut state = ContextState::with_globals(self.globals.clone());
         #[cfg(feature = "scaling")]
         self.init_data_for_scaling(&mut state);
 
@@ -1102,7 +1113,7 @@ impl Children {
         let children = self.as_ref();
         let supervisor = self.bcast.parent().clone().into_supervisor();
 
-        let state = Arc::new(Box::pin(ContextState::new()));
+        let state = Arc::new(Box::pin(ContextState::with_globals(self.globals.clone())));
 
         let ctx = BastionContext::new(id, child_ref.clone(), children, supervisor, state.clone());
         let init = self.get_heartbeat_fut();

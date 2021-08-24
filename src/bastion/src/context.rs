@@ -148,6 +148,7 @@ pub(crate) struct ContextState {
     stats: Arc<AtomicU64>,
     #[cfg(feature = "scaling")]
     actor_stats: Arc<LOTable<BastionId, u32>>,
+    data: GlobalState,
 }
 
 impl BastionId {
@@ -772,16 +773,22 @@ impl BastionContext {
         let global_dispatcher = SYSTEM.dispatcher();
         global_dispatcher.broadcast_message(target, &msg);
     }
+
+    // TODO(scrabsha): add doc
+    pub fn read_data<T: Send + Sync + 'static, O>(&self, f: impl FnOnce(Option<&T>) -> O) -> O {
+        self.state.data.read(|t| f(t))
+    }
 }
 
 impl ContextState {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn with_globals(globals: GlobalState) -> Self {
         ContextState {
             messages: SegQueue::new(),
             #[cfg(feature = "scaling")]
             stats: Arc::new(AtomicU64::new(0)),
             #[cfg(feature = "scaling")]
             actor_stats: Arc::new(LOTable::new()),
+            data: globals,
         }
     }
 
