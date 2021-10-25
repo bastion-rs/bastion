@@ -85,7 +85,7 @@ thiserror = "1.0.24"
 nuclei = "0.1"
 
 [dev-dependencies]
-env_logger = "0.8"
+env_logger = "0.9"
 proptest = "1.0"
 snap = "1.0"
 # prime_numbers example
