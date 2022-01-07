@@ -5,7 +5,7 @@ name = "bastion-executor"
 # - Update CHANGELOG.md.
 #   - npm install -g auto-changelog && auto-changelog at the root
 # - Create "v0.x.y" git tag at the root of the project.
-version = "0.4.1"
+version = "0.4.2"
 description = "Cache affine NUMA-aware executor for Rust"
 authors = ["Mahmut Bulut <vertexclique@gmail.com>"]
 keywords = ["fault-tolerant", "runtime", "actor", "system"]
@@ -16,9 +16,7 @@ documentation = "https://docs.rs/bastion"
 readme = "README.md"
 license = "Apache-2.0/MIT"
 edition = "2018"
-exclude = [
-	"scripts/*",
-]
+exclude = ["scripts/*"]
 
 [badges]
 travis-ci = { repository = "bastion-rs/bastion", branch = "master" }
@@ -30,8 +28,8 @@ tokio-runtime = ["tokio"]
 
 [dependencies]
 bastion-utils = "0.3.2"
-# lightproc = "0.3"
-lightproc =  { git = "https://github.com/bastion-rs/bastion.git" }
+lightproc = "0.3"
+# lightproc =  { git = "https://github.com/bastion-rs/bastion.git" }
 # lightproc = { path = "../lightproc" }
 # bastion-utils = { path = "../bastion-utils" }
 
@@ -52,13 +50,16 @@ tracing = "0.1.19"
 crossbeam-queue = "0.3.0"
 
 # Feature tokio
-tokio = {version = "1.1", features = ["rt", "rt-multi-thread"], optional = true }
+tokio = { version = "1.1", features = [
+	"rt",
+	"rt-multi-thread",
+], optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "^0.3.8", features = ["basetsd"] }
 
 [dev-dependencies]
-tokio = {version = "1.1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.1", features = ["rt", "rt-multi-thread", "macros"] }
 tokio-test = "0.4.0"
 proptest = "^1.0"
 futures = "0.3.5"
