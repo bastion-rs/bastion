@@ -1,0 +1,17 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: proptest
+    versions:
+    - 1.0.0
+  - dependency-name: arrayvec
+    versions:
+    - 0.5.2
+  - dependency-name: rand
+    versions:
+    - 0.8.3
