@@ -32,19 +32,19 @@ pub struct CoreId {
 
 // Linux Section
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[inline]
 fn get_core_ids_helper() -> Option<Vec<CoreId>> {
     linux::get_core_ids()
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {
     linux::set_for_current(core_id);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux {
     use std::mem;
 
@@ -377,13 +377,13 @@ mod macos {
 
 // Stub Section
 
-#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos", target_os = "android")))]
 #[inline]
 fn get_core_ids_helper() -> Option<Vec<CoreId>> {
     None
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos", target_os = "android")))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {}
 
