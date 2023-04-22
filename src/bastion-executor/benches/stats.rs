@@ -10,7 +10,7 @@ fn stress_stats<S: SmpStats + Sync + Send>(stats: &'static S) {
     let mut handles = Vec::with_capacity(*core_count());
     for core in get_cores() {
         let handle = thread::spawn(move || {
-            placement::set_for_current(*core);
+            unsafe { placement::set_for_current(*core) };
             for i in 0..100 {
                 stats.store_load(core.id, 10);
                 if i % 3 == 0 {
