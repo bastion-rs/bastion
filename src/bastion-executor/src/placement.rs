@@ -17,7 +17,7 @@ pub fn get_num_cores() -> Option<usize> {
 }
 ///
 /// Sets the current threads affinity
-pub fn set_for_current(core_id: CoreId) {
+pub unsafe fn set_for_current(core_id: CoreId) {
     tracing::trace!("Executor: placement: set affinity on core {}", core_id.id);
     set_for_current_helper(core_id);
 }
@@ -41,7 +41,7 @@ fn get_core_ids_helper() -> Option<Vec<CoreId>> {
 #[cfg(target_os = "linux")]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {
-    linux::set_for_current(core_id);
+    unsafe { linux::set_for_current(core_id) };
 }
 
 #[cfg(target_os = "linux")]
@@ -68,7 +68,7 @@ mod linux {
         }
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub unsafe fn set_for_current(core_id: CoreId) {
         // Turn `core_id` into a `libc::cpu_set_t` with only
         // one core active.
         let mut set = new_cpu_set();
@@ -141,7 +141,7 @@ mod linux {
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]);
+            unsafe { set_for_current(ids[0]) };
 
             // Ensure that the system pinned the current thread
             // to the specified core.
@@ -177,7 +177,7 @@ fn get_core_ids_helper() -> Option<Vec<CoreId>> {
 #[cfg(target_os = "windows")]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {
-    windows::set_for_current(core_id);
+    unsafe { windows::set_for_current(core_id);
 }
 
 #[cfg(target_os = "windows")]
@@ -211,7 +211,7 @@ mod windows {
         }
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub unsafe fn set_for_current(core_id: CoreId) {
         // Convert `CoreId` back into mask.
         let mask: DWORD_PTR = 1 << core_id.id;
 
@@ -267,7 +267,7 @@ mod windows {
 
             assert!(ids.len() > 0);
 
-            set_for_current(ids[0]);
+            unsafe { set_for_current(ids[0]) };
         }
     }
 }
@@ -283,7 +283,7 @@ fn get_core_ids_helper() -> Option<Vec<CoreId>> {
 #[cfg(target_os = "macos")]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {
-    macos::set_for_current(core_id);
+    unsafe { macos::set_for_current(core_id) };
 }
 
 #[cfg(target_os = "macos")]
@@ -328,7 +328,7 @@ mod macos {
         )
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub unsafe fn set_for_current(core_id: CoreId) {
         let thread_affinity_policy_count: MachMsgTypeNumberT =
             mem::size_of::<ThreadAffinityPolicyDataT>() as MachMsgTypeNumberT
                 / mem::size_of::<IntegerT>() as MachMsgTypeNumberT;
@@ -370,7 +370,7 @@ mod macos {
 
             assert!(ids.len() > 0);
 
-            set_for_current(ids[0]);
+            unsafe { set_for_current(ids[0]) };
         }
     }
 }
@@ -410,6 +410,6 @@ mod tests {
 
         assert!(!ids.is_empty());
 
-        set_for_current(ids[0]);
+        unsafe { set_for_current(ids[0]) };
     }
 }
